@@ -63,26 +63,41 @@ export const requestedAtColumn = columnHelper.accessor('requestedAt', {
     </Button>
   ),
   // ISO strings sort chronologically, so the alphanumeric sort works as-is.
-  cell: ({ getValue }) => new Date(getValue()).toLocaleDateString('th-TH'),
+  // Explicit units keep seconds out of the displayed time.
+  cell: ({ getValue }) =>
+    new Date(getValue()).toLocaleString('th-TH', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
 })
+
+// Shared header for both action columns: the inner div beats the th's
+// text-left default so the label centers over the column content.
+export const actionsHeader = <div className="text-center">จัดการ</div>
 
 const actionsColumn = columnHelper.display({
   id: 'actions',
-  header: 'จัดการ',
+  // Renderer function: TanStack's header type rejects a bare Element.
+  header: () => actionsHeader,
   cell: () => (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" className="h-8 w-8 p-0" />}
-      >
-        <MoreHorizontalIcon className="h-4 w-4" />
-        <span className="sr-only">เปิดเมนู</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>การดำเนินการ</DropdownMenuLabel>
-        {/* TODO: wire revoke access to the backend API when it exists. */}
-        <DropdownMenuItem variant="destructive">เพิกถอนสิทธิ์</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex justify-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" className="h-8 w-8 p-0" />}
+        >
+          <MoreHorizontalIcon className="h-4 w-4" />
+          <span className="sr-only">เปิดเมนู</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>การดำเนินการ</DropdownMenuLabel>
+          {/* TODO: wire revoke access to the backend API when it exists. */}
+          <DropdownMenuItem variant="destructive">เพิกถอนสิทธิ์</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   ),
 })
 

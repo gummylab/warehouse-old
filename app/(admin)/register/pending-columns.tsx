@@ -5,7 +5,7 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
 import { Button } from '@/components/ui/button'
 
-import { profileColumn, requestedAtColumn, type RegisterUser } from './columns'
+import { actionsHeader, profileColumn, requestedAtColumn, type RegisterUser } from './columns'
 
 const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
 
@@ -17,9 +17,9 @@ export const pendingColumns = columnHelper.columns([
   requestedAtColumn,
   columnHelper.display({
     id: 'actions',
-    header: 'จัดการ',
+    header: () => actionsHeader,
     cell: () => (
-      <div className="flex gap-2">
+      <div className="flex justify-center gap-2">
         {/* TODO: wire approve to the backend API when it exists. */}
         <Button size="sm">อนุมัติ</Button>
         {/* TODO: wire reject to the backend API when it exists. */}

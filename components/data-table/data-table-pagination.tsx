@@ -7,23 +7,15 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 import { type DataTableFeatures } from './data-table-features'
-
-const PAGE_SIZES = [10, 20, 25, 50]
 
 interface DataTablePaginationProps<TData extends RowData> {
   table: ReactTable<DataTableFeatures, TData>
 }
 
-// Footer controls: total rows, rows per page, and page navigation.
+// Footer controls: total rows and page navigation. Page size is fixed in
+// DataTable's initial state, so there is no rows-per-page selector here.
 // Shared by every data table so the pagination UI stays consistent.
 export function DataTablePagination<TData extends RowData>({
   table,
@@ -34,24 +26,6 @@ export function DataTablePagination<TData extends RowData>({
         {table.getFilteredRowModel().rows.length} แถว
       </div>
       <div className="flex items-center space-x-6 lg:space-x-8">
-        <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">แถวต่อหน้า</p>
-          <Select
-            value={String(table.state.pagination.pageSize)}
-            onValueChange={(value) => table.setPageSize(Number(value))}
-          >
-            <SelectTrigger size="sm" className="h-8 w-[70px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {PAGE_SIZES.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         <div className="flex w-[100px] items-center justify-center text-sm font-medium">
           หน้า {table.state.pagination.pageIndex + 1} จาก {table.getPageCount()}
         </div>

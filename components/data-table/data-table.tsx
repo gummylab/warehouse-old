@@ -40,6 +40,11 @@ export function DataTable<TData extends RowData>({ columns, data, searchColumn, 
       sorting,
       columnFilters,
     },
+    // Fixed at 50 rows per page: the rows-per-page selector was removed
+    // on purpose, so there is no reason to keep this state dynamic.
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 50 },
+    },
   })
 
   return (
@@ -60,8 +65,10 @@ export function DataTable<TData extends RowData>({ columns, data, searchColumn, 
         </div>
       )}
       {/* flex-1 fills the leftover height; the data-slot variant passes h-full
-          down to shadcn's wrapper div, which className on <Table> cannot reach. */}
-      <div className="flex-1 overflow-hidden rounded-md border [&>[data-slot=table-container]]:h-full">
+          down to shadcn's wrapper div, which className on <Table> cannot reach.
+          h-full makes the table distribute spare height across rows, so cells
+          get align-top! to pin content up top instead of floating mid-row. */}
+      <div className="flex-1 overflow-hidden rounded-md border *:data-[slot=table-container]:h-full">
         <Table className="h-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -82,7 +89,7 @@ export function DataTable<TData extends RowData>({ columns, data, searchColumn, 
                       column-visibility feature is not registered, so no column
                       can be hidden and every cell renders. */}
                   {row.getAllCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="align-top!">
                       <table.FlexRender cell={cell} />
                     </TableCell>
                   ))}
