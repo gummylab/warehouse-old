@@ -1,0 +1,94 @@
+'use client'
+
+import { createColumnHelper } from '@tanstack/react-table'
+import { ArrowUpDownIcon, MoreHorizontalIcon } from 'lucide-react'
+
+import { type DataTableFeatures } from '@/components/data-table/data-table-features'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+
+import { UserAvatar } from './user-avatar'
+
+// A LINE user who requested access through the LIFF authorization page.
+// The main table shows approved users only; pending ones live in the dialog.
+export type RegisterUser = {
+  id: string
+  displayName: string
+  // LINE picture URL; absent falls back to the first letter of the name.
+  avatarUrl?: string
+  status: 'pending' | 'approved' | 'rejected'
+  // ISO 8601. Stored as a string so server and client formats never clash.
+  requestedAt: string
+}
+
+const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
+
+// Shared with the pending queue table so both tabs render identity and
+// request dates identically.
+export const profileColumn = columnHelper.accessor('displayName', {
+  header: ({ column }) => (
+    <Button
+      variant="ghost"
+      onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+    >
+      โปรไฟล์
+      <ArrowUpDownIcon className="ml-2 h-4 w-4" />
+    </Button>
+  ),
+  cell: ({ row, getValue }) => (
+    <div className="flex items-center gap-3">
+      <UserAvatar
+        displayName={row.original.displayName}
+        avatarUrl={row.original.avatarUrl}
+      />
+      <span>{getValue()}</span>
+    </div>
+  ),
+})
+
+export const requestedAtColumn = columnHelper.accessor('requestedAt', {
+  header: ({ column }) => (
+    <Button
+      variant="ghost"
+      onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+    >
+      วันที่ขอ
+      <ArrowUpDownIcon className="ml-2 h-4 w-4" />
+    </Button>
+  ),
+  // ISO strings sort chronologically, so the alphanumeric sort works as-is.
+  cell: ({ getValue }) => new Date(getValue()).toLocaleDateString('th-TH'),
+})
+
+const actionsColumn = columnHelper.display({
+  id: 'actions',
+  header: 'จัดการ',
+  cell: () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" className="h-8 w-8 p-0" />}
+      >
+        <MoreHorizontalIcon className="h-4 w-4" />
+        <span className="sr-only">เปิดเมนู</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>การดำเนินการ</DropdownMenuLabel>
+        {/* TODO: wire revoke access to the backend API when it exists. */}
+        <DropdownMenuItem variant="destructive">เพิกถอนสิทธิ์</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+})
+
+// Approved users table: profile + request date + revoke action.
+export const columns = columnHelper.columns([
+  profileColumn,
+  requestedAtColumn,
+  actionsColumn,
+])

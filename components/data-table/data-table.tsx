@@ -1,0 +1,104 @@
+'use client'
+
+import {
+  useTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type RowData,
+  type SortingState,
+} from '@tanstack/react-table'
+import * as React from 'react'
+
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+import { features, type DataTableFeatures } from './data-table-features'
+import { DataTablePagination } from './data-table-pagination'
+
+interface DataTableProps<TData extends RowData> {
+  columns: ColumnDef<DataTableFeatures, TData>[]
+  data: TData[]
+  /** Column id wired to the search box. Omit the prop to hide the search box. */
+  searchColumn?: string
+  /** Rendered at the right end of the search row (e.g. a view switcher). */
+  searchSlot?: React.ReactNode
+}
+
+// Reusable data table: search box + table + pagination. Pages only pass their
+// own columns and data; sorting/filtering/pagination state lives here.
+export function DataTable<TData extends RowData>({ columns, data, searchColumn, searchSlot }: DataTableProps<TData>) {
+  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+
+  const table = useTable({
+    features,
+    data,
+    columns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    state: {
+      sorting,
+      columnFilters,
+    },
+  })
+
+  return (
+    // flex-1 lets the page stretch the table to the viewport bottom; pages
+    // must wrap it in a flex column for that to take effect.
+    <div className="flex flex-1 flex-col gap-y-4">
+      {(searchColumn || searchSlot) && (
+        <div className="flex items-center justify-between gap-4">
+          {searchColumn && (
+            <Input
+              placeholder="ค้นหา..."
+              value={(table.getColumn(searchColumn)?.getFilterValue() as string) ?? ''}
+              onChange={(event) => table.getColumn(searchColumn)?.setFilterValue(event.target.value)}
+              className="max-w-sm"
+            />
+          )}
+          {searchSlot}
+        </div>
+      )}
+      {/* flex-1 fills the leftover height; the data-slot variant passes h-full
+          down to shadcn's wrapper div, which className on <Table> cannot reach. */}
+      <div className="flex-1 overflow-hidden rounded-md border [&>[data-slot=table-container]]:h-full">
+        <Table className="h-full">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {/* getAllCells (core) instead of getVisibleCells: the
+                      column-visibility feature is not registered, so no column
+                      can be hidden and every cell renders. */}
+                  {row.getAllCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      <table.FlexRender cell={cell} />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  ไม่พบข้อมูล
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <DataTablePagination table={table} />
+    </div>
+  )
+}
