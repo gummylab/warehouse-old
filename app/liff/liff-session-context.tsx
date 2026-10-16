@@ -1,0 +1,202 @@
+'use client'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react'
+import liff from '@line/liff'
+
+// Inlined at build time by Next; the server verify helper answers 503 when
+// it is missing.
+const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID
+
+// No SDK or network step may hang forever: init and both API calls each get
+// a deadline, and every terminal path sets a state. The POST deadline stays
+// larger than the server's VERIFY_TIMEOUT_MS (20s) so a slow LINE verify
+// surfaces as a server result, not a client timeout.
+const INIT_TIMEOUT_MS = 15_000
+const POST_TIMEOUT_MS = 25_000
+
+// Where bootstrap stopped. Rendered only in development (a phone has no
+// console), so a stuck test on a device is still diagnosable.
+export type LiffStage = 'init-failed' | 'init-timeout' | 'api'
+
+// Who the LINE-verified server says is opening this app.
+export type LiffStatus =
+  | 'unconfigured'
+  | 'loading'
+  | 'error'
+  | 'outside-line'
+  | 'none'
+  | 'pending'
+  | 'approved'
+
+export type LiffToken = { value: string; type: 'idToken' | 'accessToken' }
+
+export type LiffSessionState = {
+  status: LiffStatus
+  stage: LiffStage | null
+  // Token for /api/liff calls; set once LINE issued one, even when the
+  // status call that follows fails (so a retry can reuse it).
+  token: LiffToken | null
+}
+
+type LiffSessionContextValue = LiffSessionState & {
+  // Re-runs the whole bootstrap; the error notices offer it as retry.
+  retry: () => void
+  // Applies a status the server just reported (the request endpoint's
+  // answer), so the authorization screen flips to "pending" without a
+  // second status round-trip.
+  applyStatus: (next: Extract<LiffStatus, 'none' | 'pending' | 'approved'>) => void
+}
+
+// The session is resolved once per page load and shared by every page under
+// /liff through this context; identity itself is verified server-side, the
+// browser only forwards the token (ADR 0003).
+const LiffSessionContext = createContext<LiffSessionContextValue | null>(null)
+
+export function LiffSessionProvider({ children }: { children: React.ReactNode }) {
+  // Unconfigured is known at first render, so it seeds the state instead of
+  // being set inside the effect (which would be a synchronous setState).
+  const [session, setSession] = useState<LiffSessionState>(() =>
+    LIFF_ID
+      ? { status: 'loading', stage: null, token: null }
+      : { status: 'unconfigured', stage: null, token: null },
+  )
+  const [run, setRun] = useState(0)
+
+  const retry = useCallback(() => {
+    if (!LIFF_ID) return
+    // Drop the cached boot so a rejected init can actually be retried.
+    bootPromise = null
+    setSession({ status: 'loading', stage: null, token: null })
+    setRun((n) => n + 1)
+  }, [])
+
+  const applyStatus = useCallback(
+    (next: Extract<LiffStatus, 'none' | 'pending' | 'approved'>) => {
+      setSession((prev) => ({ ...prev, status: next }))
+    },
+    [],
+  )
+
+  // Bootstrap: LIFF init is an external system, so it belongs in an effect.
+  // Every setState sits in a .then or setTimeout callback, never in the
+  // effect body (react-hooks/set-state-in-effect).
+  useEffect(() => {
+    if (!LIFF_ID) return
+    let cancelled = false
+
+    Promise.race([bootFromLiff(LIFF_ID), timeoutBoot()])
+      .then((boot) => {
+        if (cancelled) return
+        if (boot.phase === 'timeout') {
+          setSession({ status: 'error', stage: 'init-timeout', token: null })
+          return
+        }
+        if (boot.phase === 'no-token') {
+          // LINE has no session for this LIFF app yet; ask for a login.
+          // Inside LINE this navigates away. If we are still here a second
+          // later, the redirect did not happen, so say what to do instead
+          // of hanging on the loading screen.
+          liff.login()
+          setTimeout(() => {
+            if (!cancelled) setSession({ status: 'outside-line', stage: null, token: null })
+          }, 1000)
+          return
+        }
+        return postJson('/api/liff/status', boot.token).then((data) => {
+          if (cancelled) return
+          if (!data) {
+            setSession({ status: 'error', stage: 'api', token: boot.token })
+            return
+          }
+          setSession({ status: statusFrom(data.status), stage: null, token: boot.token })
+        })
+      })
+      .catch(() => {
+        // liff.init rejected: bad LIFF id, network failure, unsupported
+        // browser. postJson never throws, so this catch is init only.
+        if (!cancelled) setSession({ status: 'error', stage: 'init-failed', token: null })
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [run])
+
+  return (
+    <LiffSessionContext.Provider value={{ ...session, retry, applyStatus }}>
+      {children}
+    </LiffSessionContext.Provider>
+  )
+}
+
+export function useLiffSession(): LiffSessionContextValue {
+  const value = useContext(LiffSessionContext)
+  if (!value) {
+    throw new Error('useLiffSession must be used inside LiffSessionProvider')
+  }
+  return value
+}
+
+// Shared POST helper for the /api/liff endpoints: returns the parsed JSON
+// body or null on any failure (network, timeout, non-2xx), so callers map
+// "no data" onto the error notice without special cases.
+export async function postJson(
+  path: string,
+  token: LiffToken,
+): Promise<{ status?: string } | null> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token.value, tokenType: token.type }),
+    signal: AbortSignal.timeout(POST_TIMEOUT_MS),
+  }).catch(() => null)
+  if (!response?.ok) return null
+  return response.json().catch(() => null)
+}
+
+// Reads the LINE session once init has settled: a token when LINE knows
+// this user, otherwise "no-token" (this LIFF app has no login session yet).
+// The shared promise keeps StrictMode's double effect mount (dev) from
+// calling liff.init twice, which the SDK warns about.
+let bootPromise: Promise<void> | null = null
+
+function bootFromLiff(liffId: string): Promise<Boot> {
+  bootPromise ??= liff.init({ liffId })
+  return bootPromise.then((): Boot => {
+    const idToken = liff.getIDToken()
+    if (idToken) {
+      return { phase: 'token', token: { value: idToken, type: 'idToken' } }
+    }
+    const accessToken = liff.getAccessToken()
+    if (accessToken) {
+      return { phase: 'token', token: { value: accessToken, type: 'accessToken' } }
+    }
+    return { phase: 'no-token' }
+  })
+}
+
+// Boot outcome once liff.init settles (or its deadline expires).
+type Boot =
+  | { phase: 'timeout' }
+  | { phase: 'no-token' }
+  | { phase: 'token'; token: LiffToken }
+
+// Resolves when init takes too long; Promise.race turns a hanging SDK into
+// a visible error state instead of an eternal loading screen.
+function timeoutBoot(): Promise<Boot> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve({ phase: 'timeout' }), INIT_TIMEOUT_MS)
+  })
+}
+
+function statusFrom(value: string | undefined): LiffStatus {
+  if (value === 'pending') return 'pending'
+  if (value === 'approved') return 'approved'
+  return 'none'
+}

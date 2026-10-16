@@ -26,7 +26,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={cn('h-full', 'antialiased', 'font-sans', kanit.variable)}>
+    // LINE's in-app browser injects safe-area CSS variables into <html>
+    // before React hydrates; suppress the resulting attribute mismatch
+    // (React's recommended fix for third-party DOM mutation).
+    <html
+      lang="en"
+      className={cn('h-full', 'antialiased', 'font-sans', kanit.variable)}
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col">
         <TooltipProvider>{children}</TooltipProvider>
       </body>

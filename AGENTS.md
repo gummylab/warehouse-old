@@ -24,9 +24,13 @@ No test runner and no typecheck script exist. For types run `bunx tsc --noEmit` 
 
 ## Gotchas
 
+- The dev server is the user's: never start `bun run dev` / `dev:tunnel` yourself, never kill port 8080 unless asked, and only `curl` against a server the user already started.
+- The `/liff` root redirect (307 to `/liff/authorization`) lives in `next.config.ts` `redirects()`, not in an `app/liff/page.tsx`: `redirect()` in a page logs "Could not validate `instant`" under cacheComponents (seen on Next 16.4).
+- New pages under `/liff` (any route besides `/liff/authorization`) need `export const instant = false`: the LIFF gate in the layout withholds children until the LINE session resolves, so instant-navigation validation drops the segment and logs an error. `/liff/authorization` is exempt because the gate always renders it.
 - Public exposure: the tunnel's public hostname serves only `/liff*`, `/_next/*` and `/favicon.ico`; every other path returns 403 from a Cloudflare WAF allowlist rule (dashboard, not code, see `docs/adr/0001-liff-only-public-exposure.md`). Admin pages are local-only by design. Exposing a new public path means editing the rule at Cloudflare, never repo code.
 - Duplicate route crash: two pages resolving to one path kill dev with "You cannot have two parallel pages...". When moving a page into a route group, delete the original file in the same change.
 - shadcn here uses style `base-luma` = Base UI, not Radix. Compose components with the `render` prop (`render={<Link href="..." />}`), there is no `asChild`.
+- Base UI `Button` renders `type="button"` by default (unlike native HTML), so inside a `<form action={serverAction}>` it will silently do nothing — pass `type="submit"` explicitly.
 - `cn` comes from the `cn` package; `lib/utils.ts` just re-exports it. Both `import { cn } from 'cn'` and `from '@/lib/utils'` appear in existing files.
 - Tailwind v4 is wired through a Turbopack loader rule in `next.config.ts` (`cacheComponents` and `partialPrefetching` are enabled). Do not look for `tailwind.config`.
 - `tunnel.ts` deliberately drops most cloudflared log lines to keep the tunnel token and noise out of logs. Keep the filtering when editing it.

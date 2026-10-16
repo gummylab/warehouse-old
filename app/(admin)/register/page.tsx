@@ -1,21 +1,38 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 
+import { listUsers } from '@/lib/db/users'
 import { PAGE_TITLES } from '@/lib/page-titles'
 
-import { type RegisterUser } from './columns'
-import { mockUsers } from './mock-users'
 import { RegisterView } from './register-view'
 
 export const metadata: Metadata = {
   title: PAGE_TITLES['/register'],
 }
 
-// No backend yet: mock data stands in for the real fetch. When the user API
-// exists, replace `mockUsers` with it and the status split keeps working.
-const users: RegisterUser[] = mockUsers
-const approvedUsers = users.filter((user) => user.status === 'approved')
-const pendingUsers = users.filter((user) => user.status === 'pending')
-
 export default function RegisterPage() {
+  // The queue read suspends (io() in listUsers). cacheComponents refuses to
+  // prerender a route that suspends without a boundary, so the table gets
+  // its own Suspense: the shell renders immediately and the rows stream in.
+  return (
+    <Suspense fallback={<RegisterFallback />}>
+      <RegisterUsers />
+    </Suspense>
+  )
+}
+
+async function RegisterUsers() {
+  const users = await listUsers()
+  const approvedUsers = users.filter((user) => user.status === 'approved')
+  const pendingUsers = users.filter((user) => user.status === 'pending')
+
   return <RegisterView approvedUsers={approvedUsers} pendingUsers={pendingUsers} />
+}
+
+function RegisterFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center text-muted-foreground">
+      กำลังโหลด...
+    </div>
+  )
 }

@@ -12,20 +12,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { type RegisterUser } from '@/lib/db/users'
 
 import { UserAvatar } from './user-avatar'
-
-// A LINE user who requested access through the LIFF authorization page.
-// The main table shows approved users only; pending ones live in the dialog.
-export type RegisterUser = {
-  id: string
-  displayName: string
-  // LINE picture URL; absent falls back to the first letter of the name.
-  avatarUrl?: string
-  status: 'pending' | 'approved' | 'rejected'
-  // ISO 8601. Stored as a string so server and client formats never clash.
-  requestedAt: string
-}
 
 const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
 

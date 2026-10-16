@@ -4,6 +4,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/order-images': 'จัดการรูปภาพออเดอร์',
   '/register': 'จัดการผู้ใช้',
   '/liff/authorization': 'ตรวจสอบสิทธิ์การใช้งาน',
+  '/liff/forms': 'แบบฟอร์ม',
 }
 
 // Resolve a pathname to its plain-text title, with decoded fallback.

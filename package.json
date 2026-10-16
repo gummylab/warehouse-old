@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@line/liff": "^2.31.2",
     "@tanstack/react-table": "^9.3.1",
+    "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "cloudflared": "^0.7.3",
     "cn": "^0.4.0",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/bun": "^1.4.3",
     "@types/node": "^20",
     "@types/react": "^19",

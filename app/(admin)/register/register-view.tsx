@@ -4,8 +4,9 @@ import { useState } from 'react'
 
 import { DataTable } from '@/components/data-table/data-table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { type RegisterUser } from '@/lib/db/users'
 
-import { columns, type RegisterUser } from './columns'
+import { columns } from './columns'
 import { pendingColumns } from './pending-columns'
 
 interface RegisterViewProps {
