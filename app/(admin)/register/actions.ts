@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
-import { approvePendingUser, deletePendingUser } from '@/lib/db/users'
+import { approvePendingUser, deleteApprovedUser, deletePendingUser } from '@/lib/db/users'
 
 // Server action result: null on success, otherwise an error message (Thai,
 // rendered next to the button) shown when the write did not apply.
@@ -23,6 +23,18 @@ export async function rejectUser(id: string): Promise<DecideActionState> {
   const deleted = deletePendingUser(id)
   if (!deleted) {
     return { error: 'ไม่พบคำขอนี้ หรือดำเนินการไปแล้ว ลองรีเฟรชหน้าอีกครั้ง' }
+  }
+  revalidatePath('/register')
+  return null
+}
+
+// Revoking deletes the approved row; the user must request access again
+// through LIFF before using the system. The client only reaches this after
+// its confirm dialog.
+export async function revokeUser(id: string): Promise<DecideActionState> {
+  const deleted = deleteApprovedUser(id)
+  if (!deleted) {
+    return { error: 'ไม่พบผู้ใช้นี้ หรือเพิกถอนไปแล้ว ลองรีเฟรชหน้าอีกครั้ง' }
   }
   revalidatePath('/register')
   return null

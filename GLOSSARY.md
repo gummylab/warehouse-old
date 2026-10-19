@@ -27,3 +27,7 @@ _Avoid_: Pending list, pending dialog
 **LIFF**:
 The area under `/liff` that LINE users open from inside LINE (authorization screen, forms, ...); the only part of the app exposed to the public internet (ADR 0001). The layout gate resolves the session once per load and steers non-approved users to the authorization screen.
 _Avoid_: /liff/api (the API lives under /api/liff)
+
+**Local device mode**:
+When `/liff` opens on the machine running the server: the request never passed through Cloudflare and names the loopback host, so the server answers `approved` without LINE and without a users row; a banner marks these pages (ADR 0004).
+_Avoid_: dev bypass, localhost mock, local user

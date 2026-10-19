@@ -1,19 +1,13 @@
 'use client'
 
 import { createColumnHelper } from '@tanstack/react-table'
-import { ArrowUpDownIcon, MoreHorizontalIcon } from 'lucide-react'
+import { ArrowUpDownIcon } from 'lucide-react'
 
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { type RegisterUser } from '@/lib/db/users'
 
+import { RevokeButton } from './revoke-button'
 import { UserAvatar } from './user-avatar'
 
 const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
@@ -71,21 +65,12 @@ const actionsColumn = columnHelper.display({
   id: 'actions',
   // Renderer function: TanStack's header type rejects a bare Element.
   header: () => actionsHeader,
-  cell: () => (
+  cell: ({ row }) => (
     <div className="flex justify-center">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={<Button variant="ghost" className="h-8 w-8 p-0" />}
-        >
-          <MoreHorizontalIcon className="h-4 w-4" />
-          <span className="sr-only">เปิดเมนู</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>การดำเนินการ</DropdownMenuLabel>
-          {/* TODO: wire revoke access to the backend API when it exists. */}
-          <DropdownMenuItem variant="destructive">เพิกถอนสิทธิ์</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Single action per row: a direct button beats a dropdown (one click,
+          same rule the pending queue follows); the confirm dialog lives in
+          the button. */}
+      <RevokeButton id={row.original.id} displayName={row.original.displayName} />
     </div>
   ),
 })

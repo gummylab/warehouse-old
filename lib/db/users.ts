@@ -104,6 +104,17 @@ export function deletePendingUser(id: string): boolean {
   return result.changes > 0
 }
 
+// Revoking access deletes the approved row outright, with the same storage
+// trade-off as reject (ADR 0003): the user simply sees the request button
+// again on their next LIFF visit. Guarded by status so the queue path
+// (deletePendingUser) can never delete an approved row and vice versa.
+export function deleteApprovedUser(id: string): boolean {
+  const result = getDb()
+    .prepare("DELETE FROM users WHERE id = ? AND status = 'approved'")
+    .run(id)
+  return result.changes > 0
+}
+
 function toRegisterUser(row: UserRow): RegisterUser {
   return {
     id: row.id,

@@ -35,6 +35,7 @@ No test runner and no typecheck script exist. For types run `bunx tsc --noEmit` 
 - Tailwind v4 is wired through a Turbopack loader rule in `next.config.ts` (`cacheComponents` and `partialPrefetching` are enabled). Do not look for `tailwind.config`.
 - `tunnel.ts` deliberately drops most cloudflared log lines to keep the tunnel token and noise out of logs. Keep the filtering when editing it.
 - `.env` is gitignored and holds a real tunnel token. Never commit it or echo it in scripts.
+- Local device mode (ADR 0004): opening `/liff` on `localhost` skips LINE. The server trusts requests with no `CF-Connecting-IP` header plus a loopback `Host`, and the browser skips `liff.init` when `location.hostname` is loopback. `dev`/`start:next` bind `127.0.0.1`, which is what makes the `Host` half of that check hold; do not drop `--hostname 127.0.0.1`.
 - README is untouched create-next-app boilerplate (claims port 3000); trust `package.json`.
 
 <!-- BEGIN:nextjs-agent-rules -->

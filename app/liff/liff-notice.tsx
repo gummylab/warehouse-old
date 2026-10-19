@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 
+import LoadingPage from '@/components/LoadingPage'
 import type { LiffStage, LiffStatus } from './liff-session-context'
 
 // Copy for every non-actionable LIFF session state, shared by the layout
@@ -17,7 +18,7 @@ export function LiffNotice({
 }) {
   switch (status) {
     case 'loading':
-      return <p className="text-muted-foreground">กำลังโหลด...</p>
+      return <LoadingPage text="กำลังโหลด..." />
     case 'unconfigured':
       return <p className="text-destructive">ยังไม่ได้ตั้งค่า LIFF ID</p>
     case 'outside-line':
@@ -26,9 +27,7 @@ export function LiffNotice({
       return (
         <div className="flex flex-col items-center gap-3">
           <p className="text-destructive">เกิดข้อผิดพลาด กรุณาลองใหม่</p>
-          {process.env.NODE_ENV === 'development' && stage && (
-            <p className="text-muted-foreground text-xs">{stage}</p>
-          )}
+          {process.env.NODE_ENV === 'development' && stage && <p className="text-muted-foreground text-xs">{stage}</p>}
           <Button variant="outline" onClick={onRetry}>
             ลองใหม่
           </Button>

@@ -9,6 +9,8 @@ import {
 } from 'react'
 import liff from '@line/liff'
 
+import { isLocalDeviceBrowser } from '@/lib/liff/local-device'
+
 // Inlined at build time by Next; the server verify helper answers 503 when
 // it is missing.
 const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID
@@ -38,6 +40,9 @@ export type LiffToken = { value: string; type: 'idToken' | 'accessToken' }
 
 export type LiffSessionState = {
   status: LiffStatus
+  // Where the session was resolved: LINE verification, or the local device
+  // shortcut that skips LINE entirely (ADR 0004). Drives the banner.
+  mode: 'line' | 'local'
   stage: LiffStage | null
   // Token for /api/liff calls; set once LINE issued one, even when the
   // status call that follows fails (so a retry can reuse it).
@@ -63,16 +68,17 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
   // being set inside the effect (which would be a synchronous setState).
   const [session, setSession] = useState<LiffSessionState>(() =>
     LIFF_ID
-      ? { status: 'loading', stage: null, token: null }
-      : { status: 'unconfigured', stage: null, token: null },
+      ? { status: 'loading', mode: 'line', stage: null, token: null }
+      : { status: 'unconfigured', mode: 'line', stage: null, token: null },
   )
   const [run, setRun] = useState(0)
 
   const retry = useCallback(() => {
-    if (!LIFF_ID) return
+    // Local device mode needs no LIFF config to boot (ADR 0004).
+    if (!LIFF_ID && !isLocalDeviceBrowser()) return
     // Drop the cached boot so a rejected init can actually be retried.
     bootPromise = null
-    setSession({ status: 'loading', stage: null, token: null })
+    setSession({ status: 'loading', mode: 'line', stage: null, token: null })
     setRun((n) => n + 1)
   }, [])
 
@@ -87,14 +93,39 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
   // Every setState sits in a .then or setTimeout callback, never in the
   // effect body (react-hooks/set-state-in-effect).
   useEffect(() => {
-    if (!LIFF_ID) return
     let cancelled = false
+
+    // Local device (ADR 0004): skip the SDK entirely, because there is no
+    // LINE session on this machine. The POST asks for the status the same
+    // way a phone would; the server recognizes the machine from the request
+    // headers alone and answers approved without a token. Runs before the
+    // LIFF_ID guard because local mode needs no LIFF configuration.
+    if (isLocalDeviceBrowser()) {
+      postJson('/api/liff/status', null).then((data) => {
+        if (cancelled) return
+        if (!data) {
+          setSession({ status: 'error', mode: 'local', stage: 'api', token: null })
+          return
+        }
+        setSession({
+          status: statusFrom(data.status),
+          mode: data.mode === 'local' ? 'local' : 'line',
+          stage: null,
+          token: null,
+        })
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (!LIFF_ID) return
 
     Promise.race([bootFromLiff(LIFF_ID), timeoutBoot()])
       .then((boot) => {
         if (cancelled) return
         if (boot.phase === 'timeout') {
-          setSession({ status: 'error', stage: 'init-timeout', token: null })
+          setSession({ status: 'error', mode: 'line', stage: 'init-timeout', token: null })
           return
         }
         if (boot.phase === 'no-token') {
@@ -104,23 +135,30 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
           // of hanging on the loading screen.
           liff.login()
           setTimeout(() => {
-            if (!cancelled) setSession({ status: 'outside-line', stage: null, token: null })
+            if (!cancelled)
+              setSession({ status: 'outside-line', mode: 'line', stage: null, token: null })
           }, 1000)
           return
         }
         return postJson('/api/liff/status', boot.token).then((data) => {
           if (cancelled) return
           if (!data) {
-            setSession({ status: 'error', stage: 'api', token: boot.token })
+            setSession({ status: 'error', mode: 'line', stage: 'api', token: boot.token })
             return
           }
-          setSession({ status: statusFrom(data.status), stage: null, token: boot.token })
+          setSession({
+            status: statusFrom(data.status),
+            mode: 'line',
+            stage: null,
+            token: boot.token,
+          })
         })
       })
       .catch(() => {
         // liff.init rejected: bad LIFF id, network failure, unsupported
         // browser. postJson never throws, so this catch is init only.
-        if (!cancelled) setSession({ status: 'error', stage: 'init-failed', token: null })
+        if (!cancelled)
+          setSession({ status: 'error', mode: 'line', stage: 'init-failed', token: null })
       })
 
     return () => {
@@ -148,12 +186,14 @@ export function useLiffSession(): LiffSessionContextValue {
 // "no data" onto the error notice without special cases.
 export async function postJson(
   path: string,
-  token: LiffToken,
-): Promise<{ status?: string } | null> {
+  // null token: the local device status call. The server decides from the
+  // request headers, not from a token (ADR 0004), so the body stays empty.
+  token: LiffToken | null,
+): Promise<{ status?: string; mode?: string } | null> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: token.value, tokenType: token.type }),
+    body: JSON.stringify(token ? { token: token.value, tokenType: token.type } : {}),
     signal: AbortSignal.timeout(POST_TIMEOUT_MS),
   }).catch(() => null)
   if (!response?.ok) return null
