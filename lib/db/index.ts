@@ -23,6 +23,69 @@ const SCHEMA = `
   -- predate LIFF identity.
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_line_user_id
     ON users (line_user_id);
+
+  -- Order-image form (feature /liff/form/order-image): catalog of production
+  -- lines the form dropdown offers. Only seeded when empty, so a future
+  -- admin edit survives restarts.
+  CREATE TABLE IF NOT EXISTS lines (
+    name TEXT PRIMARY KEY
+  );
+
+  -- order_date is the Bangkok calendar date as plain 'YYYY-MM-DD' text: no
+  -- timezone math anywhere downstream (storage key, unique constraint, Thai
+  -- display all reuse the string). created_by stores the LINE user id or
+  -- 'local-device' (ADR 0004) and deliberately has no FK to users: revoking
+  -- deletes the users row (ADR 0003) and order history must survive it.
+  CREATE TABLE IF NOT EXISTS orders (
+    id           TEXT PRIMARY KEY,
+    order_number TEXT NOT NULL,
+    order_date   TEXT NOT NULL,
+    line         TEXT NOT NULL,
+    created_by   TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+  );
+  -- Order identity = number + date; a line change must not fork the order.
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_number_date
+    ON orders (order_number, order_date);
+  CREATE INDEX IF NOT EXISTS idx_orders_order_number
+    ON orders (order_number);
+  CREATE INDEX IF NOT EXISTS idx_orders_line ON orders (line);
+
+  -- Items self-reference for varieties (110-190 under parent 100); the
+  -- database allows any depth but the form only ever creates depth 2.
+  CREATE TABLE IF NOT EXISTS items (
+    id             TEXT PRIMARY KEY,
+    order_id       TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    parent_item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+    item_number    INTEGER NOT NULL,
+    created_by     TEXT NOT NULL,
+    created_at     TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_items_order_number
+    ON items (order_id, item_number);
+  CREATE INDEX IF NOT EXISTS idx_items_parent ON items (parent_item_id);
+
+  -- package stays NULL until someone labels the photo; filenames fall back
+  -- to 'Primary' like the old chat flow did. seq restarts per item.
+  CREATE TABLE IF NOT EXISTS images (
+    id          TEXT PRIMARY KEY,
+    item_id     TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    order_id    TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    seq         INTEGER NOT NULL,
+    package     TEXT
+                CHECK (package IS NULL
+                       OR package IN ('Primary', 'Inner Box', 'Sleeve Box',
+                                      'Tray', 'Carton')),
+    file_name   TEXT,
+    mime_type   TEXT,
+    file_size   INTEGER,
+    storage_key TEXT NOT NULL,
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_images_item_seq
+    ON images (item_id, seq);
+  CREATE INDEX IF NOT EXISTS idx_images_order ON images (order_id);
 `
 
 type GlobalWithDb = typeof globalThis & { __whDb?: Database.Database }
@@ -45,9 +108,12 @@ function openDatabase(): Database.Database {
 
   const db = new Database(join(directory, 'wh.db'))
   // WAL lets admin reads run while an action writes; busy_timeout absorbs
-  // the brief writer window instead of throwing SQLITE_BUSY.
+  // the brief writer window instead of throwing SQLITE_BUSY. Foreign keys
+  // are OFF by default in SQLite, so ON DELETE CASCADE on the order-image
+  // tables would silently do nothing without this pragma.
   db.pragma('journal_mode = WAL')
   db.pragma('busy_timeout = 5000')
+  db.pragma('foreign_keys = ON')
   db.exec(SCHEMA)
   return db
 }

@@ -1,0 +1,48 @@
+import type { Metadata } from 'next'
+
+import { io } from 'next/cache'
+
+import { getOrderDetail, listLines } from '@/lib/db/order-images'
+import { PAGE_TITLES } from '@/lib/page-titles'
+
+import { OrderImageForm } from './order-image-form'
+
+// The LIFF layout gate withholds this page until the LINE session resolves,
+// so the dev server's instant-navigation simulation never renders this
+// segment and reports it as "dropped". The masking is the design, not a
+// defect — this opts the route out of that validation (see /liff/forms).
+export const instant = false
+
+export const metadata: Metadata = {
+  title: PAGE_TITLES['/liff/form/order-image'],
+}
+
+type PageProps = {
+  searchParams: Promise<{ orderId?: string | string[] }>
+}
+
+// Step 2 continuation lands on ?orderId=...: the order tree is read here
+// and handed to the client, so a refresh or shared link restores the same
+// work in progress. A stale or foreign orderId simply starts at step 1
+// (detail null) — the lookup in step 1 recovers it either way.
+export default async function OrderImagePage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const orderId = typeof params.orderId === 'string' ? params.orderId : ''
+
+  // io() keeps both synchronous DB reads out of the static shell; during a
+  // real request it resolves immediately, so this costs nothing per visit.
+  await io()
+  const lines = await listLines()
+  const detail = (orderId ? getOrderDetail(orderId) : null) ?? null
+
+  return (
+    <OrderImageForm
+      // Keyed by orderId so every step or history transition remounts the
+      // form from fresh server props instead of needing state sync (see
+      // the component's comment). "step-one" keys the un-linked state.
+      key={detail?.order.id ?? 'step-one'}
+      lines={lines}
+      initialDetail={detail}
+    />
+  )
+}

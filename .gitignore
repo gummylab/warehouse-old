@@ -42,3 +42,7 @@ next-env.d.ts
 
 # database (WAL sidecars match *.db-wal / *.db-shm)
 /database/*.db*
+
+# order-image uploads (only when STORAGE_PATH is unset and the default
+# ./wh-order-images-storage lands in the repo root)
+/wh-order-images-storage/

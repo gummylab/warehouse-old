@@ -1,0 +1,42 @@
+import { NextResponse } from 'next/server'
+
+import { deleteItemCascade, getItemDetail } from '@/lib/db/order-images'
+import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+
+// Everything the item-images page needs for one item: the order it belongs
+// to, the item itself and its photos in seq order. Refetched after every
+// mutation on that page, so the payload never grows past one item.
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await authenticateOrderImageRequest(request)
+  if (!auth.ok) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
+  }
+
+  const { id } = await params
+  const detail = getItemDetail(id)
+  if (!detail) {
+    return NextResponse.json({ error: 'item-not-found' }, { status: 404 })
+  }
+  return NextResponse.json(detail)
+}
+
+// Removes the item row; varieties and image rows follow via ON DELETE
+// CASCADE and their files are unlinked best effort by the data layer.
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await authenticateOrderImageRequest(request)
+  if (!auth.ok) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
+  }
+
+  const { id } = await params
+  if (!deleteItemCascade(id)) {
+    return NextResponse.json({ error: 'item-not-found' }, { status: 404 })
+  }
+  return NextResponse.json({ ok: true })
+}

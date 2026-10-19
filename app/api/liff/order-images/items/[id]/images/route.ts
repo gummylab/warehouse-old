@@ -1,0 +1,50 @@
+import { NextResponse } from 'next/server'
+
+import { itemExists, saveImage } from '@/lib/db/order-images'
+import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
+
+// One file per request; the form loops over a multi-file selection so a
+// single failure can be reported without losing the other uploads. The
+// size and type caps live in lib/order-images/upload.ts, shared with the
+// client-side pre-check.
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await authenticateOrderImageRequest(request)
+  if (!auth.ok) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
+  }
+
+  const { id: itemId } = await params
+  if (!itemExists(itemId)) {
+    return NextResponse.json({ error: 'item-not-found' }, { status: 404 })
+  }
+
+  const form = await request.formData().catch(() => null)
+  const file = form?.get('file')
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: 'file-missing' }, { status: 400 })
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return NextResponse.json({ error: 'file-too-large' }, { status: 413 })
+  }
+  if (!isAcceptedImageType(file.type)) {
+    return NextResponse.json({ error: 'unsupported-type' }, { status: 400 })
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const image = saveImage({
+    itemId,
+    // The package is labelled after upload (same flow the old manage view
+    // had), so the filename falls back to 'Primary'.
+    package: null,
+    fileName: file.name,
+    mimeType: file.type,
+    fileSize: file.size,
+    createdBy: auth.createdBy,
+    buffer,
+  })
+  return NextResponse.json({ image }, { status: 201 })
+}
