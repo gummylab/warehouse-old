@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 
+import { UserKeyIcon } from 'lucide-react'
 import { LiffNotice } from '../liff-notice'
 import { postJson, useLiffSession } from '../liff-session-context'
 
@@ -29,15 +30,14 @@ export function AuthorizationClient() {
   }
 
   if (requestFailed) {
-    return (
-      <LiffNotice status="error" stage="api" onRetry={() => setRequestFailed(false)} />
-    )
+    return <LiffNotice status="error" stage="api" onRetry={() => setRequestFailed(false)} />
   }
 
   switch (status) {
     case 'none':
       return (
         <Button onClick={() => void requestAccess()} disabled={requesting}>
+          <UserKeyIcon />
           ขอสิทธิ์การใช้งานระบบ
         </Button>
       )
@@ -45,7 +45,6 @@ export function AuthorizationClient() {
       return (
         <div className="flex flex-col items-center gap-3">
           <p className="text-muted-foreground">คำขอของคุณอยู่ระหว่างรอการอนุมัติ</p>
-          <Button disabled>รอการอนุมัติ</Button>
         </div>
       )
     case 'approved':
