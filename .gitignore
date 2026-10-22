@@ -46,3 +46,11 @@ next-env.d.ts
 # order-image uploads (only when STORAGE_PATH is unset and the default
 # ./wh-order-images-storage lands in the repo root)
 /wh-order-images-storage/
+
+# test runs: the e2e server keeps its throwaway database, uploads and build
+# output under tests/.tmp/<run id>, plus Playwright's own artifacts
+/tests/.tmp/
+/test-results/
+/playwright-report/
+
+/storage

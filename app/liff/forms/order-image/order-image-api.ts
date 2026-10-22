@@ -4,7 +4,7 @@
 // expired cookie mid-session heals instead of dead-ending the form.
 // Domain records come from the data layer as type-only imports — erased at
 // compile time, so no server code reaches the client bundle.
-import type { ImageRecord, ItemDetail, ItemRecord, OrderDetail } from '@/lib/db/order-images'
+import type { ImageRecord, ItemDetail, ItemRecord, OrderDetail } from '@/lib/db/types'
 
 import { postJson, type LiffToken } from '../../liff-session-context'
 

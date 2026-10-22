@@ -5,16 +5,20 @@
 import { mkdirSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 
-const raw = process.env.STORAGE_PATH ?? './'
-const base = path.resolve(raw)
-export const STORAGE_ROOT = base.endsWith('wh-order-images-storage')
-  ? base
-  : path.join(base, 'wh-order-images-storage')
+// Resolved per call rather than once at module load: the test harness points
+// STORAGE_PATH at a throwaway directory before the first write
+// (tests/unit/setup/db.ts), which a module-level constant could never see.
+export function storageRoot(): string {
+  const base = path.resolve(process.env.STORAGE_PATH ?? './')
+  return base.endsWith('wh-order-images-storage')
+    ? base
+    : path.join(base, 'wh-order-images-storage')
+}
 
 // Convert a relative storage key ('2026-10-19/1234/ดอกแค/100/1-Primary.jpg')
 // to an absolute file path.
 export function toAbsolute(key: string): string {
-  return path.join(STORAGE_ROOT, path.normalize(key))
+  return path.join(storageRoot(), path.normalize(key))
 }
 
 // Called before writing a new file; mkdir recursive also creates the root,
@@ -36,10 +40,32 @@ export function removeStoredFile(absoluteFilePath: string): void {
 // Storage-key segments must not contain path separators or Windows-forbidden
 // characters; user-supplied order numbers and line names flow through here.
 export function sanitize(segment: string): string {
-  return segment
+  const cleaned = segment
     .replace(/[\\/:*?"<>|]/g, '')
+    // Control characters (including NUL) are invalid in a path segment and
+    // make the filesystem calls throw, so they go before anything else.
+    .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+  return normalizeSegment(cleaned)
+}
+
+// Two shapes of segment are still unsafe after the character filter, and
+// both are path instructions rather than names:
+//   - '.' and '..' mean "this folder" and "the parent folder". A key
+//     segment like that lets a photo land outside its date folder, and two
+//     such orders overwrite each other.
+//   - an empty segment collapses away when the path is normalized, which
+//     drops a level of the key just as effectively.
+// They are replaced with an obviously-safe stand-in. The stand-in is
+// injective ('.' and '..' stay distinct, and a segment that filtered away
+// to nothing stays distinct from both), so two different inputs never share
+// one folder. The key is stored in the database and read back verbatim, so
+// the replacement only affects the folder name, never the lookup.
+function normalizeSegment(segment: string): string {
+  if (segment.length === 0) return '_empty'
+  if (/^\.+$/.test(segment)) return `_dots_${segment.length}`
+  return segment
 }
 
 /**
@@ -69,7 +95,7 @@ export function buildKey(
 // Guard used before serving a stored file: a key that escapes the storage
 // root (hand-crafted storage_key, path traversal) must never be read.
 export function isInsideRoot(absoluteFilePath: string): boolean {
-  const root = path.resolve(STORAGE_ROOT)
+  const root = path.resolve(storageRoot())
   const resolved = path.resolve(absoluteFilePath)
   return resolved === root || resolved.startsWith(root + path.sep)
 }

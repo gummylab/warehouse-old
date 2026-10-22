@@ -11,9 +11,10 @@ export const metadata: Metadata = {
 }
 
 export default function RegisterPage() {
-  // The queue read suspends (io() in listUsers). cacheComponents refuses to
-  // prerender a route that suspends without a boundary, so the table gets
-  // its own Suspense: the shell renders immediately and the rows stream in.
+  // The queue read is a cached read that can suspend while the cache fills
+  // on a cold start. cacheComponents refuses to prerender a route that
+  // suspends without a boundary, so the table gets its own Suspense: the
+  // shell renders immediately and the rows stream in.
   return (
     <Suspense fallback={<RegisterFallback />}>
       <RegisterUsers />

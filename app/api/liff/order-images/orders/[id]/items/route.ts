@@ -3,12 +3,13 @@ import { NextResponse } from 'next/server'
 import { addItem, orderExists } from '@/lib/db/order-images'
 import type { AddItemResult } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { addItemSchema, parseJsonBody } from '@/lib/liff/schemas'
 
 // Step 2 "add item" buttons: auto-numbered next single (+100) or next
 // variety under a pack (+10). Omit parentItemId for a top-level single.
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteContext<'/api/liff/order-images/orders/[id]/items'>,
 ) {
   const auth = await authenticateOrderImageRequest(request)
   if (!auth.ok) {
@@ -20,13 +21,12 @@ export async function POST(
     return NextResponse.json({ error: 'order-not-found' }, { status: 404 })
   }
 
-  const body = (await request.json().catch(() => null)) as
-    | { parentItemId?: unknown }
-    | null
-  const rawParent = body?.parentItemId
-  // Anything that is not a non-empty string or explicit null means
-  // "top-level", matching the omitted-field behaviour.
-  const parentItemId = typeof rawParent === 'string' && rawParent.length > 0 ? rawParent : null
+  // A missing parentItemId means "top level", so the field is optional.
+  const body = await parseJsonBody(request, addItemSchema)
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: 400 })
+  }
+  const parentItemId = body.data.parentItemId ?? null
 
   const result = addItem(orderId, parentItemId, auth.createdBy)
   if (!result.ok) {

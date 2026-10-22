@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getUserByLineId } from '@/lib/db/users'
 import { readLineTokenRequest, resolveLineIdentity } from '@/lib/liff/identity'
 import { isLocalDeviceRequest } from '@/lib/liff/local-device'
+import { isRateLimited, rateLimitedResponse } from '@/lib/liff/rate-limit'
 
 // POST /api/liff/status — public once the WAF allowlist covers /api/liff*
 // (edited at Cloudflare, per ADR 0001), so the LINE identity check below is
@@ -13,6 +14,12 @@ export async function POST(request: Request) {
   // and without touching the database (virtual identity, no users row).
   if (isLocalDeviceRequest(request)) {
     return NextResponse.json({ status: 'approved', mode: 'local' })
+  }
+
+  // This endpoint spends an outbound HTTPS call to LINE on every request
+  // (ADR 0003), so it is the one the rate limiter guards first.
+  if (isRateLimited(request)) {
+    return rateLimitedResponse()
   }
 
   const body = await readLineTokenRequest(request)

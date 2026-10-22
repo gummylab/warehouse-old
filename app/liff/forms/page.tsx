@@ -5,6 +5,8 @@ import { ImagePlusIcon } from 'lucide-react'
 
 import { PAGE_TITLES } from '@/lib/page-titles'
 
+import { FormNavbar } from '../form-navbar'
+
 // The LIFF layout gate withholds this page until the LINE session resolves
 // (status loading → the gate shows its notice instead of children), so the
 // dev server's instant-navigation simulation never renders this segment and
@@ -22,9 +24,9 @@ export const metadata: Metadata = {
 export default function FormsPage() {
   return (
     <div className="flex flex-col gap-3">
-      <h1 className="text-lg font-semibold">แบบฟอร์ม</h1>
+      <FormNavbar title="แบบฟอร์ม" />
       <Link
-        href="/liff/form/order-image"
+        href="/liff/forms/order-image"
         className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted"
       >
         <ImagePlusIcon className="size-5 text-muted-foreground" />

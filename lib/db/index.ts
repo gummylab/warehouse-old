@@ -1,7 +1,9 @@
 import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 import Database from 'better-sqlite3'
+
+import { seedLines } from './seed'
 
 // Schema bootstrap. No migration tool by choice (ADR 0002): the first open
 // creates everything, later opens are no-ops thanks to IF NOT EXISTS. Adding
@@ -24,7 +26,7 @@ const SCHEMA = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_users_line_user_id
     ON users (line_user_id);
 
-  -- Order-image form (feature /liff/form/order-image): catalog of production
+  -- Order-image form (feature /liff/forms/order-image): catalog of production
   -- lines the form dropdown offers. Only seeded when empty, so a future
   -- admin edit survives restarts.
   CREATE TABLE IF NOT EXISTS lines (
@@ -99,14 +101,29 @@ export function getDb(): Database.Database {
   return scope.__whDb
 }
 
+// Drops the cached connection and its file handle. The app never calls this:
+// the test harness does, between test files, because each file points
+// WH_DB_PATH at its own throwaway file and must not inherit the handle of the
+// file before it (tests/unit/setup/db.ts).
+export function closeDb(): void {
+  const scope = globalThis as GlobalWithDb
+  scope.__whDb?.close()
+  delete scope.__whDb
+}
+
 function openDatabase(): Database.Database {
   // process.cwd() is the repo root because every command in this repo runs
   // from there (see AGENTS.md); running from elsewhere would silently
   // create the database in the wrong directory.
-  const directory = join(process.cwd(), 'database')
-  mkdirSync(directory, { recursive: true })
+  //
+  // WH_DB_PATH overrides the file so tests never open the real database
+  // (tests/unit/setup/db.ts, playwright.config.ts). It is read here, at call
+  // time, so a test can set it before the first getDb().
+  const override = process.env.WH_DB_PATH
+  const file = override ? resolve(override) : join(process.cwd(), 'database', 'wh.db')
+  mkdirSync(dirname(file), { recursive: true })
 
-  const db = new Database(join(directory, 'wh.db'))
+  const db = new Database(file)
   // WAL lets admin reads run while an action writes; busy_timeout absorbs
   // the brief writer window instead of throwing SQLITE_BUSY. Foreign keys
   // are OFF by default in SQLite, so ON DELETE CASCADE on the order-image
@@ -115,5 +132,8 @@ function openDatabase(): Database.Database {
   db.pragma('busy_timeout = 5000')
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA)
+  // The line catalog is seeded here, once per open, rather than on every
+  // read: a write inside a read path would make the catalog uncacheable.
+  seedLines(db)
   return db
 }

@@ -4,73 +4,41 @@
 // save/delete functions own both, because SQLite transactions in
 // better-sqlite3 are synchronous and can therefore wrap sync file IO
 // atomically (see saveImage).
+import 'server-only'
+
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 
-import { io } from 'next/cache'
-
 import { getDb } from './index'
+import type {
+  ImageRecord,
+  ItemDetail,
+  ItemRecord,
+  OrderDetail,
+  OrderItemNode,
+  OrderRecord,
+} from './types'
 import { nextSingleNumber, nextVarietyNumber } from '../order-images/item-number'
 import {
   buildKey,
   ensureDirForFile,
+  isInsideRoot,
   removeStoredFile,
   toAbsolute,
 } from '../order-images/storage'
 
-// ---------------------------------------------------------------------------
-// Domain types (camelCase records the API serializes; storage keys stay
-// server-internal so responses never leak filesystem layout).
-// ---------------------------------------------------------------------------
-
-export type OrderRecord = {
-  id: string
-  orderNumber: string
-  orderDate: string // Bangkok calendar date 'YYYY-MM-DD'
-  line: string
-  createdBy: string // LINE user id or 'local-device' (ADR 0004)
-  createdAt: string
-}
-
-export type ItemRecord = {
-  id: string
-  orderId: string
-  parentItemId: string | null
-  itemNumber: number
-  createdBy: string
-  createdAt: string
-}
-
-export type ImageRecord = {
-  id: string
-  itemId: string
-  orderId: string
-  seq: number
-  package: string | null
-  fileName: string | null
-  mimeType: string | null
-  fileSize: number | null
-  createdBy: string
-  createdAt: string
-}
-
-export type OrderItemNode = ItemRecord & {
-  images: ImageRecord[]
-  children: OrderItemNode[]
-}
-
-export type OrderDetail = {
-  order: OrderRecord
-  items: OrderItemNode[] // top-level only; varieties nested under children
-}
-
-// One item with the order it belongs to: everything the item-images page
-// needs, scoped to a single item instead of the whole order tree.
-export type ItemDetail = {
-  order: OrderRecord
-  item: ItemRecord
-  images: ImageRecord[]
-}
+// The domain types live in lib/db/types.ts, apart from this module, so the
+// client components can import the shapes without importing the database
+// driver. They are re-exported here because the data layer is where the
+// server code looks for them.
+export type {
+  ImageRecord,
+  ItemDetail,
+  ItemRecord,
+  OrderDetail,
+  OrderItemNode,
+  OrderRecord,
+} from './types'
 
 // Expected failures of the auto-numbered add; unexpected failures still
 // throw and surface as a generic 500.
@@ -151,63 +119,28 @@ function toImage(row: ImageRow): ImageRecord {
 // Lines catalog
 // ---------------------------------------------------------------------------
 
-// Production lines carried over from eu-shipment's mock catalog
-// (app/mock/data.ts) so the new form starts with the same dropdown.
-const SEED_LINES = [
-  'ดอกแค',
-  'ดาวเรือง 1',
-  'ดาวเรือง 2',
-  'ดาวเรือง 3',
-  'ดาวเรือง 4',
-  'ออฟติมัส 1',
-  'ออฟติมัส 2',
-  'ทอร์นาโด',
-  'ดอกรัก',
-  'กุหลาบ',
-  'ลิลลี่',
-  'ทิวลิป',
-  'ซากุระ',
-  'ลาเวนเดอร์',
-  'มะลิ',
-  'บานชื่น',
-  'กล้วยไม้ 1',
-  'เฟื่องฟ้า',
-  'ดาหลา',
-  'พวงชมพู',
-  'ดอกแก้ว',
-  'ดาวเรือง 5',
-  'ดาวเรือง 6',
-  'ชบาแก้ว',
-  'เดซี่',
-  'โรส',
-  'กล้วยไม้ 2',
-]
-
-// Seed only when the catalog is empty: a future admin edit (renamed or
-// removed line) must survive restarts, so this never re-inserts over rows.
-function ensureLinesSeeded(db: ReturnType<typeof getDb>): void {
-  const count = (db.prepare('SELECT COUNT(*) AS c FROM lines').get() as { c: number }).c
-  if (count > 0) return
-  const insert = db.prepare('INSERT OR IGNORE INTO lines (name) VALUES (?)')
-  for (const name of SEED_LINES) insert.run(name)
-}
-
-// io() tells cacheComponents this read must stay out of the static shell,
-// same pattern as listUsers in lib/db/users.ts. Server components only.
-export async function listLines(): Promise<string[]> {
-  await io()
-  const db = getDb()
-  ensureLinesSeeded(db)
-  const rows = db.prepare('SELECT name FROM lines ORDER BY rowid').all() as { name: string }[]
+// The production line catalog the form's dropdown offers. A plain read: the
+// catalog is seeded when the database is opened (see lib/db/index.ts) and
+// only an admin edit changes it.
+//
+// Not cached with 'use cache'. The read would run during the build and
+// bake whatever the build machine's database holds into the static shell,
+// and an admin edit to a line name would then need an explicit invalidation
+// to show up. The pages that read it are 'instant = false' anyway (the
+// LIFF gate withholds their children), so a cached shell would buy nothing.
+export function listLines(): string[] {
+  const rows = getDb().prepare('SELECT name FROM lines ORDER BY rowid').all() as {
+    name: string
+  }[]
   return rows.map((row) => row.name)
 }
 
 // Sync variant for request validation in route handlers (which are dynamic
 // anyway and must not pull in the cacheComponents io()).
 export function lineExists(name: string): boolean {
-  const db = getDb()
-  ensureLinesSeeded(db)
-  return db.prepare('SELECT 1 FROM lines WHERE name = ?').get(name) !== undefined
+  return (
+    getDb().prepare('SELECT 1 FROM lines WHERE name = ?').get(name) !== undefined
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +419,13 @@ export function saveImage(input: {
       ext,
     )
     const absolute = toAbsolute(key)
+    // The write path needs the same guard as the read path: a key that
+    // resolves outside the storage root would drop a file anywhere on the
+    // disk. buildKey() already makes every segment a plain name, so this is
+    // the second line of defence rather than the only one.
+    if (!isInsideRoot(absolute)) {
+      throw new Error('saveImage: storage key escapes the storage root')
+    }
     ensureDirForFile(absolute)
     writeFileSync(absolute, input.buffer)
 

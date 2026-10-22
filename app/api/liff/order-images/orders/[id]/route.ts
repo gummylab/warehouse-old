@@ -8,7 +8,7 @@ import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
 // state, so the server stays the single source of truth.
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteContext<'/api/liff/order-images/orders/[id]'>,
 ) {
   const auth = await authenticateOrderImageRequest(request)
   if (!auth.ok) {

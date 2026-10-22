@@ -18,7 +18,8 @@ import type { LookupInput } from './order-image-api'
 // Step 1: the three facts that identify the order the photos belong to.
 // This file owns only field state and the submit call — validation runs in
 // the orchestrator with the same helpers the server uses, so both agree on
-// every rejection message. Items are created later, in step 2.
+// every rejection message. Items are created later, in step 2. The form's
+// name sits in the navbar above (see order-image-form.tsx).
 export function StepOneFields({
   lines,
   submitting,
@@ -47,8 +48,6 @@ export function StepOneFields({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">อัปโหลดรูปภาพออเดอร์</h1>
-
       <label className="flex flex-col gap-1.5 text-sm">
         เลขออเดอร์
         <Input

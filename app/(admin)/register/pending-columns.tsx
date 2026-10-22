@@ -5,10 +5,11 @@ import { createColumnHelper } from '@tanstack/react-table'
 
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
 import { Button } from '@/components/ui/button'
-import { type RegisterUser } from '@/lib/db/users'
+import { type RegisterUser } from '@/lib/db/types'
 
 import { approveUser, rejectUser, type DecideActionState } from './actions'
 import { actionsHeader, profileColumn, requestedAtColumn } from './columns'
+import { useRegisterDecision } from './register-decision-context'
 
 const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
 
@@ -48,12 +49,21 @@ function DecideButton({
   variant: 'default' | 'destructive'
   action: (id: string) => Promise<DecideActionState>
 }) {
-  // bind() pre-fills the id argument; useActionState still calls the action
-  // with (prevState, formData) and the action ignores the extras. The hook
-  // tracks the pending state (button disables while writing) and carries
-  // the error message back for rendering.
-  const [state, formAction, pending] = useActionState(
-    action.bind(null, id),
+  const { removeUser, reportError } = useRegisterDecision()
+
+  // The row leaves the table on the click: useOptimistic only accepts
+  // updates made inside a transition or an action, and useActionState's
+  // action is one. The server's revalidated payload replaces the row
+  // afterwards, and puts it back if the write was refused.
+  const [, formAction, pending] = useActionState(
+    async (previous: DecideActionState): Promise<DecideActionState> => {
+      removeUser(id)
+      const result = await action(id)
+      // A refusal is reported above the table, not next to the button:
+      // the button unmounts together with the row it removed.
+      if (result) reportError(result.error)
+      return result
+    },
     null,
   )
 
@@ -66,7 +76,6 @@ function DecideButton({
           {label}
         </Button>
       </form>
-      {state && <p className="text-xs text-destructive">{state.error}</p>}
     </div>
   )
 }

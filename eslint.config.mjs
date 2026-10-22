@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Test runs: the e2e server writes its own Next build output, database and
+    // uploads under tests/.tmp (see playwright.config.ts), and Playwright
+    // writes its report and traces next to it. None of it is source.
+    "tests/.tmp/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 

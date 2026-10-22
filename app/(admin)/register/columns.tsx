@@ -5,7 +5,7 @@ import { ArrowUpDownIcon } from 'lucide-react'
 
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
 import { Button } from '@/components/ui/button'
-import { type RegisterUser } from '@/lib/db/users'
+import { type RegisterUser } from '@/lib/db/types'
 
 import { RevokeButton } from './revoke-button'
 import { UserAvatar } from './user-avatar'

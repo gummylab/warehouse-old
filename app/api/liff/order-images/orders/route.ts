@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { findOrCreateOrder, lineExists } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { orderLookupSchema, parseJsonBody } from '@/lib/liff/schemas'
 import {
   isValidCalendarDate,
   isValidOrderNumber,
@@ -18,29 +19,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    orderNumber?: unknown
-    orderDate?: unknown
-    line?: unknown
-  } | null
+  // The schema checks the shape of the body; the shared helpers check the
+  // value. Both live on the server, so a hand-crafted request is held to
+  // the same rules as the form.
+  const body = await parseJsonBody(request, orderLookupSchema)
+  if (!body.ok) {
+    return NextResponse.json({ error: body.error }, { status: 400 })
+  }
 
-  const orderNumber = typeof body?.orderNumber === 'string' ? normalizeOrderNumber(body.orderNumber) : ''
+  const orderNumber = normalizeOrderNumber(body.data.orderNumber)
   if (!isValidOrderNumber(orderNumber)) {
     return NextResponse.json({ error: 'invalid-order-number' }, { status: 400 })
   }
-  const orderDate = typeof body?.orderDate === 'string' ? body.orderDate : ''
-  if (!isValidCalendarDate(orderDate)) {
+  if (!isValidCalendarDate(body.data.orderDate)) {
     return NextResponse.json({ error: 'invalid-order-date' }, { status: 400 })
   }
-  const line = typeof body?.line === 'string' ? body.line : ''
-  if (!lineExists(line)) {
+  if (!lineExists(body.data.line)) {
     return NextResponse.json({ error: 'unknown-line' }, { status: 400 })
   }
 
   const order = findOrCreateOrder({
     orderNumber,
-    orderDate,
-    line,
+    orderDate: body.data.orderDate,
+    line: body.data.line,
     createdBy: auth.createdBy,
   })
   return NextResponse.json({ orderId: order.id })

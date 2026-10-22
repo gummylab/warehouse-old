@@ -1,40 +1,33 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 
-import type { OrderDetail } from '@/lib/db/order-images'
-import {
-  isValidCalendarDate,
-  isValidOrderNumber,
-  normalizeOrderNumber,
-} from '@/lib/order-images/validation'
+import { Button } from '@/components/ui/button'
+import type { OrderDetail } from '@/lib/db/types'
+import { formatThaiDate } from '@/lib/order-images/format'
+import { isValidCalendarDate, isValidOrderNumber, normalizeOrderNumber } from '@/lib/order-images/validation'
 
+import { ChevronLeftIcon } from 'lucide-react'
+import { FormNavbar } from '../../form-navbar'
 import { useLiffSession } from '../../liff-session-context'
-import {
-  errorMessage,
-  lookupOrder,
-  postSession,
-  setSessionToken,
-} from './order-image-api'
 import type { LookupInput } from './order-image-api'
+import { errorMessage, lookupOrder, postSession, setSessionToken } from './order-image-api'
 import { OrderItemsStep } from './order-items-step'
 import { StepOneFields } from './step-one-fields'
 
-// Owns the step switch, the session cookie exchange and the order detail
-// state that both steps read. Step 1 submits here because the router and
-// the session promise live here; step 2 manages its own mutations and
-// errors and reports the refreshed tree back through onDetailChange.
+// Owns the step switch, the session cookie exchange, the order detail
+// state that both steps read, and the navbar above them. Step 1 submits
+// here because the router and the session promise live here; step 2
+// manages its own mutations and errors and reports the refreshed tree back
+// through onDetailChange.
+// The navbar lives here because only this component knows whether an order
+// exists yet: before the lookup it carries the form's name, after it
+// carries the order itself.
 // The page keys this component by orderId (see page.tsx): every URL change
 // remounts it fresh from server props, which is how back/forward and the
 // step 1 → 2 transition stay correct without any prop-to-state sync.
-export function OrderImageForm({
-  lines,
-  initialDetail,
-}: {
-  lines: string[]
-  initialDetail: OrderDetail | null
-}) {
+export function OrderImageForm({ lines, initialDetail }: { lines: string[]; initialDetail: OrderDetail | null }) {
   const { token } = useLiffSession()
   const router = useRouter()
   const [detail, setDetail] = useState<OrderDetail | null>(initialDetail)
@@ -88,7 +81,7 @@ export function OrderImageForm({
       // order and hands it back under a new component key (page.tsx), so
       // the form remounts straight into step 2 with fresh data — no second
       // client-side detail read, no prop-to-state sync.
-      await router.replace(`/liff/form/order-image?orderId=${lookup.data.orderId}`)
+      await router.replace(`/liff/forms/order-image?orderId=${lookup.data.orderId}`)
     } catch {
       // router.replace is the only call here that can reject (navigation
       // aborted, offline); the API helpers return results instead.
@@ -98,15 +91,29 @@ export function OrderImageForm({
     }
   }
 
-  if (!detail) {
-    return (
-      <StepOneFields
-        lines={lines}
-        submitting={submitting}
-        error={stepOneError}
-        onSubmit={handleLookup}
+  return (
+    <div className="flex flex-col gap-4 pb-4">
+      <FormNavbar
+        title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : 'อัปโหลดรูปภาพออเดอร์'}
+        subtitle={detail ? `${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}` : undefined}
+        action={
+          detail ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="เลือกออเดอร์ใหม่"
+              onClick={() => router.push('/liff/forms/order-image')}>
+              <ChevronLeftIcon />
+            </Button>
+          ) : undefined
+        }
       />
-    )
-  }
-  return <OrderItemsStep detail={detail} onDetailChange={setDetail} />
+
+      {detail ? (
+        <OrderItemsStep detail={detail} onDetailChange={setDetail} />
+      ) : (
+        <StepOneFields lines={lines} submitting={submitting} error={stepOneError} onSubmit={handleLookup} />
+      )}
+    </div>
+  )
 }

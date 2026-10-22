@@ -1,11 +1,10 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import Link from 'next/link'
 
-import { ArrowLeftIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { ChevronLeftIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
+import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
   DialogClose,
@@ -15,22 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import type { ItemDetail } from '@/lib/db/order-images'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { ImageRecord, ItemDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
-import {
-  IMAGE_ACCEPT_ATTRIBUTE,
-  isAcceptedImageType,
-  MAX_FILE_BYTES,
-} from '@/lib/order-images/upload'
+import { IMAGE_ACCEPT_ATTRIBUTE, isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
 
+import { FormNavbar } from '../../../../form-navbar'
 import { deleteImage, errorMessage, getItem, setImagePackage, uploadImage } from '../../order-image-api'
 
 // The photo page for one item: a plain 3-column grid plus the upload button
@@ -135,100 +125,88 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   }
 
   return (
-    <div className="flex w-full flex-col gap-4 sm:gap-6">
-      <header className="flex flex-col gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 self-start"
-          render={
-            <Link href={`/liff/form/order-image?orderId=${detail.order.id}`} />
-          }
-        >
-          <ArrowLeftIcon />
-          กลับออเดอร์
-        </Button>
-        <div className="flex flex-col gap-0.5">
-          <h1 className="text-lg font-semibold">ไอเท็ม {detail.item.itemNumber}</h1>
-          <p className="break-words text-sm text-muted-foreground">
-            ออเดอร์ {detail.order.orderNumber} · {formatThaiDate(detail.order.orderDate)} · ไลน์{' '}
-            {detail.order.line}
-          </p>
-        </div>
-      </header>
+    <div className="flex w-full flex-col gap-4 pb-4 sm:gap-6">
+      {/* The navbar carries the item and the order it belongs to, so the
+          page below is only the photos. The back link keeps the name
+          "กลับออเดอร์" because that is what the e2e spec looks for. */}
+      <FormNavbar
+        title={`ไอเท็ม ${detail.item.itemNumber}`}
+        subtitle={`ออเดอร์ ${detail.order.orderNumber} / ${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`}
+        action={
+          <ButtonLink
+            variant="ghost"
+            size="icon"
+            aria-label="กลับออเดอร์"
+            href={`/liff/forms/order-image?orderId=${detail.order.id}`}>
+            <ChevronLeftIcon />
+          </ButtonLink>
+        }
+      />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 md:grid-cols-5 lg:grid-cols-6">
+      {/* The file input stays hidden: the add cell below is what opens it. */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_ACCEPT_ATTRIBUTE}
+        multiple
+        className="hidden"
+        onChange={(event) => void handleFiles(event.target.files)}
+      />
+
+      {/* The photo grid, framed like the item cards on the order page. The
+          add cell is the last one, so it always sits where the next photo
+          will appear. */}
+      <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
         {detail.images.map((image) => (
-          <button
+          <PhotoTile
             key={image.id}
-            type="button"
-            onClick={() => {
+            image={image}
+            onOpen={() => {
               setDialogError(null)
               setConfirmingDelete(false)
               setManagedImageId(image.id)
             }}
-            className="flex flex-col gap-1 text-left"
-          >
-            <span className="relative block">
-              {/* next/image would proxy through /_next/image, whose upstream
-                  fetch carries no session cookie and would be rejected 403. */}
-              {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
-              <img
-                src={`/api/liff/order-images/images/${image.id}/file`}
-                alt={`รูปที่ ${image.seq}`}
-                loading="lazy"
-                className="aspect-square w-full rounded-xl bg-muted object-cover"
-              />
-              {image.package === null && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-1 right-1 size-2.5 rounded-full bg-amber-500 ring-2 ring-background"
-                />
-              )}
-            </span>
-            <span className="w-full truncate text-xs text-muted-foreground">
-              {image.package ?? 'ยังไม่ระบุ'}
-            </span>
-          </button>
+          />
         ))}
+
         {uploading && (
-          <span aria-hidden="true" className="flex flex-col gap-1">
-            <span className="block aspect-square w-full animate-pulse rounded-xl bg-muted" />
+          <span aria-hidden="true" className="flex flex-col gap-1 rounded-xl border border-dashed p-1">
+            <span className="block aspect-square w-full animate-pulse rounded-lg bg-muted" />
             <span className="text-xs text-muted-foreground">กำลังอัปโหลด...</span>
           </span>
         )}
-      </div>
 
-      {detail.images.length === 0 && !uploading && (
-        <p className="text-sm text-muted-foreground">ยังไม่มีรูปภาพ</p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          accept={IMAGE_ACCEPT_ATTRIBUTE}
-          multiple
-          className="hidden"
-          onChange={(event) => void handleFiles(event.target.files)}
-        />
+        {/* h-auto overrides the fixed h-9 that buttonVariants sets: a grid
+            item with a fixed height does not stretch to the row height, so
+            the cell would sit as a short pill next to the photo tiles. */}
         <Button
-          className="w-full sm:w-auto"
+          variant="outline"
+          className="h-auto flex-col gap-2 border-dashed rounded-xl py-14"
           disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
+          onClick={() => inputRef.current?.click()}>
           <PlusIcon />
-          {uploading ? 'กำลังอัปโหลด...' : 'เพิ่มรูปภาพ'}
+          <span className="text-xs leading-tight">เพิ่มรูปภาพ</span>
         </Button>
-        {progress && (
-          <span className="text-xs text-muted-foreground">
-            {progress.current}/{progress.total}
-          </span>
+
+        {/* The empty message rides at the bottom of the frame, clear of the
+            add cell on the left. */}
+        {detail.images.length === 0 && !uploading && (
+          <p className="absolute bottom-4 right-4 text-sm text-muted-foreground">ยังไม่มีรูปภาพ</p>
         )}
-        {uploadError && <p className="w-full text-sm text-destructive">{uploadError}</p>}
-      </div>
+      </section>
+
+      {(progress || uploadError) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {progress && (
+            <span className="text-xs text-muted-foreground">
+              {progress.current}/{progress.total}
+            </span>
+          )}
+          {uploadError && <p className="w-full text-sm text-destructive">{uploadError}</p>}
+        </div>
+      )}
 
       <Dialog
         open={managedImage !== null}
@@ -238,8 +216,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
             setConfirmingDelete(false)
             setDialogError(null)
           }
-        }}
-      >
+        }}>
         {/* Tall content (photo + select + footer) must scroll inside the
             viewport on a small phone; the default popup has no max height. */}
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto">
@@ -261,8 +238,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
                 <Select
                   value={managedImage.package}
                   onValueChange={(pkg) => void changePackage(pkg)}
-                  disabled={packageBusy || deleting}
-                >
+                  disabled={packageBusy || deleting}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="ยังไม่ระบุแพ็กเกจ" />
                   </SelectTrigger>
@@ -278,26 +254,16 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
             </>
           )}
 
-          {confirmingDelete && (
-            <p className="text-sm text-destructive">ลบรูปนี้ถาวร ไม่สามารถกู้คืนได้</p>
-          )}
+          {confirmingDelete && <p className="text-sm text-destructive">ลบรูปนี้ถาวร ไม่สามารถกู้คืนได้</p>}
           {dialogError && <p className="text-sm text-destructive">{dialogError}</p>}
 
           <DialogFooter>
             {confirmingDelete ? (
               <>
-                <Button
-                  variant="outline"
-                  disabled={deleting}
-                  onClick={() => setConfirmingDelete(false)}
-                >
+                <Button variant="outline" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
                   ยกเลิก
                 </Button>
-                <Button
-                  variant="destructive"
-                  disabled={deleting}
-                  onClick={() => void confirmDelete()}
-                >
+                <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
                   {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
                 </Button>
               </>
@@ -307,8 +273,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
                 <Button
                   variant="destructive"
                   disabled={packageBusy || deleting}
-                  onClick={() => setConfirmingDelete(true)}
-                >
+                  onClick={() => setConfirmingDelete(true)}>
                   <Trash2Icon />
                   ลบรูปนี้
                 </Button>
@@ -318,5 +283,31 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// One photo as a tile: the picture inside its own frame, with the package
+// label under it.
+//
+// The tile stays a button because tapping it opens the editor, and the
+// label stays inside it because that is what the e2e spec reads.
+function PhotoTile({ image, onOpen }: { image: ImageRecord; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="flex flex-col gap-y-2 rounded-xl border p-2 text-left">
+      <span className="block overflow-hidden rounded-lg border">
+        {/* next/image would proxy through /_next/image, whose upstream
+            fetch carries no session cookie and would be rejected 403. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
+        <img
+          src={`/api/liff/order-images/images/${image.id}/file`}
+          alt={`รูปที่ ${image.seq}`}
+          loading="lazy"
+          className="aspect-square w-full bg-muted object-cover"
+        />
+      </span>
+      <span className="w-full truncate text-xs text-muted-foreground text-center">
+        {image.package ?? 'ยังไม่ระบุแพ็คเกจ'}
+      </span>
+    </button>
   )
 }

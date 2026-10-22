@@ -1,24 +1,13 @@
+import 'server-only'
+
 import { randomUUID } from 'node:crypto'
 
 import { io } from 'next/cache'
 
 import { getDb } from './index'
+import type { RegisterUser } from './types'
 
-// Domain type for the register screen: one users-table row, shaped for the
-// client tables. It lives in the data layer (not in the columns file) so the
-// server never imports from app/ code.
-//
-// 'rejected' is deliberately absent: rejecting a request deletes the row
-// (ADR 0003), so the only stored statuses are pending and approved.
-export type RegisterUser = {
-  id: string
-  displayName: string
-  // LINE picture URL; absent falls back to the first letter of the name.
-  avatarUrl?: string
-  status: 'pending' | 'approved'
-  // ISO 8601. Stored as a string so server and client formats never clash.
-  requestedAt: string
-}
+export type { RegisterUser } from './types'
 
 // Raw column shape as SQLite returns it: snake_case with the nullable
 // columns typed explicitly so the mapping below must handle them.
@@ -30,8 +19,18 @@ type UserRow = {
   requested_at: string
 }
 
-// io() tells cacheComponents this read must stay out of the static shell;
-// without it the user list would be baked in at build time (Next 16 docs).
+// The user list for the register screen.
+//
+// io() keeps the read out of the static shell and out of any cache, so
+// every visit sees the current state of the table. That is the right
+// trade for this list: it is the operator's approval queue, it changes
+// whenever a request arrives or a decision is made, and it is read a
+// handful of times a day by one person.
+//
+// A 'use cache' scope with a 'users' tag would serve it from cache and
+// need an explicit invalidation on every write path. It would also tie
+// this function to the Next.js cache runtime, which the unit tests cannot
+// exercise (cacheLife() throws outside a use-cache scope).
 export async function listUsers(): Promise<RegisterUser[]> {
   await io()
   const rows = getDb()
