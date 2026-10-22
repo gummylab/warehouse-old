@@ -85,7 +85,6 @@ export function OrderItemsStep({
   }
 
   const nextTop = nextSingleNumber(detail.items.map((node) => node.itemNumber))
-  const isEmpty = detail.items.length === 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -102,8 +101,8 @@ export function OrderItemsStep({
       ))}
 
       {/* The frame that closes the list: one cell, the one that adds the next
-          item. With no items yet this frame is the whole page and carries the
-          empty message at its bottom, exactly like the photo grid does. */}
+          item. With no items yet this frame is the whole page, and the
+          dashed cell is what says "no item yet". */}
       <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
         <Button
           variant="outline"
@@ -114,8 +113,6 @@ export function OrderItemsStep({
           <span className="text-xs leading-tight">เพิ่มไอเท็ม</span>
           <span className="text-xs leading-tight text-muted-foreground">({nextTop})</span>
         </Button>
-
-        {isEmpty && <p className="absolute bottom-4 right-4 text-sm text-muted-foreground">ออเดอร์นี้ยังไม่มีไอเท็ม</p>}
       </section>
 
       <Dialog

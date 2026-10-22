@@ -92,12 +92,15 @@ export function deleteItem(itemId: string) {
   })
 }
 
-export function uploadImage(itemId: string, file: File) {
+// The signal lets the caller abort an upload that is still in flight, for
+// example when the upload dialog is closed while a file is on its way.
+export function uploadImage(itemId: string, file: File, signal?: AbortSignal) {
   const form = new FormData()
   form.append('file', file)
   return request<{ image: ImageRecord }>(`/api/liff/order-images/items/${itemId}/images`, {
     method: 'POST',
     body: form,
+    signal,
   })
 }
 

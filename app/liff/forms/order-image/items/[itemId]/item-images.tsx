@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { ChevronLeftIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 
@@ -18,10 +18,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { ImageRecord, ItemDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
-import { IMAGE_ACCEPT_ATTRIBUTE, isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
 
 import { FormNavbar } from '../../../../form-navbar'
-import { deleteImage, errorMessage, getItem, setImagePackage, uploadImage } from '../../order-image-api'
+import { deleteImage, errorMessage, getItem, setImagePackage } from '../../order-image-api'
+import { UploadDialog } from './upload-dialog'
 
 // The photo page for one item: a plain 3-column grid plus the upload button
 // that used to be squeezed under every thumbnail in step 2. Tapping a photo
@@ -29,12 +29,13 @@ import { deleteImage, errorMessage, getItem, setImagePackage, uploadImage } from
 // refetch this item through the API and return to step 2 re-rendered from
 // the server, so the counts on the card are never stale.
 export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const [detail, setDetail] = useState(initialDetail)
   const [error, setError] = useState<string | null>(null)
+  // The upload lives in its own dialog (see upload-dialog.tsx). The page
+  // only needs to know whether one is running, for the placeholder in the
+  // grid, and whether the dialog is open.
   const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
   // Store the id, not the record: refresh() replaces the whole detail, so
   // the dialog re-derives its image from fresh state every render. A
   // deleted image then vanishes from the lookup and closes the dialog.
@@ -50,43 +51,6 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
     const result = await getItem(detail.item.id)
     if (result.ok) setDetail(result.data)
     else setError(errorMessage(result.error, result.status))
-  }
-
-  async function handleFiles(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0 || uploading) return
-    const files = Array.from(fileList)
-    setUploading(true)
-    setUploadError(null)
-    let firstError: string | null = null
-    try {
-      for (const [index, file] of files.entries()) {
-        setProgress({ current: index + 1, total: files.length })
-        // Mirror the server's checks so an oversized camera photo names
-        // the offending file immediately instead of a bare 413 later.
-        if (!isAcceptedImageType(file.type)) {
-          firstError ??= `${file.name}: ${errorMessage('unsupported-type')}`
-          continue
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          firstError ??= `${file.name}: ${errorMessage('file-too-large')}`
-          continue
-        }
-        // Sequential on purpose: per-file progress stays honest and one
-        // failed file never cancels the rest of the selection.
-        const result = await uploadImage(detail.item.id, file)
-        if (!result.ok) {
-          firstError ??= `${file.name}: ${errorMessage(result.error, result.status)}`
-        }
-      }
-      await refresh()
-      if (firstError) setUploadError(firstError)
-    } finally {
-      setUploading(false)
-      setProgress(null)
-      // Reset so picking the same file again after a failure re-fires
-      // change (browsers skip an unchanged input value).
-      if (inputRef.current) inputRef.current.value = ''
-    }
   }
 
   async function changePackage(pkg: string | null) {
@@ -145,16 +109,6 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* The file input stays hidden: the add cell below is what opens it. */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={IMAGE_ACCEPT_ATTRIBUTE}
-        multiple
-        className="hidden"
-        onChange={(event) => void handleFiles(event.target.files)}
-      />
-
       {/* The photo grid, framed like the item cards on the order page. The
           add cell is the last one, so it always sits where the next photo
           will appear. */}
@@ -185,28 +139,25 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           variant="outline"
           className="h-auto flex-col gap-2 border-dashed rounded-xl py-14"
           disabled={uploading}
-          onClick={() => inputRef.current?.click()}>
+          onClick={() => setUploadOpen(true)}>
           <PlusIcon />
           <span className="text-xs leading-tight">เพิ่มรูปภาพ</span>
         </Button>
-
-        {/* The empty message rides at the bottom of the frame, clear of the
-            add cell on the left. */}
-        {detail.images.length === 0 && !uploading && (
-          <p className="absolute bottom-4 right-4 text-sm text-muted-foreground">ยังไม่มีรูปภาพ</p>
-        )}
       </section>
 
-      {(progress || uploadError) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {progress && (
-            <span className="text-xs text-muted-foreground">
-              {progress.current}/{progress.total}
-            </span>
-          )}
-          {uploadError && <p className="w-full text-sm text-destructive">{uploadError}</p>}
-        </div>
-      )}
+      {/* The upload dialog owns the file list and the upload loop. Closing
+          it refetches the item, so the grid shows whatever landed, even
+          when the dialog was closed while a file was still on its way. */}
+      <UploadDialog
+        open={uploadOpen}
+        itemId={detail.item.id}
+        context={`ไอเท็ม ${detail.item.itemNumber} · ออเดอร์ ${detail.order.orderNumber}`}
+        onOpenChange={(next) => {
+          setUploadOpen(next)
+          if (!next) void refresh()
+        }}
+        onUploadingChange={setUploading}
+      />
 
       <Dialog
         open={managedImage !== null}

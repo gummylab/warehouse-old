@@ -56,7 +56,9 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await page.getByRole('link', { name: 'เพิ่มรูปภาพไอเท็ม 100' }).click()
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toBeVisible()
 
+  await page.getByRole('button', { name: 'เพิ่มรูปภาพ' }).click()
   await page.locator('input[type=file]').setInputFiles(UPLOAD)
+  await page.getByRole('button', { name: 'อัปโหลด' }).click()
 
   // The caption of the tile turns into "ยังไม่ระบุแพ็คเกจ" (unlabelled)
   // once the upload response lands, and the tile itself carries the photo.
@@ -97,7 +99,11 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await thumbnail.click()
   await dialog.getByRole('button', { name: 'ลบรูปนี้' }).click()
   await dialog.getByRole('button', { name: 'ยืนยันลบ' }).click()
-  await expect(page.getByText('ยังไม่มีรูปภาพ')).toBeVisible()
+  // The grid is back to the add cell alone: the dashed cell is what says
+  // "no photo yet". The filter skips the previous page, which the router
+  // keeps in the DOM but hidden.
+  await expect(thumbnail).toHaveCount(0)
+  await expect(page.locator('section.relative > *').filter({ visible: true })).toHaveCount(1)
   expect(existsSync(storedFile)).toBe(false)
 
   // ---- delete the item, taking its variety with it ---------------------
@@ -107,7 +113,10 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await page.getByRole('button', { name: 'ลบไอเท็ม 100' }).click()
   await dialog.getByRole('button', { name: 'ลบไอเท็ม' }).click()
 
-  await expect(page.getByText('ออเดอร์นี้ยังไม่มีไอเท็ม')).toBeVisible()
+  // The item frame is back to the add cell alone, and the next number
+  // starts over at 100.
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'เพิ่มไอเท็ม (100)' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 110' })).toHaveCount(0)
 
   expect(consoleErrors).toEqual([])
