@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
-import { CheckIcon, FileImageIcon, UploadIcon, XIcon } from 'lucide-react'
+import { CameraIcon, CheckIcon, FileImageIcon, UploadIcon, XIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -15,7 +15,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
-import { IMAGE_ACCEPT_ATTRIBUTE, isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
+import {
+  CAMERA_ACCEPT_ATTRIBUTE,
+  IMAGE_ACCEPT_ATTRIBUTE,
+  isAcceptedImageType,
+  MAX_FILE_BYTES,
+} from '@/lib/order-images/upload'
 import { cn } from '@/lib/utils'
 
 import { errorMessage, uploadImage } from '../../order-image-api'
@@ -53,6 +58,7 @@ export function UploadDialog({
   onUploadingChange: (uploading: boolean) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const controllerRef = useRef<AbortController | null>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const keyRef = useRef(0)
@@ -106,6 +112,14 @@ export function UploadDialog({
       added.push({ key, file, status: 'ready' })
     }
     setEntries((prev) => [...prev, ...added])
+  }
+
+  // Both pickers (camera and gallery) end up here, so one set of caps applies
+  // to either path and the list cannot tell them apart afterwards.
+  function handlePicked(event: ChangeEvent<HTMLInputElement>) {
+    addFiles(event.target.files)
+    // Reset so picking the same file again fires change.
+    event.target.value = ''
   }
 
   function removeEntry(key: string) {
@@ -186,21 +200,44 @@ export function UploadDialog({
           )}
         >
           <UploadIcon className="size-6 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">ลากไฟล์มาวางที่นี่ หรือ</p>
-          <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-            เลือกไฟล์
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            {/* A phone has nothing to drag onto the zone, so it reads the two
+                buttons instead of a drop instruction. */}
+            <span className="pointer-fine:hidden">ถ่ายรูปหรือเลือกไฟล์</span>
+            <span className="hidden pointer-fine:inline">ลากไฟล์มาวางที่นี่</span>
+          </p>
+          <div className="flex items-center gap-2">
+            {/* The camera has its own input instead of relying on the system
+                chooser: Android offers no camera there for the narrow accept
+                the gallery input needs. Hidden on a fine pointer, where
+                capture is ignored and the button would only reopen the file
+                dialog. */}
+            <Button
+              size="sm"
+              className="pointer-fine:hidden"
+              onClick={() => cameraRef.current?.click()}>
+              <CameraIcon />
+              ถ่ายรูป
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+              เลือกไฟล์
+            </Button>
+          </div>
+          <input
+            ref={cameraRef}
+            type="file"
+            accept={CAMERA_ACCEPT_ATTRIBUTE}
+            capture="environment"
+            className="hidden"
+            onChange={handlePicked}
+          />
           <input
             ref={inputRef}
             type="file"
             accept={IMAGE_ACCEPT_ATTRIBUTE}
             multiple
             className="hidden"
-            onChange={(event) => {
-              addFiles(event.target.files)
-              // Reset so picking the same file again fires change.
-              event.target.value = ''
-            }}
+            onChange={handlePicked}
           />
         </div>
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CAMERA_ACCEPT_ATTRIBUTE,
   IMAGE_ACCEPT_ATTRIBUTE,
   isAcceptedImageType,
   MAX_FILE_BYTES,
@@ -28,5 +29,11 @@ describe('upload limits', () => {
 
   it('offers exactly the accepted types to the file input', () => {
     expect(IMAGE_ACCEPT_ATTRIBUTE).toBe('image/jpeg,image/png,image/webp')
+  })
+
+  // The camera input is the one place a wildcard is wanted: Android hides the
+  // camera from its chooser for anything narrower.
+  it('offers any image to the camera input', () => {
+    expect(CAMERA_ACCEPT_ATTRIBUTE).toBe('image/*')
   })
 })

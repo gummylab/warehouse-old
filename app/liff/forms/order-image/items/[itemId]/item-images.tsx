@@ -1,8 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { ChevronLeftIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MoreVerticalIcon,
+  PlusIcon,
+  Trash2Icon,
+} from 'lucide-react'
 
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
@@ -14,7 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { ImageRecord, ItemDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
@@ -23,11 +40,11 @@ import { FormNavbar } from '../../../../form-navbar'
 import { deleteImage, errorMessage, getItem, setImagePackage } from '../../order-image-api'
 import { UploadDialog } from './upload-dialog'
 
-// The photo page for one item: a plain 3-column grid plus the upload button
-// that used to be squeezed under every thumbnail in step 2. Tapping a photo
-// opens the one place that edits it (package label, delete). Mutations
-// refetch this item through the API and return to step 2 re-rendered from
-// the server, so the counts on the card are never stale.
+// The photo page for one item: a grid of photos plus the cell that adds the
+// next one. Tapping a photo opens the viewer, which shows the picture and
+// nothing else. Everything that changes a photo — the package label and the
+// delete — lives in the menu on its card. Mutations refetch this item
+// through the API, so the labels and counts on the cards are never stale.
 export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   const [detail, setDetail] = useState(initialDetail)
   const [error, setError] = useState<string | null>(null)
@@ -36,16 +53,27 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   // grid, and whether the dialog is open.
   const [uploading, setUploading] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
-  // Store the id, not the record: refresh() replaces the whole detail, so
-  // the dialog re-derives its image from fresh state every render. A
-  // deleted image then vanishes from the lookup and closes the dialog.
-  const [managedImageId, setManagedImageId] = useState<string | null>(null)
-  const [packageBusy, setPackageBusy] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  // Ids, not records: refresh() replaces the whole detail, so the dialogs
+  // re-derive their photo from fresh state every render. A deleted photo
+  // then vanishes from the lookup and closes the dialog.
+  const [previewImageId, setPreviewImageId] = useState<string | null>(null)
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
+  // One flag for every request in flight: a package change and a delete
+  // never run at the same time, and neither can be triggered twice.
+  const [busy, setBusy] = useState(false)
+  // The delete dialog owns its error: the user is still deciding there.
   const [dialogError, setDialogError] = useState<string | null>(null)
+  // Where the finger went down, for the swipe across the photo in the viewer.
+  // Touch only: a mouse drag over a picture is a selection, not a navigation.
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
 
-  const managedImage = detail.images.find((image) => image.id === managedImageId) ?? null
+  const previewImage = detail.images.find((image) => image.id === previewImageId) ?? null
+  const deletingImage = detail.images.find((image) => image.id === deletingImageId) ?? null
+  // The viewer counts positions, not seq: seq is allocated as MAX(seq) + 1 per
+  // item, so a delete leaves gaps and "รูปที่ 3 จาก 2" would make no sense.
+  const previewIndex = previewImageId
+    ? detail.images.findIndex((image) => image.id === previewImageId)
+    : -1
 
   async function refresh() {
     const result = await getItem(detail.item.id)
@@ -53,40 +81,62 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
     else setError(errorMessage(result.error, result.status))
   }
 
-  async function changePackage(pkg: string | null) {
-    if (!managedImage) return
-    setPackageBusy(true)
-    setDialogError(null)
+  // The package is picked in the card's menu, which closes on every pick, so
+  // a failure is reported on the page itself instead of inside the menu.
+  async function changePackage(image: ImageRecord, pkg: string | null) {
+    setBusy(true)
+    setError(null)
     try {
-      const result = await setImagePackage(managedImage.id, pkg)
+      const result = await setImagePackage(image.id, pkg)
       if (!result.ok) {
-        setDialogError(errorMessage(result.error, result.status))
+        setError(errorMessage(result.error, result.status))
         return
       }
       await refresh()
     } finally {
-      setPackageBusy(false)
+      setBusy(false)
     }
   }
 
   async function confirmDelete() {
-    if (!managedImage) return
-    setDeleting(true)
+    if (!deletingImage) return
+    setBusy(true)
     setDialogError(null)
     try {
-      const result = await deleteImage(managedImage.id)
+      const result = await deleteImage(deletingImage.id)
       if (!result.ok) {
+        // Stays inside the dialog: the user is still deciding there, and a
+        // failure (already deleted elsewhere) must not vanish silently.
         setDialogError(errorMessage(result.error, result.status))
         return
       }
-      // Clearing the id closes the dialog; the refresh removes the tile.
-      setManagedImageId(null)
-      setConfirmingDelete(false)
+      // Clearing the id closes the dialog; the refresh removes the card.
+      setDeletingImageId(null)
       await refresh()
     } finally {
-      setDeleting(false)
+      setBusy(false)
     }
   }
+
+  // Walking the viewer by one photo. The buttons, the arrow keys and the
+  // swipe all end up here, so the three ways to move cannot drift apart.
+  function stepPreview(delta: number) {
+    setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+  }
+
+  // Arrow keys are the quickest way through the photos with a keyboard. The
+  // listener exists only while the viewer is open, and the update reads the
+  // latest list, so a refresh mid-view cannot move to a stale photo.
+  useEffect(() => {
+    if (previewImageId === null) return
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      const delta = event.key === 'ArrowRight' ? 1 : -1
+      setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [previewImageId, detail.images])
 
   return (
     <div className="flex w-full flex-col gap-4 pb-4 sm:gap-6">
@@ -117,10 +167,12 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           <PhotoTile
             key={image.id}
             image={image}
-            onOpen={() => {
+            busy={busy}
+            onPreview={() => setPreviewImageId(image.id)}
+            onPackageChange={(pkg) => void changePackage(image, pkg)}
+            onDelete={() => {
               setDialogError(null)
-              setConfirmingDelete(false)
-              setManagedImageId(image.id)
+              setDeletingImageId(image.id)
             }}
           />
         ))}
@@ -159,77 +211,103 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
         onUploadingChange={setUploading}
       />
 
+      {/* The viewer: the photo, then a bar to walk the item's photos. The
+          title stays for screen readers, so the dialog has a name without
+          putting text on screen. */}
       <Dialog
-        open={managedImage !== null}
+        open={previewImage !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setManagedImageId(null)
-            setConfirmingDelete(false)
-            setDialogError(null)
-          }
+          if (!open) setPreviewImageId(null)
         }}>
-        {/* Tall content (photo + select + footer) must scroll inside the
-            viewport on a small phone; the default popup has no max height. */}
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>รูปที่ {managedImage?.seq}</DialogTitle>
-            <DialogDescription>เลือกแพ็กเกจหรือลบรูปนี้ออก</DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className="gap-0 p-2 sm:max-w-3xl"
+          onTouchStart={(event) => {
+            const touch = event.touches[0]
+            swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+          }}
+          onTouchEnd={(event) => {
+            const start = swipeStart.current
+            swipeStart.current = null
+            const touch = event.changedTouches[0]
+            if (!start || !touch) return
+            const dx = touch.clientX - start.x
+            const dy = touch.clientY - start.y
+            // A mostly vertical drag is the user scrolling, not a request for
+            // the next photo.
+            if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return
+            stepPreview(dx < 0 ? 1 : -1)
+          }}>
+          <DialogTitle className="sr-only">
+            {previewImage
+              ? `รูปที่ ${previewIndex + 1} จาก ${detail.images.length}`
+              : 'รูปภาพ'}
+          </DialogTitle>
 
-          {managedImage && (
+          {previewImage && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
               <img
-                src={`/api/liff/order-images/images/${managedImage.id}/file`}
-                alt={`รูปที่ ${managedImage.seq}`}
-                className="max-h-64 w-full rounded-xl bg-muted object-contain sm:max-h-80"
+                src={`/api/liff/order-images/images/${previewImage.id}/file`}
+                alt={`รูปที่ ${previewImage.seq}`}
+                className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
               />
-              <label className="flex flex-col gap-1.5 text-sm">
-                แพ็กเกจ
-                <Select
-                  value={managedImage.package}
-                  onValueChange={(pkg) => void changePackage(pkg)}
-                  disabled={packageBusy || deleting}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="ยังไม่ระบุแพ็กเกจ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PACKAGE_OPTIONS.map((pkg) => (
-                      <SelectItem key={pkg} value={pkg}>
-                        {pkg}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
+
+              {/* One photo has nowhere to go, so the bar appears only when
+                  there is something to walk. 44px targets sit under the
+                  picture, where a thumb reaches and nothing covers the photo. */}
+              {detail.images.length > 1 && (
+                <div className="mt-1 flex items-center justify-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="size-11"
+                    aria-label="รูปก่อนหน้า"
+                    disabled={previewIndex <= 0}
+                    onClick={() => stepPreview(-1)}>
+                    <ChevronLeftIcon />
+                  </Button>
+                  <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground">
+                    {previewIndex + 1} / {detail.images.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="size-11"
+                    aria-label="รูปถัดไป"
+                    disabled={previewIndex >= detail.images.length - 1}
+                    onClick={() => stepPreview(1)}>
+                    <ChevronRightIcon />
+                  </Button>
+                </div>
+              )}
             </>
           )}
+        </DialogContent>
+      </Dialog>
 
-          {confirmingDelete && <p className="text-sm text-destructive">ลบรูปนี้ถาวร ไม่สามารถกู้คืนได้</p>}
+      {/* Deleting a photo cannot be undone, so it gets its own confirmation
+          instead of a button that fires on the first tap. */}
+      <Dialog
+        open={deletingImage !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingImageId(null)
+            setDialogError(null)
+          }
+        }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันการลบรูปภาพ</DialogTitle>
+            <DialogDescription>
+              {deletingImage ? `ลบรูปที่ ${deletingImage.seq} ออกถาวร ไม่สามารถกู้คืนได้` : ''}
+            </DialogDescription>
+          </DialogHeader>
           {dialogError && <p className="text-sm text-destructive">{dialogError}</p>}
-
           <DialogFooter>
-            {confirmingDelete ? (
-              <>
-                <Button variant="outline" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
-                  ยกเลิก
-                </Button>
-                <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
-                  {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
-                </Button>
-              </>
-            ) : (
-              <>
-                <DialogClose render={<Button variant="outline" />}>ปิด</DialogClose>
-                <Button
-                  variant="destructive"
-                  disabled={packageBusy || deleting}
-                  onClick={() => setConfirmingDelete(true)}>
-                  <Trash2Icon />
-                  ลบรูปนี้
-                </Button>
-              </>
-            )}
+            <DialogClose render={<Button variant="outline" />}>ยกเลิก</DialogClose>
+            <Button variant="destructive" disabled={busy} onClick={() => void confirmDelete()}>
+              {busy ? 'กำลังลบ...' : 'ยืนยันลบ'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -237,15 +315,44 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   )
 }
 
-// One photo as a tile: the picture inside its own frame, with the package
-// label under it.
+// A swipe has to be deliberate: a short drag is usually a slip while tapping.
+const SWIPE_THRESHOLD_PX = 40
+
+// The id `delta` photos away from `currentId`, or the same id at an edge, so a
+// swipe past the first or the last photo simply stays put.
+function neighbourId(
+  images: ImageRecord[],
+  currentId: string | null,
+  delta: number
+): string | null {
+  const at = images.findIndex((image) => image.id === currentId)
+  return at < 0 ? currentId : (images[at + delta]?.id ?? currentId)
+}
+
+// One photo as a card: the picture inside its own frame, the package label
+// under it, and the menu that changes the photo.
 //
-// The tile stays a button because tapping it opens the editor, and the
-// label stays inside it because that is what the e2e spec reads.
-function PhotoTile({ image, onOpen }: { image: ImageRecord; onOpen: () => void }) {
+// The card is a div, not a button: the picture and the menu trigger are two
+// separate controls, and a button inside a button is invalid HTML that the
+// component library reports in the console.
+function PhotoTile({
+  image,
+  busy,
+  onPreview,
+  onPackageChange,
+  onDelete,
+}: {
+  image: ImageRecord
+  busy: boolean
+  onPreview: () => void
+  onPackageChange: (pkg: string | null) => void
+  onDelete: () => void
+}) {
   return (
-    <button type="button" onClick={onOpen} className="flex flex-col gap-y-2 rounded-xl border p-2 text-left">
-      <span className="block overflow-hidden rounded-lg border">
+    <div className="relative flex flex-col gap-y-2 rounded-xl border p-2">
+      {/* Tapping the picture opens the viewer. Only the picture is a
+          control, so the label below stays readable text. */}
+      <button type="button" onClick={onPreview} className="block overflow-hidden rounded-lg border">
         {/* next/image would proxy through /_next/image, whose upstream
             fetch carries no session cookie and would be rejected 403. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
@@ -255,10 +362,57 @@ function PhotoTile({ image, onOpen }: { image: ImageRecord; onOpen: () => void }
           loading="lazy"
           className="aspect-square w-full bg-muted object-cover"
         />
-      </span>
+      </button>
+
       <span className="w-full truncate text-xs text-muted-foreground text-center">
-        {image.package ?? 'ยังไม่ระบุแพ็คเกจ'}
+        {image.package ?? 'ยังไม่ระบุแพ็กเกจ'}
       </span>
-    </button>
+
+      {/* Everything that changes the photo lives here. The frosted backdrop
+          keeps the trigger readable over a bright picture. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-1.5 top-1.5 bg-background/80 backdrop-blur-sm"
+              aria-label={`ตั้งค่ารูปที่ ${image.seq}`}
+            />
+          }>
+          <MoreVerticalIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-auto min-w-40">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>แพ็กเกจ</DropdownMenuSubTrigger>
+            {/* The submenu takes its width from its trigger, which is
+                narrower than the longest package name. */}
+            <DropdownMenuSubContent className="w-auto min-w-48">
+              <DropdownMenuRadioGroup
+                value={image.package ?? null}
+                onValueChange={(value: string | null) => onPackageChange(value)}>
+                {/* closeOnClick ends the whole menu on every pick, so the
+                    card shows the new label (or the error) right away. */}
+                <DropdownMenuRadioItem value={null} closeOnClick>
+                  ยังไม่ระบุแพ็กเกจ
+                </DropdownMenuRadioItem>
+                {PACKAGE_OPTIONS.map((pkg) => (
+                  <DropdownMenuRadioItem key={pkg} value={pkg} closeOnClick>
+                    {pkg}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem variant="destructive" disabled={busy} onClick={onDelete}>
+            <Trash2Icon />
+            ลบรูปนี้
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }

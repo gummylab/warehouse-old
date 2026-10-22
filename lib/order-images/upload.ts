@@ -14,4 +14,17 @@ export function isAcceptedImageType(type: string): boolean {
 }
 
 // Value for the file input's accept attribute.
+//
+// Kept to the three types on purpose: iOS converts a HEIC photo to JPEG on
+// upload only while the input does not declare HEIC support, and the server
+// rejects HEIC, so a wildcard here would break the library picker on iPhone.
 export const IMAGE_ACCEPT_ATTRIBUTE = ACCEPTED_IMAGE_TYPES.join(',')
+
+// Value for the camera input's accept attribute.
+//
+// Looser than the gallery one for a reason: Android only offers the camera in
+// its own chooser when the accept is a wildcard, so the narrow list above
+// leaves a phone with no camera at all in the browsers that ignore `capture`.
+// A camera writes a JPEG, and if a browser falls back to the gallery the pick
+// still goes through addFiles, which screens it.
+export const CAMERA_ACCEPT_ATTRIBUTE = 'image/*'
