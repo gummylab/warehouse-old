@@ -6,10 +6,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MoreVerticalIcon,
-  PlusIcon,
   Trash2Icon,
 } from 'lucide-react'
 
+import { FormPage } from '@/components/layout/form-page'
+import { TileButton, TileGrid } from '@/components/layout/tile-grid'
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
@@ -166,30 +167,32 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   }, [previewImageId, optimisticImages])
 
   return (
-    <div className="flex w-full flex-col gap-4 pb-4 sm:gap-6">
-      {/* The navbar carries the item and the order it belongs to, so the
-          page below is only the photos. The back link keeps the name
-          "กลับออเดอร์" because that is what the e2e spec looks for. */}
-      <FormNavbar
-        title={`ไอเท็ม ${detail.item.itemNumber}`}
-        subtitle={`ออเดอร์ ${detail.order.orderNumber} / ${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`}
-        action={
-          <ButtonLink
-            variant="ghost"
-            size="icon"
-            aria-label="กลับออเดอร์"
-            href={`/liff/forms/order-image?orderId=${detail.order.id}`}>
-            <ChevronLeftIcon />
-          </ButtonLink>
-        }
-      />
-
+    <FormPage
+      className="w-full"
+      header={
+        // The navbar carries the item and the order it belongs to, so the
+        // page below is only the photos. The back link keeps the name
+        // "กลับออเดอร์" because that is what the e2e spec looks for.
+        <FormNavbar
+          title={`ไอเท็ม ${detail.item.itemNumber}`}
+          subtitle={`ออเดอร์ ${detail.order.orderNumber} / ${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`}
+          action={
+            <ButtonLink
+              variant="ghost"
+              size="icon"
+              aria-label="กลับออเดอร์"
+              href={`/liff/forms/order-image?orderId=${detail.order.id}`}>
+              <ChevronLeftIcon />
+            </ButtonLink>
+          }
+        />
+      }>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {/* The photo grid, framed like the item cards on the order page. The
           add cell is the last one, so it always sits where the next photo
           will appear. */}
-      <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
+      <TileGrid label="รูปภาพของไอเท็ม">
         {optimisticImages.map((image) => (
           <PhotoTile
             key={image.id}
@@ -209,18 +212,15 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           </span>
         )}
 
-        {/* h-auto overrides the fixed h-9 that buttonVariants sets: a grid
-            item with a fixed height does not stretch to the row height, so
-            the cell would sit as a short pill next to the photo tiles. */}
-        <Button
-          variant="outline"
-          className="h-auto flex-col gap-2 border-dashed rounded-xl py-14"
+        {/* The add cell is the last tile, so it always sits where the next
+            photo will appear. Height and layout live in TileButton. */}
+        <TileButton
+          height="tall"
+          label="เพิ่มรูปภาพ"
           disabled={uploading}
-          onClick={() => setUploadOpen(true)}>
-          <PlusIcon />
-          <span className="text-xs leading-tight">เพิ่มรูปภาพ</span>
-        </Button>
-      </section>
+          onClick={() => setUploadOpen(true)}
+        />
+      </TileGrid>
 
       {/* The upload dialog owns the file list and the upload loop. Closing
           it refetches the item, so the grid shows whatever landed, even
@@ -332,7 +332,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </FormPage>
   )
 }
 

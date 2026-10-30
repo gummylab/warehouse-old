@@ -1,7 +1,8 @@
 import { io } from 'next/cache'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
+import { FormPage } from '@/components/layout/form-page'
+import { ButtonLink } from '@/components/ui/button'
 import { getItemDetail } from '@/lib/db/order-images'
 
 import { FormNavbar } from '../../../../form-navbar'
@@ -33,15 +34,17 @@ export default async function ItemImagesPage(props: PageProps<'/liff/forms/order
 
   if (!detail) {
     return (
-      <div className="flex flex-col gap-4 pb-4">
-        <FormNavbar title="ไม่พบไอเท็มนี้" />
-        <Link
+      <FormPage header={<FormNavbar title="ไม่พบไอเท็มนี้" />}>
+        <p className="text-sm text-muted-foreground">
+          ไอเท็มอาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง
+        </p>
+        <ButtonLink
+          variant="outline"
           href="/liff/forms/order-image"
-          className="text-sm text-primary underline-offset-4 hover:underline"
-        >
+          className="self-start">
           กลับไปหน้าแบบฟอร์ม
-        </Link>
-      </div>
+        </ButtonLink>
+      </FormPage>
     )
   }
 

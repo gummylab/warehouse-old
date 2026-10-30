@@ -2,8 +2,9 @@
 
 import { startTransition, useOptimistic, useRef, useState } from 'react'
 
-import { ImagePlusIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { ImagePlusIcon, Trash2Icon } from 'lucide-react'
 
+import { TileButton, TileGrid } from '@/components/layout/tile-grid'
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
@@ -167,17 +168,14 @@ export function OrderItemsStep({
       {/* The frame that closes the list: one cell, the one that adds the next
           item. With no items yet this frame is the whole page, and the
           dashed cell is what says "no item yet". */}
-      <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
-        <Button
-          variant="outline"
-          className="h-auto flex-col gap-2 border-dashed py-13 rounded-xl"
+      <TileGrid label="เพิ่มไอเท็ม">
+        <TileButton
+          label="เพิ่มไอเท็ม"
+          hint={`(${nextTop})`}
           disabled={pendingAddKeys.has('root')}
-          onClick={() => handleAdd(null)}>
-          <PlusIcon />
-          <span className="text-xs leading-tight">เพิ่มไอเท็ม</span>
-          <span className="text-xs leading-tight text-muted-foreground">({nextTop})</span>
-        </Button>
-      </section>
+          onClick={() => handleAdd(null)}
+        />
+      </TileGrid>
 
       <Dialog
         open={confirmItem !== null}
@@ -234,13 +232,17 @@ function ItemTile({
     <div
       className={cn(
         'flex flex-col items-center justify-between gap-2 rounded-xl border px-2 py-10',
-        isPack ? 'bg-blue-400/10 border-primary/20' : 'bg-yellow-400/10 border-border',
+        isPack ? 'bg-primary/5 border-primary/20' : 'bg-muted/50 border-border',
         isTemp && 'opacity-60'
       )}>
-      <h3 className="font-medium text-sm">ไอเท็ม {node.itemNumber}</h3>
-      <div className="flex flex-col gap-y-2 items-center gap-1">
+      {isPack ? (
+        <h2 className="font-medium text-sm">ไอเท็ม {node.itemNumber}</h2>
+      ) : (
+        <h3 className="font-medium text-sm">ไอเท็ม {node.itemNumber}</h3>
+      )}
+      <div className="flex flex-col items-center gap-2">
         <span className="text-xs text-muted-foreground">จำนวน {node.images.length} ภาพ</span>
-        <div className="flex gap-x-2">
+        <div className="flex gap-2">
           {isTemp ? (
             // No row exists behind a temporary node yet, so its photo link
             // would open an item page that does not exist.
@@ -308,7 +310,7 @@ function ItemCard({
       )
 
   return (
-    <section className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
+    <TileGrid label={`ไอเท็ม ${node.itemNumber}`}>
       <ItemTile node={node} deletePending={deletePending} onDelete={onDelete} />
 
       {node.children.map((child) => (
@@ -319,24 +321,16 @@ function ItemCard({
           out entirely instead of showing a button that cannot do anything.
           The visible label is split over two lines so it fits the tile
           width, while the accessible name stays the single phrase the
-          form and the e2e spec look for.
-
-          h-auto overrides the fixed h-9 that buttonVariants sets: a grid
-          item with a fixed height does not stretch to the row height, so
-          the button would sit as a short pill in a tall cell. py-10 and
-          gap-2 then give it the same box proportions as the tiles above. */}
+          form and the e2e spec look for. */}
       {nextVariety !== null && (
-        <Button
-          variant="outline"
+        <TileButton
           aria-label={`เพิ่มไอเท็มย่อย (${nextVariety})`}
-          className="h-auto flex-col gap-2 border-dashed py-10 rounded-xl"
+          label="เพิ่ม Variety Pack"
+          hint={`(${nextVariety})`}
           disabled={pendingAddKeys.has(node.id)}
-          onClick={() => onAdd(node.id)}>
-          <PlusIcon />
-          <span className="text-xs leading-tight">เพิ่ม Variety Pack</span>
-          <span className="text-xs leading-tight text-muted-foreground">({nextVariety})</span>
-        </Button>
+          onClick={() => onAdd(node.id)}
+        />
       )}
-    </section>
+    </TileGrid>
   )
 }

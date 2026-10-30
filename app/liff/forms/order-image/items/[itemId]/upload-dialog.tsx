@@ -259,7 +259,7 @@ export function UploadDialog({
                   <Spinner className="size-4 shrink-0" aria-label="กำลังอัปโหลด" />
                 )}
                 {entry.status === 'done' && (
-                  <CheckIcon className="size-4 shrink-0 text-emerald-600" aria-label="อัปโหลดแล้ว" />
+                  <CheckIcon className="size-4 shrink-0 text-success" aria-label="อัปโหลดแล้ว" />
                 )}
                 {(entry.status === 'error' || entry.status === 'rejected') && (
                   <span className="max-w-40 shrink-0 truncate text-xs text-destructive">

@@ -25,11 +25,11 @@ export function DataTablePagination<TData extends RowData>({
       <div className="flex-1 text-sm text-muted-foreground">
         {table.getFilteredRowModel().rows.length} แถว
       </div>
-      <div className="flex items-center space-x-6 lg:space-x-8">
+      <div className="flex items-center gap-6 lg:gap-8">
         <div className="flex w-[100px] items-center justify-center text-sm font-medium">
           หน้า {table.state.pagination.pageIndex + 1} จาก {table.getPageCount()}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"

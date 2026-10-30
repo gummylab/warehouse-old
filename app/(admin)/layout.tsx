@@ -1,14 +1,20 @@
 import { Suspense } from 'react'
 
-import { AppNavbarLabel } from '@/components/app-navbar-label'
 import { AppSidebar } from '@/components/app-sidebar'
-import { Separator } from '@/components/ui/separator'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { PageBody } from '@/components/layout/page-body'
+import { PageFooter } from '@/components/layout/page-footer'
+import { SkipLink } from '@/components/layout/skip-link'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 
 import AdminGate from './admin-gate'
+import { AppHeader } from './app-header'
 
-// Dashboard chrome: sidebar + header. Root layout stays minimal so future
-// non-admin pages can opt out of this shell.
+// Dashboard chrome: sidebar + header + content + footer. The root layout
+// stays minimal so pages outside (admin) can opt out of this shell.
+//
+// SidebarInset is already a <main>, so the page body is a div inside it, not
+// a second main element. PageBody owns the gutter and the flex-1 height the
+// data table needs.
 export default function AdminLayout({
   children,
 }: {
@@ -16,23 +22,22 @@ export default function AdminLayout({
 }) {
   return (
     <SidebarProvider defaultOpen={false}>
+      {/* First focusable element in the DOM, before the sidebar links. */}
+      <SkipLink />
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 border-b">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="my-2" />
-            <AppNavbarLabel />
-          </div>
-        </header>
-        <main className="flex flex-1 flex-col p-4">
+      <SidebarInset className="flex min-h-svh flex-col">
+        <AppHeader />
+
+        <PageBody id="main-content" fill>
           {/* The gate reads the request headers, which is runtime data, so
               it needs a boundary. It also keeps the admin pages out of the
               static shell for anyone but the machine running the server. */}
           <Suspense fallback={null}>
             <AdminGate>{children}</AdminGate>
           </Suspense>
-        </main>
+        </PageBody>
+
+        <PageFooter>โหมดเครื่องผู้ดูแลระบบ</PageFooter>
       </SidebarInset>
     </SidebarProvider>
   )

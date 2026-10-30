@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 }
 
 export default function DashboardPage() {
-  return <p>Dashboard</p>
+  return <p>แดชบอร์ด</p>
 }
