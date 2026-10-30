@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    // Marks this app as being upgraded for a published security advisory, so
+    // Next.js can surface upgrade-specific guidance during the update.
+    agentUpgrade: 'security',
   },
   // /liff is only a folder prefix; land visitors on the authorization screen
   // instead of a 404. Done here (before render) rather than with an
