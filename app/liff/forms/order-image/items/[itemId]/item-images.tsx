@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { startTransition, useEffect, useOptimistic, useRef, useState } from 'react'
 
 import {
   ChevronLeftIcon,
@@ -33,8 +33,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { ImageRecord, ItemDetail } from '@/lib/db/types'
+import { toastMessages } from '@/lib/messages'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
+import { reduceImages } from '@/lib/order-images/tree'
+import { notifyError, notifySuccess } from '@/lib/toast'
 
 import { FormNavbar } from '../../../../form-navbar'
 import { deleteImage, errorMessage, getItem, setImagePackage } from '../../order-image-api'
@@ -58,21 +61,23 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   // then vanishes from the lookup and closes the dialog.
   const [previewImageId, setPreviewImageId] = useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
-  // One flag for every request in flight: a package change and a delete
-  // never run at the same time, and neither can be triggered twice.
-  const [busy, setBusy] = useState(false)
-  // The delete dialog owns its error: the user is still deciding there.
-  const [dialogError, setDialogError] = useState<string | null>(null)
+  // One request per image: a second package change on the same card waits,
+  // while the other cards stay usable.
+  const [pendingPackageId, setPendingPackageId] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  // The grid renders the preview, not the last server response, so a change
+  // appears on the click and the response replaces the preview afterwards.
+  const [optimisticImages, applyOptimistic] = useOptimistic(detail.images, reduceImages)
   // Where the finger went down, for the swipe across the photo in the viewer.
   // Touch only: a mouse drag over a picture is a selection, not a navigation.
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
 
-  const previewImage = detail.images.find((image) => image.id === previewImageId) ?? null
-  const deletingImage = detail.images.find((image) => image.id === deletingImageId) ?? null
+  const previewImage = optimisticImages.find((image) => image.id === previewImageId) ?? null
+  const deletingImage = optimisticImages.find((image) => image.id === deletingImageId) ?? null
   // The viewer counts positions, not seq: seq is allocated as MAX(seq) + 1 per
   // item, so a delete leaves gaps and "รูปที่ 3 จาก 2" would make no sense.
   const previewIndex = previewImageId
-    ? detail.images.findIndex((image) => image.id === previewImageId)
+    ? optimisticImages.findIndex((image) => image.id === previewImageId)
     : -1
 
   async function refresh() {
@@ -81,47 +86,69 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
     else setError(errorMessage(result.error, result.status))
   }
 
-  // The package is picked in the card's menu, which closes on every pick, so
-  // a failure is reported on the page itself instead of inside the menu.
-  async function changePackage(image: ImageRecord, pkg: string | null) {
-    setBusy(true)
+  // The package is picked in the card's menu, which closes on every pick.
+  // The label changes on the click; a refusal reverts it and reports through
+  // the shared toast instead of a line under a menu that no longer exists.
+  function changePackage(image: ImageRecord, pkg: string | null) {
+    if (pendingPackageId) return
+    setPendingPackageId(image.id)
     setError(null)
-    try {
-      const result = await setImagePackage(image.id, pkg)
-      if (!result.ok) {
-        setError(errorMessage(result.error, result.status))
-        return
+    startTransition(async () => {
+      applyOptimistic({ type: 'package', id: image.id, package: pkg })
+      try {
+        const result = await setImagePackage(image.id, pkg)
+        if (!result.ok) {
+          notifyError(toastMessages.packageChangeFailed, {
+            description: errorMessage(result.error, result.status),
+          })
+          return
+        }
+        setDetail((current) => ({
+          ...current,
+          images: reduceImages(current.images, {
+            type: 'replace',
+            image: result.data.image,
+          }),
+        }))
+        notifySuccess(pkg ? toastMessages.packageChanged(pkg) : toastMessages.packageCleared)
+      } finally {
+        setPendingPackageId(null)
       }
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
-  async function confirmDelete() {
-    if (!deletingImage) return
-    setBusy(true)
-    setDialogError(null)
-    try {
-      const result = await deleteImage(deletingImage.id)
-      if (!result.ok) {
-        // Stays inside the dialog: the user is still deciding there, and a
-        // failure (already deleted elsewhere) must not vanish silently.
-        setDialogError(errorMessage(result.error, result.status))
-        return
+  function confirmDelete() {
+    if (!deletingImage || pendingDeleteId) return
+    const target = deletingImage
+    // Close first: the card is already leaving the grid, so keeping the
+    // dialog open would make the delete feel slower than it is.
+    setDeletingImageId(null)
+    setPendingDeleteId(target.id)
+    startTransition(async () => {
+      applyOptimistic({ type: 'remove', id: target.id })
+      try {
+        const result = await deleteImage(target.id)
+        if (!result.ok) {
+          notifyError(toastMessages.imageDeleteFailed, {
+            description: errorMessage(result.error, result.status),
+          })
+          return
+        }
+        setDetail((current) => ({
+          ...current,
+          images: reduceImages(current.images, { type: 'remove', id: target.id }),
+        }))
+        notifySuccess(toastMessages.imageDeleted)
+      } finally {
+        setPendingDeleteId(null)
       }
-      // Clearing the id closes the dialog; the refresh removes the card.
-      setDeletingImageId(null)
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
+    })
   }
 
   // Walking the viewer by one photo. The buttons, the arrow keys and the
   // swipe all end up here, so the three ways to move cannot drift apart.
   function stepPreview(delta: number) {
-    setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+    setPreviewImageId((currentId) => neighbourId(optimisticImages, currentId, delta))
   }
 
   // Arrow keys are the quickest way through the photos with a keyboard. The
@@ -132,11 +159,11 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
       const delta = event.key === 'ArrowRight' ? 1 : -1
-      setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+      setPreviewImageId((currentId) => neighbourId(optimisticImages, currentId, delta))
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [previewImageId, detail.images])
+  }, [previewImageId, optimisticImages])
 
   return (
     <div className="flex w-full flex-col gap-4 pb-4 sm:gap-6">
@@ -163,17 +190,15 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           add cell is the last one, so it always sits where the next photo
           will appear. */}
       <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
-        {detail.images.map((image) => (
+        {optimisticImages.map((image) => (
           <PhotoTile
             key={image.id}
             image={image}
-            busy={busy}
+            pending={pendingPackageId !== null}
+            deletePending={pendingDeleteId !== null}
             onPreview={() => setPreviewImageId(image.id)}
-            onPackageChange={(pkg) => void changePackage(image, pkg)}
-            onDelete={() => {
-              setDialogError(null)
-              setDeletingImageId(image.id)
-            }}
+            onPackageChange={(pkg) => changePackage(image, pkg)}
+            onDelete={() => setDeletingImageId(image.id)}
           />
         ))}
 
@@ -239,7 +264,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           }}>
           <DialogTitle className="sr-only">
             {previewImage
-              ? `รูปที่ ${previewIndex + 1} จาก ${detail.images.length}`
+              ? `รูปที่ ${previewIndex + 1} จาก ${optimisticImages.length}`
               : 'รูปภาพ'}
           </DialogTitle>
 
@@ -255,7 +280,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
               {/* One photo has nowhere to go, so the bar appears only when
                   there is something to walk. 44px targets sit under the
                   picture, where a thumb reaches and nothing covers the photo. */}
-              {detail.images.length > 1 && (
+              {optimisticImages.length > 1 && (
                 <div className="mt-1 flex items-center justify-center gap-2">
                   <Button
                     variant="ghost"
@@ -267,14 +292,14 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
                     <ChevronLeftIcon />
                   </Button>
                   <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground">
-                    {previewIndex + 1} / {detail.images.length}
+                    {previewIndex + 1} / {optimisticImages.length}
                   </span>
                   <Button
                     variant="ghost"
                     size="icon-lg"
                     className="size-11"
                     aria-label="รูปถัดไป"
-                    disabled={previewIndex >= detail.images.length - 1}
+                    disabled={previewIndex >= optimisticImages.length - 1}
                     onClick={() => stepPreview(1)}>
                     <ChevronRightIcon />
                   </Button>
@@ -290,10 +315,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
       <Dialog
         open={deletingImage !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setDeletingImageId(null)
-            setDialogError(null)
-          }
+          if (!open) setDeletingImageId(null)
         }}>
         <DialogContent>
           <DialogHeader>
@@ -302,11 +324,10 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
               {deletingImage ? `ลบรูปที่ ${deletingImage.seq} ออกถาวร ไม่สามารถกู้คืนได้` : ''}
             </DialogDescription>
           </DialogHeader>
-          {dialogError && <p className="text-sm text-destructive">{dialogError}</p>}
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>ยกเลิก</DialogClose>
-            <Button variant="destructive" disabled={busy} onClick={() => void confirmDelete()}>
-              {busy ? 'กำลังลบ...' : 'ยืนยันลบ'}
+            <Button variant="destructive" onClick={confirmDelete}>
+              ยืนยันลบ
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -337,13 +358,15 @@ function neighbourId(
 // component library reports in the console.
 function PhotoTile({
   image,
-  busy,
+  pending,
+  deletePending,
   onPreview,
   onPackageChange,
   onDelete,
 }: {
   image: ImageRecord
-  busy: boolean
+  pending: boolean
+  deletePending: boolean
   onPreview: () => void
   onPackageChange: (pkg: string | null) => void
   onDelete: () => void
@@ -378,6 +401,7 @@ function PhotoTile({
               size="icon-sm"
               className="absolute right-1.5 top-1.5 bg-background/80 backdrop-blur-sm"
               aria-label={`ตั้งค่ารูปที่ ${image.seq}`}
+              disabled={pending}
             />
           }>
           <MoreVerticalIcon />
@@ -407,7 +431,10 @@ function PhotoTile({
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem variant="destructive" disabled={busy} onClick={onDelete}>
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={pending || deletePending}
+            onClick={onDelete}>
             <Trash2Icon />
             ลบรูปนี้
           </DropdownMenuItem>
