@@ -7,6 +7,9 @@ import { type DataTableFeatures } from '@/components/data-table/data-table-featu
 import { Button } from '@/components/ui/button'
 import { type RegisterUser } from '@/lib/db/types'
 
+import { toastMessages } from '@/lib/messages'
+import { notifySuccess } from '@/lib/toast'
+
 import { approveUser, rejectUser, type DecideActionState } from './actions'
 import { actionsHeader, profileColumn, requestedAtColumn } from './columns'
 import { useRegisterDecision } from './register-decision-context'
@@ -22,32 +25,52 @@ export const pendingColumns = columnHelper.columns([
   columnHelper.display({
     id: 'actions',
     header: () => actionsHeader,
-    cell: ({ row }) => <DecideButtons id={row.original.id} />,
+    cell: ({ row }) => (
+      <DecideButtons id={row.original.id} displayName={row.original.displayName} />
+    ),
   }),
 ])
 
 // Both buttons post straight to server actions (write + revalidate
 // /register), so a decided row leaves the queue without the client
 // navigating anywhere.
-function DecideButtons({ id }: { id: string }) {
+function DecideButtons({ id, displayName }: { id: string; displayName: string }) {
   return (
     <div className="flex justify-center gap-2">
-      <DecideButton id={id} label="อนุมัติ" variant="default" action={approveUser} />
-      <DecideButton id={id} label="ปฏิเสธ" variant="destructive" action={rejectUser} />
+      <DecideButton
+        id={id}
+        displayName={displayName}
+        label="อนุมัติ"
+        variant="default"
+        action={approveUser}
+        successMessage={toastMessages.userApproved}
+      />
+      <DecideButton
+        id={id}
+        displayName={displayName}
+        label="ปฏิเสธ"
+        variant="destructive"
+        action={rejectUser}
+        successMessage={toastMessages.userRejected}
+      />
     </div>
   )
 }
 
 function DecideButton({
   id,
+  displayName,
   label,
   variant,
   action,
+  successMessage,
 }: {
   id: string
+  displayName: string
   label: string
   variant: 'default' | 'destructive'
   action: (id: string) => Promise<DecideActionState>
+  successMessage: (name: string) => string
 }) {
   const { removeUser, reportError } = useRegisterDecision()
 
@@ -60,8 +83,11 @@ function DecideButton({
       removeUser(id)
       const result = await action(id)
       // A refusal is reported above the table, not next to the button:
-      // the button unmounts together with the row it removed.
+      // the button unmounts together with the row it removed. A success is
+      // announced after the write lands, so the toast cannot contradict a
+      // row that had to come back.
       if (result) reportError(result.error)
+      else notifySuccess(successMessage(displayName))
       return result
     },
     null,

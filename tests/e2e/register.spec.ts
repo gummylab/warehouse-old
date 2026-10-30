@@ -25,6 +25,10 @@ test('approving a request moves the user into the approved table', async ({ page
 
   await pendingRow.getByRole('button', { name: 'อนุมัติ' }).click()
 
+  // The toast confirms the write on the same round trip, so a failed action
+  // can never leave a success message behind.
+  await expect(page.getByText(`อนุมัติ ${user.displayName} แล้ว`)).toBeVisible()
+
   // The row leaves the queue as soon as the server action revalidates.
   await expect(pendingRow).toHaveCount(0)
   // The row leaving the table proves the UI updated, not that the write

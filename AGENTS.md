@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Next.js 16 dashboard for warehouse order images ("Warehouse Dashboard"). Bun is the package manager. UI copy is Thai.
+Next.js 16.4.3 dashboard for warehouse order images ("Warehouse Dashboard"). Bun is the package manager. UI copy is Thai.
 
 ## Commands
 
@@ -10,7 +10,9 @@ All run with bun (do not use npm/yarn/pnpm, `packageManager: bun@1.4.2`):
 - `bun run lint` → ESLint flat config.
 - `bun run typecheck` → `bunx next typegen && bunx tsc --noEmit`. The typegen step writes the generated route types (`PageProps`, `RouteContext`) that the code uses; without it the typecheck sees no route types at all.
 - `bun run test` → Vitest unit tests under `tests/unit` (`test:watch` to keep them running).
+- `bun run test tests/unit/order-images/tree.test.ts` → one unit file.
 - `bun run test:e2e` → Playwright, which starts its own server on port **3100** (specs in `tests/e2e`, `test:e2e:ui` for the UI runner).
+- `bun run test:e2e tests/e2e/order-image.spec.ts` → one e2e spec; the script already sets `--conditions=react-server`.
 - `bun run verify` → lint + typecheck + unit tests + production build. Run this before claiming a change works. The build step is part of it because cacheComponents only surfaces its validation errors there, not in dev.
 - `bun run dev:tunnel` → dev server + Cloudflare Tunnel side by side (`concurrently`).
 - `bun run tunnel` → tunnel only. Requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`, exits if missing.
@@ -20,8 +22,8 @@ All run with bun (do not use npm/yarn/pnpm, `packageManager: bun@1.4.2`):
 
 Two layers, split by what they can prove.
 
-- **Unit (`tests/unit`, Vitest, `environment: 'node'`)** covers the pure rules (item numbering, validation, storage keys, page titles) and the server logic that needs a real database (data layer, LINE identity with `fetch` stubbed, the session/auth matrix, route handlers called directly with a `Request`). They run on Node rather than Bun on purpose: `better-sqlite3` must load on the same runtime as production, and `bun run dev` runs Next on Node.
-- **E2E (`tests/e2e`, Playwright)** runs a real browser against a real server for the journeys unit tests cannot reach: the LIFF routing gate, the whole order-image flow, and the register queue. First run on a machine needs `bunx playwright install chromium`.
+- **Unit (`tests/unit`, Vitest, `environment: 'node'`)** covers the pure rules (item numbering, validation, storage keys, page titles, optimistic tree reducers) and the server logic that needs a real database (data layer, LINE identity with `fetch` stubbed, the session/auth matrix, route handlers called directly with a `Request`). They run on Node rather than Bun on purpose: `better-sqlite3` must load on the same runtime as production, and `bun run dev` runs Next on Node.
+- **E2E (`tests/e2e`, Playwright)** runs a real browser against a real server for the journeys unit tests cannot reach: the LIFF routing gate, the whole order-image flow, the register queue, and the optimistic timing/rollback gates. First run on a machine needs `bunx playwright install chromium`.
 
 Data isolation is the part to understand before adding a test:
 
@@ -37,15 +39,26 @@ Data isolation is the part to understand before adding a test:
 
 ## Layout architecture
 
-- `app/layout.tsx` (root) is intentionally thin: Kanit font, `TooltipProvider`, global metadata title template ("Warehouse Dashboard"). Do not add sidebar or header here.
+- `app/layout.tsx` (root) is intentionally thin: Kanit font, `TooltipProvider`, global metadata title template ("Warehouse Dashboard"), and the single `<Toaster />`. Do not add sidebar or header here.
 - `app/(admin)/layout.tsx` owns the dashboard chrome: `SidebarProvider` + `AppSidebar` + header with `SidebarTrigger` and `AppNavbarLabel`. Every admin page lives under `app/(admin)/`; the route group name does not appear in URLs.
 - Pages outside `(admin)` (currently `app/liff/authorization`) render without sidebar/header by design. The `app/liff/layout.tsx` wrapper only adds `<main>` padding.
 - `lib/page-titles.ts` is the single source of truth for page titles, shared by `metadata.title` in each page and the header label (`components/app-navbar-label.tsx` via `getPageTitle`). When adding a route: add its path key there, or the header falls back to the decoded last URL segment.
 - `components/app-sidebar.tsx` hardcodes nav links. Keep its `href`s in sync with the folders under `app/(admin)/` (a stale href silently 404s).
 
+## Notifications and optimistic UI
+
+- One `<Toaster />` is mounted in the root layout from `components/ui/sonner.tsx`. It pins `theme="light"` because the app has no `ThemeProvider`; do not reintroduce `next-themes` unless dark mode is actually built. The 12px top offset deliberately overlays the sticky navbar, so do not "fix" it by pushing the toast back down.
+- Toast copy lives in `lib/messages.ts`; calls go through `notifySuccess` / `notifyError` in `lib/toast.ts`. That module is client-only, so server actions return results and the client decides the toast.
+- Success toasts last 2.5s and errors 6s. Pass an `id` for actions that can repeat so toasts replace instead of stack. Validation errors stay inline under the field; do not toast them.
+- The order-image form uses `useOptimistic` with `startTransition(async ...)`. Put tree and image-list updates in the pure reducers in `lib/order-images/tree.ts`, never in components.
+- A temporary item (id starts with `temp-`) exists only in the optimistic overlay. On success, cancel the preview with `applyOptimistic({ type: 'remove', id: tempId })` before adding the real server row to the base; otherwise the overlay re-applies the add and renders a duplicate. On failure, leave the base alone and the overlay reverts. Adding locks only that parent (`pendingAddKeys`, `'root'` for top level), not the whole page.
+- Deleting an item or photo closes the dialog immediately and removes the card optimistically. A refusal returns the card and reports through a toast. The file unlink happens on the server response, so e2e assertions must poll the filesystem.
+
 ## Gotchas
 
 - The dev server is the user's: never start `bun run dev` / `dev:tunnel` yourself, never kill port 8080 unless asked, and only `curl` against a server the user already started.
+- `next.config.ts` sets `experimental.agentUpgrade: 'security'` for the 16.4.3 security update, and `experimental.agentFeedback: true` writes the generated blocks at the bottom of this file. Keep both settings and commit the regenerated blocks.
+- `components/ui/sonner.tsx` is hand-adapted. Re-running `bunx shadcn add sonner` reintroduces `next-themes` and a `useTheme` wrapper; edit the existing file instead.
 - The `/liff` root redirect (307 to `/liff/authorization`) lives in `next.config.ts` `redirects()`, not in an `app/liff/page.tsx`: `redirect()` in a page logs "Could not validate `instant`" under cacheComponents (seen on Next 16.4).
 - New pages under `/liff` (any route besides `/liff/authorization`) need `export const instant = false`: the LIFF gate in the layout withholds children until the LINE session resolves, so instant-navigation validation drops the segment and logs an error. `/liff/authorization` is exempt because the gate always renders it.
 - Public exposure: the tunnel's public hostname serves only `/liff*`, `/_next/*` and `/favicon.ico`; every other path returns 403 from a Cloudflare WAF allowlist rule (dashboard, not code, see `docs/adr/0001-liff-only-public-exposure.md`). Admin pages are local-only by design. Exposing a new public path means editing the rule at Cloudflare, never repo code.

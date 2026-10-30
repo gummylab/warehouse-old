@@ -110,7 +110,14 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
       />
 
       {detail ? (
-        <OrderItemsStep detail={detail} onDetailChange={setDetail} />
+        <OrderItemsStep
+          detail={detail}
+          // The update receives the latest base state, so two actions that
+          // overlap cannot overwrite each other with a stale tree.
+          onDetailChange={(updater) =>
+            setDetail((current) => (current ? updater(current) : current))
+          }
+        />
       ) : (
         <StepOneFields lines={lines} submitting={submitting} error={stepOneError} onSubmit={handleLookup} />
       )}

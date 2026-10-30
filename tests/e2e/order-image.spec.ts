@@ -99,6 +99,8 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await page.getByRole('menuitem', { name: 'แพ็กเกจ' }).click()
   await page.getByRole('menuitemradio', { name: 'Inner Box' }).click()
 
+  // The toast confirms the label after the PATCH lands.
+  await expect(page.getByText('เปลี่ยนแพ็กเกจเป็น Inner Box แล้ว')).toBeVisible()
   // The menu closes on the pick, so the card's label holds the only
   // "Inner Box" on the page.
   await expect(page.getByText('Inner Box', { exact: true })).toBeVisible()
@@ -143,7 +145,9 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await expect(thumbnail).toHaveCount(0)
   await expect(page.locator('img[alt="รูปที่ 2"]')).toHaveCount(1)
   await expect(page.locator('section.relative > *').filter({ visible: true })).toHaveCount(2)
-  expect(existsSync(storedFile)).toBe(false)
+  // The card leaves the grid on the click; the unlink happens on the server
+  // response, so poll the disk instead of reading it in the same tick.
+  await expect.poll(() => existsSync(storedFile)).toBe(false)
 
   // ---- delete the item, taking its variety with it ---------------------
   await page.getByRole('link', { name: 'กลับออเดอร์' }).click()

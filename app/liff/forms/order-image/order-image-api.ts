@@ -5,6 +5,8 @@
 // Domain records come from the data layer as type-only imports — erased at
 // compile time, so no server code reaches the client bundle.
 import type { ImageRecord, ItemDetail, ItemRecord, OrderDetail } from '@/lib/db/types'
+import { toastMessages } from '@/lib/messages'
+import { notifyError } from '@/lib/toast'
 
 import { postJson, type LiffToken } from '../../liff-session-context'
 
@@ -34,9 +36,18 @@ async function request<T>(
 ): Promise<ApiResult<T>> {
   let response = await fetch(path, init).catch(() => null)
   if (response?.status === 401) {
-    // Expired cookie: one renewal attempt, then a single retry.
+    // Expired cookie: one renewal attempt, then a single retry. A failed
+    // renewal is a page-wide auth failure, so it gets one shared toast
+    // instead of an inline message on whichever card happened to call first.
     const renewed = await postSession()
-    if (renewed) response = await fetch(path, init).catch(() => null)
+    if (!renewed) {
+      notifyError(toastMessages.sessionUnavailable, {
+        id: 'order-image-session',
+        description: toastMessages.sessionUnavailableDescription,
+      })
+      return { ok: false, status: 401, error: 'unauthorized' }
+    }
+    response = await fetch(path, init).catch(() => null)
   }
   if (!response) return { ok: false, status: 0, error: 'network-error' }
 

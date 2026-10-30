@@ -15,12 +15,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { toastMessages } from '@/lib/messages'
 import {
   CAMERA_ACCEPT_ATTRIBUTE,
   IMAGE_ACCEPT_ATTRIBUTE,
   isAcceptedImageType,
   MAX_FILE_BYTES,
 } from '@/lib/order-images/upload'
+import { notifySuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 import { errorMessage, uploadImage } from '../../order-image-api'
@@ -156,9 +158,11 @@ export function UploadDialog({
     setUploading(false)
     onUploadingChange(false)
 
-    // Every file landed: let the check marks show for a moment, then close.
-    // A failure keeps the dialog open with the reason next to the file.
+    // Every file landed: confirm the batch, let the check marks show for a
+    // moment, then close. A failure keeps the dialog open with the reason
+    // next to the file and does not claim success.
     if (!failed && !controller.signal.aborted) {
+      notifySuccess(toastMessages.uploadDone(queue.length))
       closeTimerRef.current = setTimeout(() => handleOpenChange(false), 700)
     }
   }

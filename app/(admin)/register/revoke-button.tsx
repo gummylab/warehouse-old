@@ -13,6 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+import { toastMessages } from '@/lib/messages'
+import { notifySuccess } from '@/lib/toast'
+
 import { revokeUser, type DecideActionState } from './actions'
 import { useRegisterDecision } from './register-decision-context'
 
@@ -40,8 +43,11 @@ export function RevokeButton({
       removeUser(id)
       const result = await revokeUser(id)
       // A refusal is reported above the table, not next to the button:
-      // the button unmounts together with the row it removed.
+      // the button unmounts together with the row it removed. A success is
+      // announced after the write lands, so the toast cannot contradict a
+      // row that had to come back.
       if (result) reportError(result.error)
+      else notifySuccess(toastMessages.userRevoked(displayName))
       return result
     },
     null,
