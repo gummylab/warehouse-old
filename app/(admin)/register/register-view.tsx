@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useOptimistic, useState } from 'react'
 
 import { DataTable } from '@/components/data-table/data-table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { type RegisterUser } from '@/lib/db/types'
 
-import { columns, type RegisterUser } from './columns'
+import { columns } from './columns'
 import { pendingColumns } from './pending-columns'
+import { RegisterDecisionProvider } from './register-decision-context'
 
 interface RegisterViewProps {
   approvedUsers: RegisterUser[]
@@ -21,22 +23,52 @@ export function RegisterView({ approvedUsers, pendingUsers }: RegisterViewProps)
   const [tab, setTab] = useState<'approved' | 'pending'>(
     pendingUsers.length > 0 ? 'pending' : 'approved',
   )
+  // The last refused decision. It lives here rather than next to the
+  // button, because a refused decision puts its row back and the button
+  // that reported it has already unmounted with the row it removed.
+  const [error, setError] = useState<string | null>(null)
+
+  // The rows the operator sees. A decided row leaves the table on the
+  // click, before the server has answered, and the server's revalidated
+  // payload replaces these rows once it arrives (or puts the row back if
+  // the write was refused).
+  //
+  // useOptimistic only accepts updates made inside a transition or an
+  // action, so removeUser is called from the buttons' own action, never
+  // from an event handler.
+  const [optimisticUsers, removeOptimistic] = useOptimistic(
+    [...approvedUsers, ...pendingUsers],
+    (users, id: string) => users.filter((user) => user.id !== id),
+  )
+
+  const approved = optimisticUsers.filter((user) => user.status === 'approved')
+  const pending = optimisticUsers.filter((user) => user.status === 'pending')
 
   return (
-    <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col">
-      <DataTable
-        columns={tab === 'pending' ? pendingColumns : columns}
-        data={tab === 'pending' ? pendingUsers : approvedUsers}
-        searchColumn="displayName"
-        searchSlot={
-          <TabsList>
-            <TabsTrigger value="approved">ผู้ใช้ที่อนุมัติแล้ว</TabsTrigger>
-            <TabsTrigger value="pending">
-              รอตรวจสอบ ({pendingUsers.length})
-            </TabsTrigger>
-          </TabsList>
-        }
-      />
-    </Tabs>
+    <RegisterDecisionProvider
+      value={{
+        removeUser: removeOptimistic,
+        reportError: setError,
+      }}
+    >
+      {error && (
+        <p className="mb-2 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+      <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col">
+        <DataTable
+          columns={tab === 'pending' ? pendingColumns : columns}
+          data={tab === 'pending' ? pending : approved}
+          searchColumn="displayName"
+          searchSlot={
+            <TabsList>
+              <TabsTrigger value="approved">ผู้ใช้ที่อนุมัติแล้ว</TabsTrigger>
+              <TabsTrigger value="pending">รอตรวจสอบ ({pending.length})</TabsTrigger>
+            </TabsList>
+          }
+        />
+      </Tabs>
+    </RegisterDecisionProvider>
   )
 }

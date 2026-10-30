@@ -1,8 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 // User picture with the first letter as fallback (no LINE picture, or image
-// still loading). Shared by the profile column and the pending dialog so the
-// two views render identity the same way.
+// still loading). Shared by the profile column and the approval queue tab so
+// the two views render identity the same way.
 export function UserAvatar({
   displayName,
   avatarUrl,

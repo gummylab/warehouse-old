@@ -1,0 +1,418 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MoreVerticalIcon,
+  PlusIcon,
+  Trash2Icon,
+} from 'lucide-react'
+
+import { Button, ButtonLink } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import type { ImageRecord, ItemDetail } from '@/lib/db/types'
+import { formatThaiDate } from '@/lib/order-images/format'
+import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
+
+import { FormNavbar } from '../../../../form-navbar'
+import { deleteImage, errorMessage, getItem, setImagePackage } from '../../order-image-api'
+import { UploadDialog } from './upload-dialog'
+
+// The photo page for one item: a grid of photos plus the cell that adds the
+// next one. Tapping a photo opens the viewer, which shows the picture and
+// nothing else. Everything that changes a photo — the package label and the
+// delete — lives in the menu on its card. Mutations refetch this item
+// through the API, so the labels and counts on the cards are never stale.
+export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
+  const [detail, setDetail] = useState(initialDetail)
+  const [error, setError] = useState<string | null>(null)
+  // The upload lives in its own dialog (see upload-dialog.tsx). The page
+  // only needs to know whether one is running, for the placeholder in the
+  // grid, and whether the dialog is open.
+  const [uploading, setUploading] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  // Ids, not records: refresh() replaces the whole detail, so the dialogs
+  // re-derive their photo from fresh state every render. A deleted photo
+  // then vanishes from the lookup and closes the dialog.
+  const [previewImageId, setPreviewImageId] = useState<string | null>(null)
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
+  // One flag for every request in flight: a package change and a delete
+  // never run at the same time, and neither can be triggered twice.
+  const [busy, setBusy] = useState(false)
+  // The delete dialog owns its error: the user is still deciding there.
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  // Where the finger went down, for the swipe across the photo in the viewer.
+  // Touch only: a mouse drag over a picture is a selection, not a navigation.
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+
+  const previewImage = detail.images.find((image) => image.id === previewImageId) ?? null
+  const deletingImage = detail.images.find((image) => image.id === deletingImageId) ?? null
+  // The viewer counts positions, not seq: seq is allocated as MAX(seq) + 1 per
+  // item, so a delete leaves gaps and "รูปที่ 3 จาก 2" would make no sense.
+  const previewIndex = previewImageId
+    ? detail.images.findIndex((image) => image.id === previewImageId)
+    : -1
+
+  async function refresh() {
+    const result = await getItem(detail.item.id)
+    if (result.ok) setDetail(result.data)
+    else setError(errorMessage(result.error, result.status))
+  }
+
+  // The package is picked in the card's menu, which closes on every pick, so
+  // a failure is reported on the page itself instead of inside the menu.
+  async function changePackage(image: ImageRecord, pkg: string | null) {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await setImagePackage(image.id, pkg)
+      if (!result.ok) {
+        setError(errorMessage(result.error, result.status))
+        return
+      }
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deletingImage) return
+    setBusy(true)
+    setDialogError(null)
+    try {
+      const result = await deleteImage(deletingImage.id)
+      if (!result.ok) {
+        // Stays inside the dialog: the user is still deciding there, and a
+        // failure (already deleted elsewhere) must not vanish silently.
+        setDialogError(errorMessage(result.error, result.status))
+        return
+      }
+      // Clearing the id closes the dialog; the refresh removes the card.
+      setDeletingImageId(null)
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Walking the viewer by one photo. The buttons, the arrow keys and the
+  // swipe all end up here, so the three ways to move cannot drift apart.
+  function stepPreview(delta: number) {
+    setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+  }
+
+  // Arrow keys are the quickest way through the photos with a keyboard. The
+  // listener exists only while the viewer is open, and the update reads the
+  // latest list, so a refresh mid-view cannot move to a stale photo.
+  useEffect(() => {
+    if (previewImageId === null) return
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      const delta = event.key === 'ArrowRight' ? 1 : -1
+      setPreviewImageId((currentId) => neighbourId(detail.images, currentId, delta))
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [previewImageId, detail.images])
+
+  return (
+    <div className="flex w-full flex-col gap-4 pb-4 sm:gap-6">
+      {/* The navbar carries the item and the order it belongs to, so the
+          page below is only the photos. The back link keeps the name
+          "กลับออเดอร์" because that is what the e2e spec looks for. */}
+      <FormNavbar
+        title={`ไอเท็ม ${detail.item.itemNumber}`}
+        subtitle={`ออเดอร์ ${detail.order.orderNumber} / ${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`}
+        action={
+          <ButtonLink
+            variant="ghost"
+            size="icon"
+            aria-label="กลับออเดอร์"
+            href={`/liff/forms/order-image?orderId=${detail.order.id}`}>
+            <ChevronLeftIcon />
+          </ButtonLink>
+        }
+      />
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {/* The photo grid, framed like the item cards on the order page. The
+          add cell is the last one, so it always sits where the next photo
+          will appear. */}
+      <section className="relative grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-2 border p-4 rounded-xl">
+        {detail.images.map((image) => (
+          <PhotoTile
+            key={image.id}
+            image={image}
+            busy={busy}
+            onPreview={() => setPreviewImageId(image.id)}
+            onPackageChange={(pkg) => void changePackage(image, pkg)}
+            onDelete={() => {
+              setDialogError(null)
+              setDeletingImageId(image.id)
+            }}
+          />
+        ))}
+
+        {uploading && (
+          <span aria-hidden="true" className="flex flex-col gap-1 rounded-xl border border-dashed p-1">
+            <span className="block aspect-square w-full animate-pulse rounded-lg bg-muted" />
+            <span className="text-xs text-muted-foreground">กำลังอัปโหลด...</span>
+          </span>
+        )}
+
+        {/* h-auto overrides the fixed h-9 that buttonVariants sets: a grid
+            item with a fixed height does not stretch to the row height, so
+            the cell would sit as a short pill next to the photo tiles. */}
+        <Button
+          variant="outline"
+          className="h-auto flex-col gap-2 border-dashed rounded-xl py-14"
+          disabled={uploading}
+          onClick={() => setUploadOpen(true)}>
+          <PlusIcon />
+          <span className="text-xs leading-tight">เพิ่มรูปภาพ</span>
+        </Button>
+      </section>
+
+      {/* The upload dialog owns the file list and the upload loop. Closing
+          it refetches the item, so the grid shows whatever landed, even
+          when the dialog was closed while a file was still on its way. */}
+      <UploadDialog
+        open={uploadOpen}
+        itemId={detail.item.id}
+        context={`ไอเท็ม ${detail.item.itemNumber} · ออเดอร์ ${detail.order.orderNumber}`}
+        onOpenChange={(next) => {
+          setUploadOpen(next)
+          if (!next) void refresh()
+        }}
+        onUploadingChange={setUploading}
+      />
+
+      {/* The viewer: the photo, then a bar to walk the item's photos. The
+          title stays for screen readers, so the dialog has a name without
+          putting text on screen. */}
+      <Dialog
+        open={previewImage !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImageId(null)
+        }}>
+        <DialogContent
+          className="gap-0 p-2 sm:max-w-3xl"
+          onTouchStart={(event) => {
+            const touch = event.touches[0]
+            swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+          }}
+          onTouchEnd={(event) => {
+            const start = swipeStart.current
+            swipeStart.current = null
+            const touch = event.changedTouches[0]
+            if (!start || !touch) return
+            const dx = touch.clientX - start.x
+            const dy = touch.clientY - start.y
+            // A mostly vertical drag is the user scrolling, not a request for
+            // the next photo.
+            if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return
+            stepPreview(dx < 0 ? 1 : -1)
+          }}>
+          <DialogTitle className="sr-only">
+            {previewImage
+              ? `รูปที่ ${previewIndex + 1} จาก ${detail.images.length}`
+              : 'รูปภาพ'}
+          </DialogTitle>
+
+          {previewImage && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
+              <img
+                src={`/api/liff/order-images/images/${previewImage.id}/file`}
+                alt={`รูปที่ ${previewImage.seq}`}
+                className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
+              />
+
+              {/* One photo has nowhere to go, so the bar appears only when
+                  there is something to walk. 44px targets sit under the
+                  picture, where a thumb reaches and nothing covers the photo. */}
+              {detail.images.length > 1 && (
+                <div className="mt-1 flex items-center justify-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="size-11"
+                    aria-label="รูปก่อนหน้า"
+                    disabled={previewIndex <= 0}
+                    onClick={() => stepPreview(-1)}>
+                    <ChevronLeftIcon />
+                  </Button>
+                  <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground">
+                    {previewIndex + 1} / {detail.images.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    className="size-11"
+                    aria-label="รูปถัดไป"
+                    disabled={previewIndex >= detail.images.length - 1}
+                    onClick={() => stepPreview(1)}>
+                    <ChevronRightIcon />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Deleting a photo cannot be undone, so it gets its own confirmation
+          instead of a button that fires on the first tap. */}
+      <Dialog
+        open={deletingImage !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingImageId(null)
+            setDialogError(null)
+          }
+        }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันการลบรูปภาพ</DialogTitle>
+            <DialogDescription>
+              {deletingImage ? `ลบรูปที่ ${deletingImage.seq} ออกถาวร ไม่สามารถกู้คืนได้` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {dialogError && <p className="text-sm text-destructive">{dialogError}</p>}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>ยกเลิก</DialogClose>
+            <Button variant="destructive" disabled={busy} onClick={() => void confirmDelete()}>
+              {busy ? 'กำลังลบ...' : 'ยืนยันลบ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// A swipe has to be deliberate: a short drag is usually a slip while tapping.
+const SWIPE_THRESHOLD_PX = 40
+
+// The id `delta` photos away from `currentId`, or the same id at an edge, so a
+// swipe past the first or the last photo simply stays put.
+function neighbourId(
+  images: ImageRecord[],
+  currentId: string | null,
+  delta: number
+): string | null {
+  const at = images.findIndex((image) => image.id === currentId)
+  return at < 0 ? currentId : (images[at + delta]?.id ?? currentId)
+}
+
+// One photo as a card: the picture inside its own frame, the package label
+// under it, and the menu that changes the photo.
+//
+// The card is a div, not a button: the picture and the menu trigger are two
+// separate controls, and a button inside a button is invalid HTML that the
+// component library reports in the console.
+function PhotoTile({
+  image,
+  busy,
+  onPreview,
+  onPackageChange,
+  onDelete,
+}: {
+  image: ImageRecord
+  busy: boolean
+  onPreview: () => void
+  onPackageChange: (pkg: string | null) => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="relative flex flex-col gap-y-2 rounded-xl border p-2">
+      {/* Tapping the picture opens the viewer. Only the picture is a
+          control, so the label below stays readable text. */}
+      <button type="button" onClick={onPreview} className="block overflow-hidden rounded-lg border">
+        {/* next/image would proxy through /_next/image, whose upstream
+            fetch carries no session cookie and would be rejected 403. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
+        <img
+          src={`/api/liff/order-images/images/${image.id}/file`}
+          alt={`รูปที่ ${image.seq}`}
+          loading="lazy"
+          className="aspect-square w-full bg-muted object-cover"
+        />
+      </button>
+
+      <span className="w-full truncate text-xs text-muted-foreground text-center">
+        {image.package ?? 'ยังไม่ระบุแพ็กเกจ'}
+      </span>
+
+      {/* Everything that changes the photo lives here. The frosted backdrop
+          keeps the trigger readable over a bright picture. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-1.5 top-1.5 bg-background/80 backdrop-blur-sm"
+              aria-label={`ตั้งค่ารูปที่ ${image.seq}`}
+            />
+          }>
+          <MoreVerticalIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-auto min-w-40">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>แพ็กเกจ</DropdownMenuSubTrigger>
+            {/* The submenu takes its width from its trigger, which is
+                narrower than the longest package name. */}
+            <DropdownMenuSubContent className="w-auto min-w-48">
+              <DropdownMenuRadioGroup
+                value={image.package ?? null}
+                onValueChange={(value: string | null) => onPackageChange(value)}>
+                {/* closeOnClick ends the whole menu on every pick, so the
+                    card shows the new label (or the error) right away. */}
+                <DropdownMenuRadioItem value={null} closeOnClick>
+                  ยังไม่ระบุแพ็กเกจ
+                </DropdownMenuRadioItem>
+                {PACKAGE_OPTIONS.map((pkg) => (
+                  <DropdownMenuRadioItem key={pkg} value={pkg} closeOnClick>
+                    {pkg}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem variant="destructive" disabled={busy} onClick={onDelete}>
+            <Trash2Icon />
+            ลบรูปนี้
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}

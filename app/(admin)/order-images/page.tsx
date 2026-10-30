@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 }
 
 export default function OrderImageManagementPage() {
-  return <main>จัดการรูปภาพออเดอร์</main>
+  return <p>จัดการรูปภาพออเดอร์</p>
 }
