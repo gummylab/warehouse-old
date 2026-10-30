@@ -40,10 +40,17 @@ Data isolation is the part to understand before adding a test:
 ## Layout architecture
 
 - `app/layout.tsx` (root) is intentionally thin: Kanit font, `TooltipProvider`, global metadata title template ("Warehouse Dashboard"), and the single `<Toaster />`. Do not add sidebar or header here.
-- `app/(admin)/layout.tsx` owns the dashboard chrome: `SidebarProvider` + `AppSidebar` + header with `SidebarTrigger` and `AppNavbarLabel`. Every admin page lives under `app/(admin)/`; the route group name does not appear in URLs.
-- Pages outside `(admin)` (currently `app/liff/authorization`) render without sidebar/header by design. The `app/liff/layout.tsx` wrapper only adds `<main>` padding.
-- `lib/page-titles.ts` is the single source of truth for page titles, shared by `metadata.title` in each page and the header label (`components/app-navbar-label.tsx` via `getPageTitle`). When adding a route: add its path key there, or the header falls back to the decoded last URL segment.
+- `app/(admin)/layout.tsx` owns the dashboard chrome: `SidebarProvider` + `AppSidebar` + `AppHeader` + `PageBody` + `PageFooter`. `AppHeader` (`app/(admin)/app-header.tsx`) reads the pathname and renders the title through `getPageTitle`; the sidebar trigger lives there, not in the layout. Every admin page lives under `app/(admin)/`; the route group name does not appear in URLs.
+- Pages outside `(admin)` (currently `app/liff/authorization`) render without sidebar/header by design. `app/liff/layout.tsx` only provides the session provider and the gate; `app/liff/authorization/layout.tsx` centres its content and `app/liff/forms/layout.tsx` keeps the form routes top-aligned.
+- `lib/page-titles.ts` is the single source of truth for page titles, shared by `metadata.title` in each page and the header label (`app/(admin)/app-header.tsx` via `getPageTitle`). When adding a route: add its path key there, or the header falls back to the decoded last URL segment.
 - `components/app-sidebar.tsx` hardcodes nav links. Keep its `href`s in sync with the folders under `app/(admin)/` (a stale href silently 404s).
+
+## Layout primitives
+
+- `components/layout/` holds the shared shells: `PageHeader` (one title bar for admin and LIFF forms), `PageBody` (gutter, optional `max-w-[42rem]` form width, `fill` for `flex-1`), `PageFooter`, `FormPage` (sticky header + padded body + safe-area bottom padding), `StateScreen` (loading, empty, error, not-found) and `TileGrid`/`TileButton`.
+- The shell owns height and padding. Pages use `flex-1`, `gap-*` and `min-w-0`; they do not add `min-h-screen`, negative margins to escape padding, or their own page-level padding.
+- `z-index` is fixed: 10 inside a card, 20 sticky header/footer, 30 chrome, 50 overlays (dialog, sheet, menu, select, tooltip), 60 toast. Do not add arbitrary values.
+- `global-error.tsx` replaces the root layout, so it uses inline styles, not Tailwind or the app stylesheet.
 
 ## Notifications and optimistic UI
 

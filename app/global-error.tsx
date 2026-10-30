@@ -1,13 +1,43 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 
 // Global error UI: the last line of defence, shown when even the root
-// layout fails to render. It replaces the root layout, so it has to bring
-// its own <html> and <body>, and it cannot use the app's global styles.
+// layout fails to render. It replaces the root layout, so it cannot rely on
+// the app's global stylesheet or Tailwind classes. Everything here is an
+// inline style on purpose.
 //
 // The digest identifies the error in the server log, so the operator can
 // match a report from a phone to a line in the dev server output.
+const styles = {
+  page: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '1rem',
+    textAlign: 'center',
+    fontFamily: 'system-ui, sans-serif',
+    color: '#18181b',
+    background: '#ffffff',
+  },
+  title: { margin: 0, fontSize: '1.125rem', fontWeight: 600 },
+  description: { margin: 0, maxWidth: '28rem', fontSize: '0.875rem', color: '#52525b' },
+  reference: { margin: 0, fontSize: '0.75rem', color: '#71717a' },
+  button: {
+    borderRadius: '0.5rem',
+    border: '1px solid #d4d4d8',
+    background: 'transparent',
+    padding: '0.5rem 1rem',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    color: 'inherit',
+    cursor: 'pointer',
+  },
+} satisfies Record<string, CSSProperties>
+
 export default function GlobalError({
   error,
   retry,
@@ -21,20 +51,14 @@ export default function GlobalError({
 
   return (
     <html lang="th">
-      <body>
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-4 text-center">
-          <h1 className="text-lg font-semibold">เกิดข้อผิดพลาดที่ระบบ</h1>
-          <p className="text-sm text-muted-foreground">
+      <body style={{ margin: 0 }}>
+        <div style={styles.page}>
+          <h1 style={styles.title}>เกิดข้อผิดพลาดที่ระบบ</h1>
+          <p style={styles.description}>
             กรุณาลองใหม่อีกครั้ง ถ้ายังพบปัญหาให้แจ้งผู้ดูแลระบบ
           </p>
-          {error.digest && (
-            <p className="text-xs text-muted-foreground">รหัสอ้างอิง: {error.digest}</p>
-          )}
-          <button
-            type="button"
-            onClick={() => retry()}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium"
-          >
+          {error.digest ? <p style={styles.reference}>รหัสอ้างอิง: {error.digest}</p> : null}
+          <button type="button" onClick={() => retry()} style={styles.button}>
             ลองใหม่
           </button>
         </div>

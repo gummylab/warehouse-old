@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import { ImagePlusIcon } from 'lucide-react'
 
+import { FormPage } from '@/components/layout/form-page'
 import { PAGE_TITLES } from '@/lib/page-titles'
 
 import { FormNavbar } from '../form-navbar'
@@ -23,8 +24,7 @@ export const metadata: Metadata = {
 // shared URLs keep working without client-side routing state.
 export default function FormsPage() {
   return (
-    <div className="flex flex-col gap-3">
-      <FormNavbar title="แบบฟอร์ม" />
+    <FormPage header={<FormNavbar title="แบบฟอร์ม" />}>
       <Link
         href="/liff/forms/order-image"
         className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted"
@@ -37,6 +37,6 @@ export default function FormsPage() {
           </span>
         </span>
       </Link>
-    </div>
+    </FormPage>
   )
 }

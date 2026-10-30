@@ -144,7 +144,9 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // router keeps in the DOM but hidden.
   await expect(thumbnail).toHaveCount(0)
   await expect(page.locator('img[alt="รูปที่ 2"]')).toHaveCount(1)
-  await expect(page.locator('section.relative > *').filter({ visible: true })).toHaveCount(2)
+  await expect(
+    page.locator('section[data-slot="tile-grid"] > *').filter({ visible: true }),
+  ).toHaveCount(2)
   // The card leaves the grid on the click; the unlink happens on the server
   // response, so poll the disk instead of reading it in the same tick.
   await expect.poll(() => existsSync(storedFile)).toBe(false)

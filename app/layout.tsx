@@ -8,7 +8,9 @@ import './globals.css'
 // Kanit supports Thai + Latin — single font for the whole app
 const kanit = Kanit({
   subsets: ['latin', 'thai'],
-  weight: ['300', '400', '500', '600', '700'],
+  // Only the weights the UI actually uses. Light and black would add bytes
+  // to every page for no visible difference.
+  weight: ['400', '500', '600'],
   variable: '--font-sans',
   display: 'swap',
 })

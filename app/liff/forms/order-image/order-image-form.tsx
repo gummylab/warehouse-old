@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
+import { FormPage } from '@/components/layout/form-page'
 import { Button } from '@/components/ui/button'
 import type { OrderDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
@@ -92,23 +93,28 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-4">
-      <FormNavbar
-        title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : 'อัปโหลดรูปภาพออเดอร์'}
-        subtitle={detail ? `${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}` : undefined}
-        action={
-          detail ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="เลือกออเดอร์ใหม่"
-              onClick={() => router.push('/liff/forms/order-image')}>
-              <ChevronLeftIcon />
-            </Button>
-          ) : undefined
-        }
-      />
-
+    <FormPage
+      header={
+        <FormNavbar
+          title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : 'อัปโหลดรูปภาพออเดอร์'}
+          subtitle={
+            detail
+              ? `${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`
+              : undefined
+          }
+          action={
+            detail ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="เลือกออเดอร์ใหม่"
+                onClick={() => router.push('/liff/forms/order-image')}>
+                <ChevronLeftIcon />
+              </Button>
+            ) : undefined
+          }
+        />
+      }>
       {detail ? (
         <OrderItemsStep
           detail={detail}
@@ -119,8 +125,13 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
           }
         />
       ) : (
-        <StepOneFields lines={lines} submitting={submitting} error={stepOneError} onSubmit={handleLookup} />
+        <StepOneFields
+          lines={lines}
+          submitting={submitting}
+          error={stepOneError}
+          onSubmit={handleLookup}
+        />
       )}
-    </div>
+    </FormPage>
   )
 }
