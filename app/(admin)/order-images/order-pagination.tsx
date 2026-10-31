@@ -19,7 +19,7 @@ export function OrderPagination({
   total: number
 }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
         พบ {total.toLocaleString('th-TH')} ออเดอร์
         {pageCount > 1 ? ` · หน้า ${page} จาก ${pageCount}` : ''}

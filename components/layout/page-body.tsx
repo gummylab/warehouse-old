@@ -7,6 +7,7 @@ export function PageBody({
   id,
   width = 'full',
   fill = false,
+  scroll = false,
   className,
   children,
 }: {
@@ -16,6 +17,10 @@ export function PageBody({
   // Use when the parent is a flex column and this area should take the
   // remaining height (the admin shell and the data table depend on it).
   fill?: boolean
+  // Make this area the scroll container. The admin shell uses it so the
+  // document itself never scrolls; a page that fills the height (the order
+  // list) leaves it idle and scrolls its own table instead.
+  scroll?: boolean
   className?: string
   children: React.ReactNode
 }) {
@@ -28,7 +33,8 @@ export function PageBody({
       data-slot="page-body"
       className={cn(
         'flex flex-col gap-4 px-4 py-4 md:px-6',
-        fill && 'flex-1',
+        fill && 'flex-1 md:min-h-0',
+        scroll && 'md:overflow-y-auto',
         width === 'form' && 'mx-auto w-full max-w-[42rem]',
         className,
       )}>

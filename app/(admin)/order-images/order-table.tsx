@@ -20,18 +20,17 @@ import {
 // horizontally scrollable.
 export function OrderTable({ rows }: { rows: OrderListRow[] }) {
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <Table>
-        <TableHeader>
+    <div className="flex flex-col overflow-hidden rounded-xl border md:min-h-0 md:flex-1">
+      <Table containerClassName="md:min-h-0 md:flex-1 md:overflow-y-auto">
+        <TableHeader className="[&_th]:border-b [&_th]:bg-background md:[&_th]:sticky md:[&_th]:top-0 md:[&_th]:z-10">
           <TableRow>
             <TableHead>เลขออเดอร์</TableHead>
             <TableHead>วันที่</TableHead>
             <TableHead className="hidden md:table-cell">ไลน์</TableHead>
-            <TableHead className="text-right">ไอเท็ม</TableHead>
-            <TableHead className="text-right">รูป</TableHead>
+            <TableHead className="text-center">ไอเท็ม</TableHead>
             <TableHead className="hidden lg:table-cell">ผู้สร้าง</TableHead>
             <TableHead className="hidden xl:table-cell">สร้างเมื่อ</TableHead>
-            <TableHead className="text-right">จัดการ</TableHead>
+            <TableHead className="text-center">จัดการ</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -48,15 +47,14 @@ export function OrderTable({ rows }: { rows: OrderListRow[] }) {
               <TableCell className="hidden max-w-40 truncate md:table-cell">
                 {row.line}
               </TableCell>
-              <TableCell className="text-right tabular-nums">{row.itemCount}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.imageCount}</TableCell>
+              <TableCell className="text-center tabular-nums">{row.itemCount}</TableCell>
               <TableCell className="hidden max-w-48 truncate lg:table-cell">
                 {row.creatorName ?? row.createdBy}
               </TableCell>
               <TableCell className="hidden xl:table-cell">
                 {formatThaiDateTime(row.createdAt)}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-center">
                 <ButtonLink
                   variant="ghost"
                   size="sm"

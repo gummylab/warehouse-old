@@ -89,7 +89,7 @@ describe('getOrderSummary', () => {
 })
 
 describe('listOrders', () => {
-  it('returns the counts, bytes and creator for each order', () => {
+  it('returns the item count and creator for each order', () => {
     const order = newOrder('B-1')
     const pack = addPack(order.id)
     const variety = addVariety(order.id, pack.id)
@@ -105,7 +105,6 @@ describe('listOrders', () => {
       id: order.id,
       orderNumber: 'B-1',
       itemCount: 2,
-      imageCount: 2,
       creatorName: null,
     })
   })

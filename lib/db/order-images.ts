@@ -75,7 +75,6 @@ type ItemRow = {
 
 type OrderListRowSql = OrderRow & {
   item_count: number
-  image_count: number
   creator_name: string | null
 }
 
@@ -108,7 +107,6 @@ function toOrderListRow(row: OrderListRowSql): OrderListRow {
   return {
     ...toOrder(row),
     itemCount: row.item_count,
-    imageCount: row.image_count,
     creatorName:
       row.creator_name ??
       (row.created_by === 'local-device' ? 'เครื่องนี้' : null),
@@ -239,7 +237,6 @@ export function listOrders(filters: OrderListFilters): OrderListResult {
       `SELECT
          o.id, o.order_number, o.order_date, o.line, o.created_by, o.created_at,
          (SELECT COUNT(*) FROM items i WHERE i.order_id = o.id) AS item_count,
-         (SELECT COUNT(*) FROM images img WHERE img.order_id = o.id) AS image_count,
          u.display_name AS creator_name
        FROM orders o
        LEFT JOIN users u ON u.line_user_id = o.created_by

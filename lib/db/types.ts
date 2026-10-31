@@ -82,7 +82,6 @@ export type OrderListFilters = {
 
 export type OrderListRow = OrderRecord & {
   itemCount: number
-  imageCount: number
   creatorName: string | null
 }
 

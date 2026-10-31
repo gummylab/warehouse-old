@@ -25,7 +25,7 @@ export default function AdminLayout({
       {/* First focusable element in the DOM, before the sidebar links. */}
       <SkipLink />
       <AppSidebar />
-      <SidebarInset className="flex min-h-svh flex-col">
+      <SidebarInset className="flex min-h-svh flex-col md:h-svh md:overflow-hidden">
         {/* AppHeader reads usePathname; the fallback keeps the sticky bar's
             height while the title streams in on a prerendered route. */}
         <Suspense
@@ -35,7 +35,7 @@ export default function AdminLayout({
           <AppHeader />
         </Suspense>
 
-        <PageBody id="main-content" fill>
+        <PageBody id="main-content" fill scroll>
           {/* The gate reads the request headers, which is runtime data, so
               it needs a boundary. It also keeps the admin pages out of the
               static shell for anyone but the machine running the server. */}

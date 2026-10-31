@@ -62,7 +62,7 @@ async function OrderImagesData({
   const defaultToday = filters.period === 'day' && filters.date === todayBangkok()
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-hidden">
       <SummaryCards summary={summary} />
 
       <OrderFilters
@@ -73,6 +73,7 @@ async function OrderImagesData({
 
       {result.total === 0 ? (
         <StateScreen
+          className="md:min-h-0 md:overflow-y-auto"
           headingLevel="h2"
           title={
             filtered
