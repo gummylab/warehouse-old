@@ -3,6 +3,14 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
+import {
+  CalendarDaysIcon,
+  CalendarRangeIcon,
+  SearchIcon,
+  SunIcon,
+  XIcon,
+} from 'lucide-react'
+
 import { Button, ButtonLink } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,6 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from '@/components/ui/toggle-group'
 import {
   orderListHref,
   type OrderListFilters,
@@ -34,6 +46,12 @@ const PERIOD_ITEMS = [
   { value: 'year', label: 'รายปี' },
 ] as const
 
+const PERIOD_ICONS = {
+  day: SunIcon,
+  month: CalendarDaysIcon,
+  year: CalendarRangeIcon,
+} as const
+
 export function OrderFilters({
   lines,
   filters,
@@ -55,6 +73,14 @@ export function OrderFilters({
     { value: 'all', label: 'ทั้งหมด' },
     ...lines.map((name) => ({ value: name, label: name })),
   ]
+
+  // The clear action only makes sense once the view differs from the clean
+  // default: today, by day, every line, no search.
+  const isDefaultView =
+    filters.period === 'day' &&
+    filters.date === todayBangkok() &&
+    filters.line === null &&
+    filters.query === null
 
   const currentYear = Number(todayBangkok().slice(0, 4))
   const years = Array.from(
@@ -88,10 +114,10 @@ export function OrderFilters({
   }
 
   function changePeriod(value: string | null) {
-    const next = value === 'month' || value === 'year' ? value : 'day'
-    setPeriod(next)
-    if (next === 'month') setMonth(date.slice(0, 7))
-    if (next === 'year') setYear(date.slice(0, 4))
+    if (value !== 'day' && value !== 'month' && value !== 'year') return
+    setPeriod(value)
+    if (value === 'month') setMonth(date.slice(0, 7))
+    if (value === 'year') setYear(date.slice(0, 4))
   }
 
   function changeMonth(value: string) {
@@ -109,25 +135,17 @@ export function OrderFilters({
     <form
       aria-label="ตัวกรองออเดอร์"
       onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:items-end">
+      className="flex shrink-0 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:items-end">
       <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ช่วงเวลา
-        <Select
-          items={PERIOD_ITEMS}
-          value={period}
-          onValueChange={changePeriod}
-          disabled={pending}>
-          <SelectTrigger className="w-full" aria-label="ช่วงเวลา">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PERIOD_ITEMS.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        ค้นหาเลขออเดอร์
+        <Input
+          type="search"
+          name="q"
+          defaultValue={filters.query ?? ''}
+          placeholder="เช่น 12345"
+          autoComplete="off"
+          disabled={pending}
+        />
       </label>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
@@ -182,25 +200,49 @@ export function OrderFilters({
         </Select>
       </label>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ค้นหาเลขออเดอร์
-        <Input
-          type="search"
-          name="q"
-          defaultValue={filters.query ?? ''}
-          placeholder="เช่น 12345"
-          autoComplete="off"
+      <div className="flex shrink-0 flex-col gap-1.5 text-sm">
+        <span>ช่วงเวลา</span>
+        <ToggleGroup
+          aria-label="ช่วงเวลา"
+          value={[period]}
+          onValueChange={(value) => changePeriod(value[0] ?? null)}
+          variant="outline"
+          spacing={2}
+          size="default"
           disabled={pending}
-        />
-      </label>
+          className="w-fit">
+          {PERIOD_ITEMS.map((item) => {
+            const Icon = PERIOD_ICONS[item.value]
+            return (
+              <ToggleGroupItem
+                key={item.value}
+                value={item.value}
+                aria-label={item.label}
+                title={item.label}
+                disabled={pending}
+                className="px-0">
+                <Icon />
+              </ToggleGroupItem>
+            )
+          })}
+        </ToggleGroup>
+      </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? 'กำลังกรอง...' : 'กรอง'}
+          <SearchIcon />
+          {pending ? 'กำลังค้นหา...' : 'ค้นหา'}
         </Button>
-        <ButtonLink href="/order-images" variant="ghost">
-          ล้างตัวกรอง
-        </ButtonLink>
+        {!isDefaultView ? (
+          <ButtonLink
+            href="/order-images"
+            variant="ghost"
+            size="icon"
+            aria-label="ล้างตัวกรอง"
+            title="ล้างตัวกรอง">
+            <XIcon />
+          </ButtonLink>
+        ) : null}
       </div>
     </form>
   )

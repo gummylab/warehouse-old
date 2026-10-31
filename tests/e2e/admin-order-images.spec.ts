@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 
 import { expect, test } from '@playwright/test'
 
+import { findOrCreateOrder } from '../../lib/db/order-images'
 import { toAbsolute } from '../../lib/order-images/storage'
 import { todayBangkok } from '../../lib/order-images/validation'
 
@@ -23,34 +24,46 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   await expect(page.getByText('ออเดอร์ทั้งหมด')).toBeVisible()
   // The first view is today, by day.
   await expect(page.getByLabel('วันที่')).toHaveValue(today)
-  // Base UI renders the raw value unless the select receives its items, so
-  // these two assertions guard the Thai labels on the trigger.
-  await expect(page.getByRole('combobox', { name: 'ช่วงเวลา' })).toContainText(
-    'รายวัน',
-  )
+  // The line select still uses Base UI's items so the trigger shows Thai.
   await expect(page.getByRole('combobox', { name: 'ไลน์ผลิต' })).toContainText(
     'ทั้งหมด',
   )
+  // The period is a single-select toggle group now, and the search box
+  // leads the row while the period group closes it.
+  const periodGroup = page.getByRole('group', { name: 'ช่วงเวลา' })
+  await expect(
+    periodGroup.getByRole('button', { name: 'รายวัน' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  expect(
+    (
+      await page
+        .locator('form[aria-label="ตัวกรองออเดอร์"] > *')
+        .allInnerTexts()
+    ).map((text) => text.split('\n')[0]),
+  ).toEqual(['ค้นหาเลขออเดอร์', 'วันที่', 'ไลน์ผลิต', 'ช่วงเวลา', 'ค้นหา'])
 
   const orderLink = page.getByRole('link', { name: orderNumber })
   await expect(orderLink).toBeVisible()
+  // The clear action is hidden on the clean today view.
+  await expect(
+    page.getByRole('link', { name: 'ล้างตัวกรอง' }),
+  ).toHaveCount(0)
 
   // The same order stays visible when the view widens to the month and year.
-  const period = page.getByRole('combobox', { name: 'ช่วงเวลา' })
-  await period.click()
-  await page.getByRole('option', { name: 'รายเดือน' }).click()
-  await page.getByRole('button', { name: 'กรอง' }).click()
-  await expect(period).toContainText('รายเดือน')
+  await periodGroup.getByRole('button', { name: 'รายเดือน' }).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(orderLink).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'ล้างตัวกรอง' }),
+  ).toBeVisible()
 
-  await period.click()
-  await page.getByRole('option', { name: 'รายปี' }).click()
-  await page.getByRole('button', { name: 'กรอง' }).click()
+  await periodGroup.getByRole('button', { name: 'รายปี' }).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(orderLink).toBeVisible()
 
   // The order-number search narrows the table to the seeded order.
   await page.getByLabel('ค้นหาเลขออเดอร์').fill(orderNumber)
-  await page.getByRole('button', { name: 'กรอง' }).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(orderLink).toBeVisible()
   await orderLink.click()
 
@@ -92,6 +105,84 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   await expect
     .poll(() => existsSync(toAbsolute(seeded.storageKeys[1])))
     .toBe(false)
+
+  expect(consoleErrors).toEqual([])
+})
+
+test('scrolls the table on desktop and the page on mobile', async ({ page }) => {
+  const prefix = `E2E-SCROLL-${Date.now()}`
+  const today = todayBangkok()
+
+  // More rows than one page (25) and more than the viewport, so the table has
+  // somewhere to scroll on desktop and the page has somewhere to scroll on
+  // mobile.
+  for (let index = 0; index < 26; index += 1) {
+    findOrCreateOrder({
+      orderNumber: `${prefix}-${String(index).padStart(2, '0')}`,
+      orderDate: today,
+      line: 'ดอกแค',
+      createdBy: 'local-device',
+    })
+  }
+
+  const consoleErrors = collectConsoleErrors(page)
+
+  // Desktop: the shell is exactly one viewport and the table owns the scroll.
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto(`/order-images?q=${prefix}`)
+  // The oldest of the 26 rows sits on page two, so match any row from this
+  // run instead of a specific number.
+  await expect(
+    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+  ).toBeVisible()
+
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    ),
+  ).toBeLessThanOrEqual(1)
+
+  const tableContainer = page.locator('[data-slot="table-container"]')
+  expect(
+    await tableContainer.evaluate(
+      (element) => element.scrollHeight - element.clientHeight,
+    ),
+  ).toBeGreaterThan(0)
+
+  await tableContainer.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  expect(
+    await tableContainer.evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0)
+
+  // The header is sticky, so it stays visible while the rows move.
+  await expect(
+    page.getByRole('columnheader', { name: 'เลขออเดอร์' }),
+  ).toBeVisible()
+
+  // Mobile: the table grows with its rows and the document scrolls instead.
+  await page.setViewportSize({ width: 393, height: 851 })
+  await page.reload()
+  await expect(
+    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+  ).toBeVisible()
+
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    ),
+  ).toBeGreaterThan(0)
+  expect(
+    await tableContainer.evaluate(
+      (element) => element.scrollHeight - element.clientHeight,
+    ),
+  ).toBeLessThanOrEqual(1)
+
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight)
+  })
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 
   expect(consoleErrors).toEqual([])
 })
