@@ -47,7 +47,9 @@ export function StepOneFields({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      className="flex w-full flex-col gap-4 md:grid md:grid-cols-3 md:items-end">
       <label className="flex flex-col gap-1.5 text-sm">
         เลขออเดอร์
         <Input
@@ -85,9 +87,14 @@ export function StepOneFields({
         </Select>
       </label>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="text-sm text-destructive md:col-span-3">{error}</p>
+      )}
 
-      <Button type="submit" disabled={submitting}>
+      <Button
+        type="submit"
+        disabled={submitting}
+        className="md:col-span-3 md:w-fit md:justify-self-start">
         {submitting ? 'กำลังค้นหา...' : 'ถัดไป'}
       </Button>
     </form>

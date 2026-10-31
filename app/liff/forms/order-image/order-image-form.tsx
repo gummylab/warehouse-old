@@ -94,8 +94,10 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
 
   return (
     <FormPage
+      width="full"
       header={
         <FormNavbar
+          width="full"
           title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : 'อัปโหลดรูปภาพออเดอร์'}
           subtitle={
             detail

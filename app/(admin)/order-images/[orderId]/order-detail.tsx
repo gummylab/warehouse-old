@@ -1,12 +1,31 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 
-import { ChevronLeftIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react'
+import {
+  CalendarDaysIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FactoryIcon,
+  ImageIcon,
+  PackageIcon,
+  PlusIcon,
+  Trash2Icon,
+  UserIcon,
+} from 'lucide-react'
 
 import { StateScreen } from '@/components/layout/state-screen'
 import { TileGrid } from '@/components/layout/tile-grid'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
@@ -23,6 +42,7 @@ import type {
 } from '@/lib/db/types'
 import { toastMessages } from '@/lib/messages'
 import { formatThaiDate } from '@/lib/order-images/format'
+import { PAGE_TITLES } from '@/lib/page-titles'
 import { notifyError, notifySuccess } from '@/lib/toast'
 
 import {
@@ -176,39 +196,77 @@ export function OrderDetail({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <section className="flex flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground">
-        <div className="flex items-start gap-2">
-          <ButtonLink
-            variant="ghost"
-            size="icon"
-            aria-label="กลับไปหน้ารวม"
-            href="/order-images">
-            <ChevronLeftIcon />
-          </ButtonLink>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Breadcrumb className="min-w-0 flex-1">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink render={<Link href="/order-images" />}>
+                {PAGE_TITLES['/order-images']}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="max-w-[16rem] truncate sm:max-w-none">
+                {detail.order.orderNumber}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="truncate text-xl font-semibold">
-              ออเดอร์ {detail.order.orderNumber}
-            </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {formatThaiDate(detail.order.orderDate)} / ไลน์
-              {detail.order.line} / โดย {creatorLabel}
-            </p>
-          </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <ButtonLink
+            href={`/liff/forms/order-image?orderId=${detail.order.id}`}
+            size="sm"
+            target="_blank"
+            rel="noreferrer">
+            <PlusIcon />
+            เพิ่มข้อมูล
+          </ButtonLink>
 
           <Button
             variant="destructive"
             size="sm"
-            className="ml-auto shrink-0"
+            className="shrink-0"
             disabled={orderPending}
             onClick={() => setDeleteOrderOpen(true)}>
             ลบออเดอร์
           </Button>
         </div>
+      </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span>ไอเท็ม {itemCount}</span>
-          <span>รูป {images.length}</span>
+      <section className="flex flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h2 className="truncate text-xl font-semibold">
+            ออเดอร์ {detail.order.orderNumber}
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDaysIcon className="size-4 shrink-0" />
+              {formatThaiDate(detail.order.orderDate)}
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <FactoryIcon className="size-4 shrink-0" />
+              <span className="truncate">ไลน์ {detail.order.line}</span>
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <UserIcon className="size-4 shrink-0" />
+              <span className="truncate">{creatorLabel}</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end md:border-l md:border-border md:pl-4">
+          <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm">
+            <PackageIcon className="size-4 text-muted-foreground" />
+            <span className="text-muted-foreground">ไอเท็ม</span>
+            <span className="font-semibold tabular-nums">{itemCount}</span>
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm">
+            <ImageIcon className="size-4 text-muted-foreground" />
+            <span className="text-muted-foreground">รูป</span>
+            <span className="font-semibold tabular-nums">{images.length}</span>
+          </span>
         </div>
       </section>
 

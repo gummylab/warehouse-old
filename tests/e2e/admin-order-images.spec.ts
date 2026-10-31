@@ -70,6 +70,21 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   await expect(
     page.getByRole('heading', { name: `ออเดอร์ ${orderNumber}` }),
   ).toBeVisible()
+  const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
+  await expect(breadcrumb).toBeVisible()
+  await expect(
+    breadcrumb.getByRole('link', { name: 'จัดการรูปภาพออเดอร์' }),
+  ).toBeVisible()
+  await expect(breadcrumb.getByText(orderNumber)).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'เพิ่มข้อมูล' }),
+  ).toHaveAttribute(
+    'href',
+    `/liff/forms/order-image?orderId=${seeded.orderId}`,
+  )
+  await expect(
+    page.getByRole('link', { name: 'กลับไปหน้ารวม' }),
+  ).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 110' })).toBeVisible()
 
@@ -142,7 +157,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
     ),
   ).toBeLessThanOrEqual(1)
 
-  const tableContainer = page.locator('[data-slot="table-container"]')
+  const tableContainer = page.locator('[data-slot="table-container"]:visible')
   expect(
     await tableContainer.evaluate(
       (element) => element.scrollHeight - element.clientHeight,
@@ -185,6 +200,28 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 
   expect(consoleErrors).toEqual([])
+})
+
+test('keeps the period group compact on desktop and full width on mobile', async ({
+  page,
+}) => {
+  const periodGroup = page.getByRole('group', { name: 'ช่วงเวลา' })
+  const form = page.locator('form[aria-label="ตัวกรองออเดอร์"]:visible')
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/order-images')
+  expect((await periodGroup.boundingBox())?.width ?? 0).toBeLessThan(200)
+
+  await page.setViewportSize({ width: 393, height: 851 })
+  await page.reload()
+  // The mobile width is applied after useIsMobile hydrates.
+  await expect
+    .poll(async () => {
+      const group = await periodGroup.boundingBox()
+      const frame = await form.boundingBox()
+      return group && frame ? group.width / frame.width : 0
+    })
+    .toBeGreaterThan(0.8)
 })
 
 test('refuses the admin page when the request came through Cloudflare', async ({

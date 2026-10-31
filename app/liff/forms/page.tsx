@@ -24,7 +24,9 @@ export const metadata: Metadata = {
 // shared URLs keep working without client-side routing state.
 export default function FormsPage() {
   return (
-    <FormPage header={<FormNavbar title="แบบฟอร์ม" />}>
+    <FormPage
+      width="full"
+      header={<FormNavbar width="full" title="แบบฟอร์ม" />}>
       <Link
         href="/liff/forms/order-image"
         className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted"
