@@ -195,3 +195,21 @@ test('rejects an incomplete step 1 before it reaches the network', async ({ page
   // All three checks run client-side with the same helpers the route uses.
   expect(orderImageCalls).toEqual([])
 })
+
+test('uses the desktop width for the LIFF form hub and order form', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+
+  for (const path of ['/liff/forms', '/liff/forms/order-image']) {
+    await page.goto(path)
+
+    const body = page.locator('[data-slot="page-body"]:visible')
+    await expect(body).toBeVisible()
+    expect((await body.boundingBox())?.width ?? 0).toBeGreaterThan(1000)
+
+    const headerRow = page.locator('[data-slot="page-header-row"]:visible')
+    await expect(headerRow).toBeVisible()
+    expect((await headerRow.boundingBox())?.width ?? 0).toBeGreaterThan(1000)
+  }
+})

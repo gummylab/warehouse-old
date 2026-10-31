@@ -14,14 +14,17 @@ export function FormNavbar({
   title,
   subtitle,
   action,
+  width = 'form',
 }: {
   title: string
   subtitle?: string
   action?: React.ReactNode
+  width?: 'form' | 'full'
 }) {
   return (
     <PageHeader
       variant="form"
+      width={width}
       sticky
       title={title}
       subtitle={subtitle}

@@ -168,12 +168,13 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
 
   return (
     <FormPage
-      className="w-full"
+      width="full"
       header={
         // The navbar carries the item and the order it belongs to, so the
         // page below is only the photos. The back link keeps the name
         // "กลับออเดอร์" because that is what the e2e spec looks for.
         <FormNavbar
+          width="full"
           title={`ไอเท็ม ${detail.item.itemNumber}`}
           subtitle={`ออเดอร์ ${detail.order.orderNumber} / ${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`}
           action={

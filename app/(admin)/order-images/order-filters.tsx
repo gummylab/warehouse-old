@@ -24,6 +24,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui/toggle-group'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   orderListHref,
   type OrderListFilters,
@@ -33,6 +34,7 @@ import {
   isValidCalendarDate,
   todayBangkok,
 } from '@/lib/order-images/validation'
+import { cn } from '@/lib/utils'
 
 // The filter bar writes its state into the URL and lets the server page read
 // it. The period turns one anchor date into a day, month or year range.
@@ -60,6 +62,7 @@ export function OrderFilters({
   filters: OrderListFilters
 }) {
   const router = useRouter()
+  const mobile = useIsMobile()
   const [pending, startTransition] = useTransition()
   const [line, setLine] = useState(filters.line ?? 'all')
   const [period, setPeriod] = useState<OrderPeriod>(filters.period)
@@ -207,10 +210,10 @@ export function OrderFilters({
           value={[period]}
           onValueChange={(value) => changePeriod(value[0] ?? null)}
           variant="outline"
-          spacing={2}
+          spacing={0}
           size="default"
           disabled={pending}
-          className="w-fit">
+          className={cn('w-fit', mobile && 'w-full')}>
           {PERIOD_ITEMS.map((item) => {
             const Icon = PERIOD_ICONS[item.value]
             return (
@@ -220,7 +223,7 @@ export function OrderFilters({
                 aria-label={item.label}
                 title={item.label}
                 disabled={pending}
-                className="px-0">
+                className={cn('px-0', mobile && 'flex-1')}>
                 <Icon />
               </ToggleGroupItem>
             )
@@ -228,8 +231,11 @@ export function OrderFilters({
         </ToggleGroup>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        <Button type="submit" disabled={pending}>
+      <div className={cn('flex items-center gap-2', mobile ? 'w-full' : 'shrink-0')}>
+        <Button
+          type="submit"
+          disabled={pending}
+          className={cn(mobile && 'flex-1')}>
           <SearchIcon />
           {pending ? 'กำลังค้นหา...' : 'ค้นหา'}
         </Button>
