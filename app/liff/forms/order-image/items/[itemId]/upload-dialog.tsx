@@ -251,9 +251,6 @@ export function UploadDialog({
               <li key={entry.key} className="flex items-center gap-2 rounded-xl border p-2">
                 <FileImageIcon className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm">{entry.file.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatBytes(entry.file.size)}
-                </span>
 
                 {entry.status === 'uploading' && (
                   <Spinner className="size-4 shrink-0" aria-label="กำลังอัปโหลด" />
@@ -294,11 +291,4 @@ export function UploadDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-// The size a phone camera produces is best read in megabytes.
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
