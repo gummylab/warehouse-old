@@ -26,7 +26,14 @@ export default function AdminLayout({
       <SkipLink />
       <AppSidebar />
       <SidebarInset className="flex min-h-svh flex-col">
-        <AppHeader />
+        {/* AppHeader reads usePathname; the fallback keeps the sticky bar's
+            height while the title streams in on a prerendered route. */}
+        <Suspense
+          fallback={
+            <div className="h-16 shrink-0 border-b bg-background/80" />
+          }>
+          <AppHeader />
+        </Suspense>
 
         <PageBody id="main-content" fill>
           {/* The gate reads the request headers, which is runtime data, so

@@ -16,7 +16,11 @@ import type {
   ItemRecord,
   OrderDetail,
   OrderItemNode,
+  OrderListFilters,
+  OrderListResult,
+  OrderListRow,
   OrderRecord,
+  OrderSummary,
 } from './types'
 import { nextSingleNumber, nextVarietyNumber } from '../order-images/item-number'
 import {
@@ -37,7 +41,12 @@ export type {
   ItemRecord,
   OrderDetail,
   OrderItemNode,
+  OrderListFilters,
+  OrderListResult,
+  OrderListRow,
+  OrderPeriod,
   OrderRecord,
+  OrderSummary,
 } from './types'
 
 // Expected failures of the auto-numbered add; unexpected failures still
@@ -64,6 +73,12 @@ type ItemRow = {
   created_at: string
 }
 
+type OrderListRowSql = OrderRow & {
+  item_count: number
+  image_count: number
+  creator_name: string | null
+}
+
 type ImageRow = {
   id: string
   item_id: string
@@ -86,6 +101,17 @@ function toOrder(row: OrderRow): OrderRecord {
     line: row.line,
     createdBy: row.created_by,
     createdAt: row.created_at,
+  }
+}
+
+function toOrderListRow(row: OrderListRowSql): OrderListRow {
+  return {
+    ...toOrder(row),
+    itemCount: row.item_count,
+    imageCount: row.image_count,
+    creatorName:
+      row.creator_name ??
+      (row.created_by === 'local-device' ? 'เครื่องนี้' : null),
   }
 }
 
@@ -119,9 +145,9 @@ function toImage(row: ImageRow): ImageRecord {
 // Lines catalog
 // ---------------------------------------------------------------------------
 
-// The production line catalog the form's dropdown offers. A plain read: the
-// catalog is seeded when the database is opened (see lib/db/index.ts) and
-// only an admin edit changes it.
+// The production line catalog, read by the form's dropdown and by the admin
+// order filter. A plain read: the catalog is seeded when the database is
+// opened (see lib/db/index.ts) and only an admin edit changes it.
 //
 // Not cached with 'use cache'. The read would run during the build and
 // bake whatever the build machine's database holds into the static shell,
@@ -141,6 +167,89 @@ export function lineExists(name: string): boolean {
   return (
     getDb().prepare('SELECT 1 FROM lines WHERE name = ?').get(name) !== undefined
   )
+}
+
+// ---------------------------------------------------------------------------
+// Admin order list
+// ---------------------------------------------------------------------------
+
+export function getOrderSummary(): OrderSummary {
+  const row = getDb()
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM orders) AS orders,
+         (SELECT COUNT(*) FROM items) AS items,
+         (SELECT COUNT(*) FROM images) AS images`,
+    )
+    .get() as {
+    orders: number
+    items: number
+    images: number
+  }
+
+  return {
+    orders: row.orders,
+    items: row.items,
+    images: row.images,
+  }
+}
+
+// LIKE treats % and _ as wildcards; a user typing them means the literal
+// character, so escape them before wrapping the value in %...%.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+export function listOrders(filters: OrderListFilters): OrderListResult {
+  const db = getDb()
+  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize)))
+  const where: string[] = []
+  const params: (string | number)[] = []
+
+  if (filters.from) {
+    where.push('o.order_date >= ?')
+    params.push(filters.from)
+  }
+  if (filters.to) {
+    where.push('o.order_date <= ?')
+    params.push(filters.to)
+  }
+  if (filters.line) {
+    where.push('o.line = ?')
+    params.push(filters.line)
+  }
+  if (filters.query) {
+    // The escape character is a single backslash, written as a JS escape.
+    where.push("o.order_number LIKE ? ESCAPE '\\'")
+    params.push(`%${escapeLike(filters.query)}%`)
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const total = (
+    db.prepare(`SELECT COUNT(*) AS total FROM orders o ${whereSql}`).get(...params) as {
+      total: number
+    }
+  ).total
+
+  const pageCount = total > 0 ? Math.ceil(total / pageSize) : 0
+  const page = Math.min(Math.max(1, Math.floor(filters.page)), Math.max(1, pageCount))
+
+  const rows = db
+    .prepare(
+      `SELECT
+         o.id, o.order_number, o.order_date, o.line, o.created_by, o.created_at,
+         (SELECT COUNT(*) FROM items i WHERE i.order_id = o.id) AS item_count,
+         (SELECT COUNT(*) FROM images img WHERE img.order_id = o.id) AS image_count,
+         u.display_name AS creator_name
+       FROM orders o
+       LEFT JOIN users u ON u.line_user_id = o.created_by
+       ${whereSql}
+       ORDER BY o.order_date DESC, o.created_at DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, pageSize, (page - 1) * pageSize) as OrderListRowSql[]
+
+  return { rows: rows.map(toOrderListRow), total, page, pageCount }
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +469,25 @@ export function deleteItemCascade(itemId: string): boolean {
     .all(itemId, itemId) as { storage_key: string }[]
   const info = db.prepare('DELETE FROM items WHERE id = ?').run(itemId)
   if (info.changes === 0) return false
+  for (const row of keys) removeStoredFile(toAbsolute(row.storage_key))
+  return true
+}
+
+// Deletes the order; the FK cascade removes its items and image rows. The
+// storage keys are read inside the transaction, then the files are unlinked
+// after the commit (best effort, same rule as deleteItemCascade).
+export function deleteOrderCascade(orderId: string): boolean {
+  const db = getDb()
+  const run = db.transaction((): { storage_key: string }[] | null => {
+    const keys = db
+      .prepare('SELECT storage_key FROM images WHERE order_id = ?')
+      .all(orderId) as { storage_key: string }[]
+    const info = db.prepare('DELETE FROM orders WHERE id = ?').run(orderId)
+    return info.changes > 0 ? keys : null
+  })
+
+  const keys = run()
+  if (!keys) return false
   for (const row of keys) removeStoredFile(toAbsolute(row.storage_key))
   return true
 }

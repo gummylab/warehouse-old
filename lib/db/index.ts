@@ -52,6 +52,8 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_orders_order_number
     ON orders (order_number);
   CREATE INDEX IF NOT EXISTS idx_orders_line ON orders (line);
+  -- The admin list filters by order_date range and sorts by it.
+  CREATE INDEX IF NOT EXISTS idx_orders_order_date ON orders (order_date);
 
   -- Items self-reference for varieties (110-190 under parent 100); the
   -- database allows any depth but the form only ever creates depth 2.

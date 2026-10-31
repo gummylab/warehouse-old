@@ -8,10 +8,20 @@ export const PAGE_TITLES: Record<string, string> = {
   '/liff/forms/order-image': 'อัปโหลดรูปภาพออเดอร์',
 }
 
+// Nested admin routes keep their section title. Without this, the detail
+// page at /order-images/<uuid> would show the UUID in the header.
+const PREFIX_TITLES: Record<string, string> = {
+  '/order-images': PAGE_TITLES['/order-images'],
+}
+
 // Resolve a pathname to its plain-text title, with decoded fallback.
 export function getPageTitle(pathname: string): string {
   const exact = PAGE_TITLES[pathname]
   if (exact) return exact
+
+  for (const [prefix, title] of Object.entries(PREFIX_TITLES)) {
+    if (pathname.startsWith(`${prefix}/`)) return title
+  }
 
   const lastSegment = pathname.split('/').filter(Boolean).pop()
   if (!lastSegment) return PAGE_TITLES['/']
