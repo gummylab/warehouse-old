@@ -17,6 +17,12 @@ describe('page titles', () => {
     expect(getPageTitle('/register')).not.toBe(PAGE_TITLES['/order-images'])
   })
 
+  it('keeps the section title for a nested order-image route', () => {
+    expect(getPageTitle('/order-images/abc-123')).toBe(
+      PAGE_TITLES['/order-images'],
+    )
+  })
+
   it('resolves the LIFF pages that carry a title', () => {
     expect(getPageTitle('/liff/authorization')).toBe(PAGE_TITLES['/liff/authorization'])
     expect(getPageTitle('/liff/forms/order-image')).toBe(PAGE_TITLES['/liff/forms/order-image'])

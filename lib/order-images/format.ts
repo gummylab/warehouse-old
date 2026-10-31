@@ -12,3 +12,18 @@ export function formatThaiDate(orderDate: string): string {
     year: 'numeric',
   }).format(parsed)
 }
+
+// Timestamps are stored as ISO 8601. The warehouse works in Bangkok time, so
+// the display is anchored there instead of the server's local timezone.
+export function formatThaiDateTime(value: string): string {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    // medium keeps the full Buddhist-era year; short rendered it as "69".
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed)
+}
+
+

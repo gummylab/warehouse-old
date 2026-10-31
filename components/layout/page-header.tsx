@@ -34,32 +34,26 @@ export function PageHeader({
         'flex w-full shrink-0 border-b bg-background/80 backdrop-blur-md',
         variant === 'admin' ? 'h-16' : 'min-h-14',
         sticky && 'sticky top-0 z-20',
-        className,
+        className
       )}>
       <div
         className={cn(
           'flex w-full items-center gap-2',
-          variant === 'admin'
-            ? 'px-4 md:px-6'
-            : 'mx-auto max-w-[42rem] px-4 py-2 md:px-6',
+          variant === 'admin' ? 'px-4 md:px-6' : 'mx-auto max-w-2xl px-4 py-2 md:px-6'
         )}>
         {leading ? (
           <>
             {leading}
-            <Separator orientation="vertical" className="my-2" />
+            <Separator orientation="vertical" className="my-6" />
           </>
         ) : null}
 
         <div className="flex min-w-0 flex-col">
           <h1 className="truncate text-base font-semibold">{title}</h1>
-          {subtitle ? (
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-          ) : null}
+          {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
         </div>
 
-        {trailing ? (
-          <div className="ml-auto flex shrink-0 items-center gap-2">{trailing}</div>
-        ) : null}
+        {trailing ? <div className="ml-auto flex shrink-0 items-center gap-2">{trailing}</div> : null}
       </div>
     </header>
   )

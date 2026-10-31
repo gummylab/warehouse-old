@@ -62,6 +62,43 @@ export type OrderDetail = {
   items: OrderItemNode[] // top-level only; varieties nested under children
 }
 
+// The admin list reads one row per order, with the counts and the creator
+// name already resolved by SQL. The shapes live here, apart from the data
+// layer, so a Client Component can import them without pulling in
+// better-sqlite3.
+export type OrderPeriod = 'day' | 'month' | 'year'
+
+export type OrderListFilters = {
+  period: OrderPeriod
+  // Anchor date ('YYYY-MM-DD'); the range below is derived from it.
+  date: string
+  from: string
+  to: string
+  line: string | null
+  query: string | null
+  page: number
+  pageSize: number
+}
+
+export type OrderListRow = OrderRecord & {
+  itemCount: number
+  imageCount: number
+  creatorName: string | null
+}
+
+export type OrderListResult = {
+  rows: OrderListRow[]
+  total: number
+  page: number
+  pageCount: number
+}
+
+export type OrderSummary = {
+  orders: number
+  items: number
+  images: number
+}
+
 // One item with the order it belongs to: everything the item-images page
 // needs, scoped to a single item instead of the whole order tree.
 export type ItemDetail = {
