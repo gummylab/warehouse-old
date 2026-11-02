@@ -21,7 +21,10 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   const consoleErrors = collectConsoleErrors(page)
 
   await page.goto('/order-images')
-  await expect(page.getByText('ออเดอร์ทั้งหมด')).toBeVisible()
+  const summaryRegion = page.getByRole('region', { name: 'ภาพรวมออเดอร์' })
+  await expect(
+    summaryRegion.getByText('ออเดอร์', { exact: true }),
+  ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'สร้างออเดอร์' }),
   ).toHaveAttribute('href', '/liff/forms/order-image')
@@ -125,6 +128,23 @@ test('summarizes, inspects and deletes an uploaded order', async ({
     .toBe(false)
 
   expect(consoleErrors).toEqual([])
+})
+
+test('switches the KPI between the filtered view and all', async ({ page }) => {
+  await page.goto('/order-images')
+  const scope = page.getByRole('group', { name: 'ขอบเขต KPI' })
+  await expect(
+    scope.getByRole('button', { name: 'ตามตัวกรอง' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+
+  await scope.getByRole('button', { name: 'ทั้งหมด' }).click()
+  await expect(page).toHaveURL(/summary=all/)
+  await expect(
+    scope.getByRole('button', { name: 'ทั้งหมด' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+
+  await scope.getByRole('button', { name: 'ตามตัวกรอง' }).click()
+  await expect(page).not.toHaveURL(/summary=all/)
 })
 
 test('scrolls the table on desktop and the page on mobile', async ({ page }) => {

@@ -65,6 +65,7 @@ function filters(overrides: Partial<Parameters<typeof listOrders>[0]> = {}) {
     to: '2999-12-31',
     line: null,
     query: null,
+    summary: 'filtered' as const,
     page: 1,
     pageSize: 25,
     ...overrides,
@@ -85,6 +86,25 @@ describe('getOrderSummary', () => {
       items: 3,
       images: 2,
     })
+  })
+
+  it('counts only the orders that match the filters', () => {
+    const first = newOrder('S-1', '2026-10-19')
+    newOrder('S-2', '2026-10-20')
+    const pack = addPack(first.id)
+    const variety = addVariety(first.id, pack.id)
+    upload(pack.id, 4)
+    upload(variety.id, 6)
+
+    expect(
+      getOrderSummary(filters({ from: '2026-10-19', to: '2026-10-19' })),
+    ).toEqual({ orders: 1, items: 2, images: 2 })
+    expect(getOrderSummary(filters({ query: 'S-2' }))).toEqual({
+      orders: 1,
+      items: 0,
+      images: 0,
+    })
+    expect(getOrderSummary()).toEqual({ orders: 2, items: 2, images: 2 })
   })
 })
 

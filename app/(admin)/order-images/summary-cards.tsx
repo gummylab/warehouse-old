@@ -3,24 +3,44 @@
 import { ImageIcon, PackageIcon, ShoppingCartIcon } from 'lucide-react'
 
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { OrderSummary } from '@/lib/db/types'
+import type { OrderSummary, SummaryScope } from '@/lib/db/types'
 import { cn } from '@/lib/utils'
 
-// The three facts an operator checks before opening the table. The values are
-// global, not filtered, so the summary keeps its meaning while the table
-// below is narrowed by the filter bar.
+// The values follow the selected KPI scope: filtered counts only the orders
+// matching the filter bar; all counts the whole system. The table below stays
+// narrowed by the filter bar in both cases.
 //
 // One strip with dividers rather than three free-floating cards: the three
 // numbers belong to one set, and the shared surface keeps the row from
 // leaving an orphan card on the second line at medium widths.
-export function SummaryCards({ summary }: { summary: OrderSummary }) {
+export function SummaryCards({
+  summary,
+  scope,
+}: {
+  summary: OrderSummary
+  scope: SummaryScope
+}) {
+  const all = scope === 'all'
+
   return (
     <section
       aria-label="ภาพรวมออเดอร์"
       className="grid shrink-0 grid-cols-3 divide-x divide-border overflow-hidden rounded-xl border bg-card text-card-foreground">
-      <SummaryCard icon={<ShoppingCartIcon />} label="ออเดอร์ทั้งหมด" value={summary.orders} />
-      <SummaryCard icon={<PackageIcon />} label="ไอเท็มทั้งหมด" value={summary.items} />
-      <SummaryCard icon={<ImageIcon />} label="รูปภาพทั้งหมด" value={summary.images} />
+      <SummaryCard
+        icon={<ShoppingCartIcon />}
+        label={all ? 'ออเดอร์ทั้งหมด' : 'ออเดอร์'}
+        value={summary.orders}
+      />
+      <SummaryCard
+        icon={<PackageIcon />}
+        label={all ? 'ไอเท็มทั้งหมด' : 'ไอเท็ม'}
+        value={summary.items}
+      />
+      <SummaryCard
+        icon={<ImageIcon />}
+        label={all ? 'รูปภาพทั้งหมด' : 'รูปภาพ'}
+        value={summary.images}
+      />
     </section>
   )
 }

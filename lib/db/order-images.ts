@@ -171,36 +171,12 @@ export function lineExists(name: string): boolean {
 // Admin order list
 // ---------------------------------------------------------------------------
 
-export function getOrderSummary(): OrderSummary {
-  const row = getDb()
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM orders) AS orders,
-         (SELECT COUNT(*) FROM items) AS items,
-         (SELECT COUNT(*) FROM images) AS images`,
-    )
-    .get() as {
-    orders: number
-    items: number
-    images: number
-  }
-
-  return {
-    orders: row.orders,
-    items: row.items,
-    images: row.images,
-  }
-}
-
-// LIKE treats % and _ as wildcards; a user typing them means the literal
-// character, so escape them before wrapping the value in %...%.
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
-}
-
-export function listOrders(filters: OrderListFilters): OrderListResult {
-  const db = getDb()
-  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize)))
+// Shared WHERE for the admin list and the KPI summary: both must narrow the
+// same way, so the filter rules live in one place.
+function buildOrderWhere(filters: OrderListFilters): {
+  whereSql: string
+  params: (string | number)[]
+} {
   const where: string[] = []
   const params: (string | number)[] = []
 
@@ -222,7 +198,76 @@ export function listOrders(filters: OrderListFilters): OrderListResult {
     params.push(`%${escapeLike(filters.query)}%`)
   }
 
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  return {
+    whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+    params,
+  }
+}
+
+export function getOrderSummary(filters?: OrderListFilters): OrderSummary {
+  const db = getDb()
+
+  // No filters means the whole-system totals, used by the "all" KPI scope.
+  if (!filters) {
+    const row = db
+      .prepare(
+        `SELECT
+           (SELECT COUNT(*) FROM orders) AS orders,
+           (SELECT COUNT(*) FROM items) AS items,
+           (SELECT COUNT(*) FROM images) AS images`,
+      )
+      .get() as {
+      orders: number
+      items: number
+      images: number
+    }
+
+    return {
+      orders: row.orders,
+      items: row.items,
+      images: row.images,
+    }
+  }
+
+  // The filtered totals count items and images that belong to the matching
+  // orders, not every row in their tables.
+  const { whereSql, params } = buildOrderWhere(filters)
+  const row = db
+    .prepare(
+      `WITH filtered AS (
+         SELECT o.id FROM orders o
+         ${whereSql}
+       )
+       SELECT
+         (SELECT COUNT(*) FROM filtered) AS orders,
+         (SELECT COUNT(*) FROM items i
+            JOIN filtered f ON f.id = i.order_id) AS items,
+         (SELECT COUNT(*) FROM images img
+            JOIN filtered f ON f.id = img.order_id) AS images`,
+    )
+    .get(...params) as {
+    orders: number
+    items: number
+    images: number
+  }
+
+  return {
+    orders: row.orders,
+    items: row.items,
+    images: row.images,
+  }
+}
+
+// LIKE treats % and _ as wildcards; a user typing them means the literal
+// character, so escape them before wrapping the value in %...%.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
+}
+
+export function listOrders(filters: OrderListFilters): OrderListResult {
+  const db = getDb()
+  const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize)))
+  const { whereSql, params } = buildOrderWhere(filters)
   const total = (
     db.prepare(`SELECT COUNT(*) AS total FROM orders o ${whereSql}`).get(...params) as {
       total: number

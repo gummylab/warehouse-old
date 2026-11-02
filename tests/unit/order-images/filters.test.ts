@@ -18,6 +18,7 @@ describe('parseOrderListParams', () => {
       to: today,
       line: null,
       query: null,
+      summary: 'filtered',
       page: 1,
       pageSize: ORDER_PAGE_SIZE,
     })
@@ -88,6 +89,11 @@ describe('parseOrderListParams', () => {
     expect(parseOrderListParams({ page: 'abc' }).page).toBe(1)
     expect(parseOrderListParams({ page: '3' }).page).toBe(3)
   })
+
+  it('defaults the KPI scope to filtered and reads the all scope', () => {
+    expect(parseOrderListParams({}).summary).toBe('filtered')
+    expect(parseOrderListParams({ summary: 'all' }).summary).toBe('all')
+  })
 })
 
 describe('hasOrderFilters', () => {
@@ -131,5 +137,11 @@ describe('orderListHref', () => {
     expect(orderListHref(filters, 2)).toBe(
       '/order-images?line=%E0%B8%94%E0%B8%AD%E0%B8%81%E0%B9%81%E0%B8%84&q=12+34&page=2',
     )
+  })
+
+  it('keeps the all KPI scope in the URL', () => {
+    expect(
+      orderListHref(parseOrderListParams({ summary: 'all' }), 1),
+    ).toBe('/order-images?summary=all')
   })
 })
