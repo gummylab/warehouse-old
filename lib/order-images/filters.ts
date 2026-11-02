@@ -5,7 +5,7 @@ import type { OrderListFilters, OrderPeriod } from '@/lib/db/types'
 
 import { isValidCalendarDate, todayBangkok } from './validation'
 
-export type { OrderListFilters, OrderPeriod } from '@/lib/db/types'
+export type { OrderListFilters, OrderPeriod, SummaryScope } from '@/lib/db/types'
 
 export const ORDER_PAGE_SIZE = 25
 
@@ -62,6 +62,7 @@ export function parseOrderListParams(params: SearchParams): OrderListFilters {
     to,
     line: first(params.line) || null,
     query: query || null,
+    summary: params.summary === 'all' ? 'all' : 'filtered',
     page,
     pageSize: ORDER_PAGE_SIZE,
   }
@@ -83,6 +84,7 @@ export function orderListHref(filters: OrderListFilters, page: number): string {
   }
   if (filters.line) params.set('line', filters.line)
   if (filters.query) params.set('q', filters.query)
+  if (filters.summary === 'all') params.set('summary', 'all')
   if (page > 1) params.set('page', String(page))
 
   const query = params.toString()

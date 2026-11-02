@@ -68,6 +68,10 @@ export type OrderDetail = {
 // better-sqlite3.
 export type OrderPeriod = 'day' | 'month' | 'year'
 
+// The KPI scope is a view option, not a table filter: 'filtered' follows the
+// filter bar, 'all' counts the whole system. The default is 'filtered'.
+export type SummaryScope = 'filtered' | 'all'
+
 export type OrderListFilters = {
   period: OrderPeriod
   // Anchor date ('YYYY-MM-DD'); the range below is derived from it.
@@ -76,6 +80,7 @@ export type OrderListFilters = {
   to: string
   line: string | null
   query: string | null
+  summary: SummaryScope
   page: number
   pageSize: number
 }
