@@ -2,7 +2,6 @@
 
 import { MoreVerticalIcon, Trash2Icon } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -35,7 +34,7 @@ export function AdminImageTile({
   onDelete: () => void
 }) {
   return (
-    <div className="relative flex flex-col gap-2 rounded-xl border p-2">
+    <div className="relative flex flex-col gap-y-2 rounded-xl border p-2">
       <button
         type="button"
         onClick={onPreview}
@@ -52,52 +51,54 @@ export function AdminImageTile({
         />
       </button>
 
-      <div className="flex items-center justify-between gap-2">
-        <Badge variant={image.package ? 'secondary' : 'outline'}>
-          {image.package ?? 'ยังไม่ระบุ'}
-        </Badge>
+      <span className="w-full truncate text-xs text-muted-foreground text-center">
+        {image.package ?? 'ยังไม่ระบุแพ็กเกจ'}
+      </span>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`ตั้งค่ารูปที่ ${image.seq}`}
-                disabled={pending}
-              />
-            }>
-            <MoreVerticalIcon />
-          </DropdownMenuTrigger>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-1.5 top-1.5 bg-background/80 backdrop-blur-sm"
+              aria-label={`ตั้งค่ารูปที่ ${image.seq}`}
+              disabled={pending}
+            />
+          }>
+          <MoreVerticalIcon />
+        </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-auto min-w-40">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>แพ็กเกจ</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="w-auto min-w-48">
-                <DropdownMenuRadioGroup
-                  value={image.package ?? null}
-                  onValueChange={(value: string | null) => onPackageChange(value)}>
-                  <DropdownMenuRadioItem value={null} closeOnClick>
-                    ยังไม่ระบุแพ็กเกจ
+        <DropdownMenuContent align="end" className="w-auto min-w-40">
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>แพ็กเกจ</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-auto min-w-48">
+              <DropdownMenuRadioGroup
+                value={image.package ?? null}
+                onValueChange={(value: string | null) => onPackageChange(value)}>
+                <DropdownMenuRadioItem value={null} closeOnClick>
+                  ยังไม่ระบุแพ็กเกจ
+                </DropdownMenuRadioItem>
+                {PACKAGE_OPTIONS.map((pkg) => (
+                  <DropdownMenuRadioItem key={pkg} value={pkg} closeOnClick>
+                    {pkg}
                   </DropdownMenuRadioItem>
-                  {PACKAGE_OPTIONS.map((pkg) => (
-                    <DropdownMenuRadioItem key={pkg} value={pkg} closeOnClick>
-                      {pkg}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-            <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
 
-            <DropdownMenuItem variant="destructive" onClick={onDelete}>
-              <Trash2Icon />
-              ลบรูปนี้
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={pending}
+            onClick={onDelete}>
+            <Trash2Icon />
+            ลบรูปนี้
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

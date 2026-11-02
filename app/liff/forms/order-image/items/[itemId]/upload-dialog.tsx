@@ -211,11 +211,11 @@ export function UploadDialog({
             <span className="hidden pointer-fine:inline">ลากไฟล์มาวางที่นี่</span>
           </p>
           <div className="flex items-center gap-2">
-            {/* The camera has its own input instead of relying on the system
-                chooser: Android offers no camera there for the narrow accept
-                the gallery input needs. Hidden on a fine pointer, where
-                capture is ignored and the button would only reopen the file
-                dialog. */}
+            {/* The camera has its own input because the gallery input's narrow
+                accept leaves some Android browsers without a camera option.
+                capture is only a hint, so a device may still show a
+                camera/file chooser; the hint below covers that. Hidden on a
+                fine pointer, where capture is ignored. */}
             <Button
               size="sm"
               className="pointer-fine:hidden"
@@ -227,6 +227,9 @@ export function UploadDialog({
               เลือกไฟล์
             </Button>
           </div>
+          <p className="pointer-fine:hidden text-xs text-muted-foreground">
+            หากระบบให้เลือกแหล่งภาพ ให้เลือก &quot;กล้อง&quot;
+          </p>
           <input
             ref={cameraRef}
             type="file"

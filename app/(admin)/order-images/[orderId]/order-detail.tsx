@@ -562,7 +562,9 @@ function ImageGrid({
   }
 
   return (
-    <TileGrid label={`รูปภาพไอเท็ม ${itemNumber}`}>
+    <TileGrid
+      label={`รูปภาพไอเท็ม ${itemNumber}`}
+      className="border-0 p-0">
       {images.map((image) => (
         <AdminImageTile
           key={image.id}

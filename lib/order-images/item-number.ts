@@ -39,3 +39,12 @@ export function nextVarietyNumber(parentNumber: number, childNumbers: number[]):
   const next = base + VARIETY_STEP
   return next - parentNumber > MAX_VARIETY_SPAN ? null : next
 }
+
+// Substring match on one printed number, used by the item search in step 2.
+// Matching is per tile, so searching 220 shows item 220 alone instead of the
+// pack's other varieties. An empty query matches everything, which is what
+// lets the caller skip a separate "is the filter on" branch.
+export function matchesItemNumber(itemNumber: number, query: string): boolean {
+  const needle = query.trim()
+  return !needle || String(itemNumber).includes(needle)
+}
