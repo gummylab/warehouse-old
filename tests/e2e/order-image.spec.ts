@@ -170,6 +170,52 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   expect(consoleErrors).toEqual([])
 })
 
+test('filters the item cards as a number is typed', async ({ page }) => {
+  const orderNumber = `E2E-${Date.now()}`
+  const consoleErrors = collectConsoleErrors(page)
+
+  await page.goto('/liff/forms/order-image')
+
+  await page.getByLabel('เลขออเดอร์').fill(orderNumber)
+  await page.getByLabel('วันที่ออเดอร์').fill(ORDER_DATE)
+  await page.getByLabel('ไลน์ผลิต').click()
+  await page.getByRole('option').first().click()
+  await page.getByRole('button', { name: 'ถัดไป' }).click()
+
+  // Two packs, one of them with a variety, so the search has something to
+  // tell apart at both levels.
+  await page.getByRole('button', { name: 'เพิ่มไอเท็ม (100)' }).click()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toBeVisible()
+  await page.getByRole('button', { name: 'เพิ่มไอเท็มย่อย (110)' }).click()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 110' })).toBeVisible()
+  await page.getByRole('button', { name: 'เพิ่มไอเท็ม (200)' }).click()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 200' })).toBeVisible()
+
+  // Every keystroke filters: there is no submit button to press.
+  const search = page.getByLabel('ค้นหาเลขไอเท็ม')
+  await search.pressSequentially('200')
+
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 200' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toHaveCount(0)
+
+  // The match is per tile: item 110 appears alone, without pack 100.
+  await search.fill('110')
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 110' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 200' })).toHaveCount(0)
+
+  // A number nobody holds leaves the dashed "not found" note instead of an
+  // empty page.
+  await search.fill('999')
+  await expect(page.getByText('ไม่พบไอเท็มที่ตรงกับเลข 999')).toBeVisible()
+
+  await page.getByRole('button', { name: 'ล้างคำค้นหา' }).click()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'ไอเท็ม 200' })).toBeVisible()
+
+  expect(consoleErrors).toEqual([])
+})
+
 test('rejects an incomplete step 1 before it reaches the network', async ({ page }) => {
   const orderImageCalls: string[] = []
   page.on('request', (request) => {

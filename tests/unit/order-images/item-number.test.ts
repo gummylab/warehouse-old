@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isVarietyNumber,
   isValidItemNumber,
+  matchesItemNumber,
   nextSingleNumber,
   nextVarietyNumber,
   parentItemNumber,
@@ -84,6 +85,36 @@ describe('item numbering', () => {
       // The +90 span rule fires before the count rule here: 190 has no room
       // left under 100 even though the pack holds a single child.
       expect(nextVarietyNumber(100, [190])).toBeNull()
+    })
+  })
+
+  describe('matchesItemNumber', () => {
+    it('matches everything when the query is empty', () => {
+      expect(matchesItemNumber(100, '')).toBe(true)
+      expect(matchesItemNumber(100, '   ')).toBe(true)
+    })
+
+    it('matches on a substring of the printed number', () => {
+      expect(matchesItemNumber(100, '100')).toBe(true)
+      expect(matchesItemNumber(100, '10')).toBe(true)
+      expect(matchesItemNumber(210, '1')).toBe(true)
+    })
+
+    it('answers for one tile only, so a variety never drags in its pack', () => {
+      // The bug this guards: searching 220 used to keep 200 and 210 on screen
+      // because the pack answered for the variety that matched.
+      expect(matchesItemNumber(220, '220')).toBe(true)
+      expect(matchesItemNumber(200, '220')).toBe(false)
+      expect(matchesItemNumber(210, '220')).toBe(false)
+    })
+
+    it('rejects a number that does not contain the query', () => {
+      expect(matchesItemNumber(100, '200')).toBe(false)
+      expect(matchesItemNumber(100, '9')).toBe(false)
+    })
+
+    it('ignores surrounding whitespace', () => {
+      expect(matchesItemNumber(100, '  100  ')).toBe(true)
     })
   })
 })

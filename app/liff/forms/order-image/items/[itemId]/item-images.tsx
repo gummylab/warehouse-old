@@ -193,7 +193,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
       {/* The photo grid, framed like the item cards on the order page. The
           add cell is the last one, so it always sits where the next photo
           will appear. */}
-      <TileGrid label="รูปภาพของไอเท็ม">
+      <TileGrid label="รูปภาพของไอเท็ม" className="border-0 p-0">
         {optimisticImages.map((image) => (
           <PhotoTile
             key={image.id}

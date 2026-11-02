@@ -1,11 +1,13 @@
 'use client'
 
-import { startTransition, useOptimistic, useRef, useState } from 'react'
+import { Fragment, startTransition, useOptimistic, useRef, useState } from 'react'
 
-import { ImagePlusIcon, Trash2Icon } from 'lucide-react'
+import { ImagePlusIcon, PlusIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react'
 
 import { TileButton, TileGrid } from '@/components/layout/tile-grid'
 import { Button, ButtonLink } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogClose,
@@ -17,7 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import type { OrderDetail, OrderItemNode } from '@/lib/db/types'
 import { toastMessages } from '@/lib/messages'
-import { nextSingleNumber, nextVarietyNumber } from '@/lib/order-images/item-number'
+import { matchesItemNumber, nextSingleNumber, nextVarietyNumber } from '@/lib/order-images/item-number'
 import { reduceOrderDetail } from '@/lib/order-images/tree'
 import { notifyError, notifySuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -52,6 +54,9 @@ export function OrderItemsStep({
   // One shared confirm dialog serves every item card (top level or
   // variety) — a dialog per card would duplicate identical markup.
   const [confirmItem, setConfirmItem] = useState<OrderItemNode | null>(null)
+  // Instant filter over the item numbers. Local state on purpose: finding a
+  // card on this screen is not a view worth keeping in the URL.
+  const [query, setQuery] = useState('')
 
   function markAddPending(key: string, pending: boolean) {
     setPendingAddKeys((prev) => {
@@ -78,6 +83,11 @@ export function OrderItemsStep({
         )
       : nextSingleNumber(optimisticDetail.items.map((node) => node.itemNumber))
     if (itemNumber === null) return
+
+    // A filtered list would hide the card that is about to appear, so the
+    // search is dropped only when the new number falls outside it. A number
+    // that already matches keeps the filter the user set.
+    if (!matchesItemNumber(itemNumber, query)) setQuery('')
 
     const tempId = `temp-${tempIdRef.current++}`
     const temp: OrderItemNode = {
@@ -151,31 +161,81 @@ export function OrderItemsStep({
   const nextTop = nextSingleNumber(
     optimisticDetail.items.map((node) => node.itemNumber),
   )
+  // Matching is per tile: searching 220 shows item 220 alone, not the pack's
+  // other varieties. A pack survives the filter when either its own number or
+  // one of its varieties answers the query.
+  const filtering = query.trim() !== ''
+  const visibleItems = optimisticDetail.items
+    .map((node) => ({
+      node,
+      showPack: matchesItemNumber(node.itemNumber, query),
+      varieties: node.children.filter((child) => matchesItemNumber(child.itemNumber, query)),
+    }))
+    .filter((entry) => entry.showPack || entry.varieties.length > 0)
 
   return (
     <div className="flex flex-col gap-4">
-      {optimisticDetail.items.map((node) => (
-        <ItemCard
-          key={node.id}
-          node={node}
-          pendingAddKeys={pendingAddKeys}
-          deletePending={pendingDeleteId !== null}
-          onAdd={handleAdd}
-          onDelete={setConfirmItem}
-        />
+      <div className="flex items-center justify-between gap-2">
+        <div className="relative min-w-0 flex-1 max-w-md">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            // Item numbers are whole numbers, so the phone opens its number
+            // pad. The browser's own clear button is hidden: the button below
+            // sits in the same corner.
+            inputMode="numeric"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="ค้นหาเลขไอเท็ม"
+            aria-label="ค้นหาเลขไอเท็ม"
+            className="pl-9 pr-9 [&::-webkit-search-cancel-button]:appearance-none"
+          />
+          {query ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+              aria-label="ล้างคำค้นหา"
+              onClick={() => setQuery('')}>
+              <XIcon />
+            </Button>
+          ) : null}
+        </div>
+
+        <Button
+          type="button"
+          className="shrink-0"
+          disabled={pendingAddKeys.has('root')}
+          onClick={() => handleAdd(null)}>
+          <PlusIcon />
+          เพิ่มไอเท็ม ({nextTop})
+        </Button>
+      </div>
+
+      {visibleItems.map((entry, index) => (
+        <Fragment key={entry.node.id}>
+          {index > 0 ? <Separator /> : null}
+          <ItemCard
+            node={entry.node}
+            varieties={entry.varieties}
+            showPack={entry.showPack}
+            filtering={filtering}
+            pendingAddKeys={pendingAddKeys}
+            deletePending={pendingDeleteId !== null}
+            onAdd={handleAdd}
+            onDelete={setConfirmItem}
+          />
+        </Fragment>
       ))}
 
-      {/* The frame that closes the list: one cell, the one that adds the next
-          item. With no items yet this frame is the whole page, and the
-          dashed cell is what says "no item yet". */}
-      <TileGrid label="เพิ่มไอเท็ม">
-        <TileButton
-          label="เพิ่มไอเท็ม"
-          hint={`(${nextTop})`}
-          disabled={pendingAddKeys.has('root')}
-          onClick={() => handleAdd(null)}
-        />
-      </TileGrid>
+      {/* Only a search can empty the list: with no query the page shows the
+          add button alone, which is the "no item yet" state. */}
+      {query.trim() && visibleItems.length === 0 ? (
+        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+          ไม่พบไอเท็มที่ตรงกับเลข {query.trim()}
+        </p>
+      ) : null}
 
       <Dialog
         open={confirmItem !== null}
@@ -290,18 +350,27 @@ function ItemTile({
 // where the next variety will appear.
 function ItemCard({
   node,
+  varieties,
+  showPack,
+  filtering,
   pendingAddKeys,
   deletePending,
   onAdd,
   onDelete,
 }: {
   node: OrderItemNode
+  // Already filtered by the search. The pack's own tile is not in here.
+  varieties: OrderItemNode[]
+  showPack: boolean
+  filtering: boolean
   pendingAddKeys: ReadonlySet<string>
   deletePending: boolean
   onAdd: (parentItemId: string | null) => void
   onDelete: (node: OrderItemNode) => void
 }) {
   const isTemp = node.id.startsWith('temp-')
+  // Numbering reads the full child list, never the filtered one: a variety
+  // hidden by the search still holds its number.
   const nextVariety = isTemp
     ? null
     : nextVarietyNumber(
@@ -310,10 +379,14 @@ function ItemCard({
       )
 
   return (
-    <TileGrid label={`ไอเท็ม ${node.itemNumber}`}>
-      <ItemTile node={node} deletePending={deletePending} onDelete={onDelete} />
+    <TileGrid
+      label={`ไอเท็ม ${node.itemNumber}`}
+      className="border-0 p-0">
+      {showPack ? (
+        <ItemTile node={node} deletePending={deletePending} onDelete={onDelete} />
+      ) : null}
 
-      {node.children.map((child) => (
+      {varieties.map((child) => (
         <ItemTile key={child.id} node={child} deletePending={deletePending} onDelete={onDelete} />
       ))}
 
@@ -321,8 +394,9 @@ function ItemCard({
           out entirely instead of showing a button that cannot do anything.
           The visible label is split over two lines so it fits the tile
           width, while the accessible name stays the single phrase the
-          form and the e2e spec look for. */}
-      {nextVariety !== null && (
+          form and the e2e spec look for. Hidden while the search is on: the
+          results should be the matches, not an extra action cell. */}
+      {!filtering && nextVariety !== null && (
         <TileButton
           aria-label={`เพิ่มไอเท็มย่อย (${nextVariety})`}
           label="เพิ่ม Variety Pack"
