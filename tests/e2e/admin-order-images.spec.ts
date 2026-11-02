@@ -22,6 +22,9 @@ test('summarizes, inspects and deletes an uploaded order', async ({
 
   await page.goto('/order-images')
   await expect(page.getByText('ออเดอร์ทั้งหมด')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'สร้างออเดอร์' }),
+  ).toHaveAttribute('href', '/liff/forms/order-image')
   // The first view is today, by day.
   await expect(page.getByLabel('วันที่')).toHaveValue(today)
   // The line select still uses Base UI's items so the trigger shows Thai.

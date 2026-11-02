@@ -2,6 +2,8 @@ import { io } from 'next/cache'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 
+import { PlusIcon } from 'lucide-react'
+
 import { StateScreen } from '@/components/layout/state-screen'
 import { ButtonLink } from '@/components/ui/button'
 import {
@@ -63,6 +65,17 @@ async function OrderImagesData({
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-hidden">
+      <div className="flex shrink-0 justify-end">
+        <ButtonLink
+          href="/liff/forms/order-image"
+          target="_blank"
+          rel="noreferrer"
+          size="sm">
+          <PlusIcon />
+          สร้างออเดอร์
+        </ButtonLink>
+      </div>
+
       <SummaryCards summary={summary} />
 
       <OrderFilters
