@@ -16,7 +16,7 @@ import {
   UserIcon,
 } from 'lucide-react'
 
-import { StateScreen } from '@/components/layout/state-screen'
+import { EmptyState } from '@/components/layout/empty-state'
 import { TileGrid } from '@/components/layout/tile-grid'
 import {
   Breadcrumb,
@@ -277,10 +277,20 @@ export function OrderDetail({
       ) : null}
 
       {detail.items.length === 0 ? (
-        <StateScreen
-          headingLevel="h2"
+        <EmptyState
+          variant="section"
+          icon={<PackageIcon />}
           title="ออเดอร์นี้ยังไม่มีไอเท็ม"
-          description="เพิ่มไอเท็มได้จากฟอร์ม LIFF"
+          description="เพิ่มไอเท็มได้จากฟอร์ม LIFF แล้วกลับมาที่หน้านี้"
+          actions={
+            <ButtonLink
+              variant="outline"
+              href={`/liff/forms/order-image?orderId=${detail.order.id}`}
+              target="_blank"
+              rel="noreferrer">
+              เปิดฟอร์ม LIFF
+            </ButtonLink>
+          }
         />
       ) : (
         detail.items.map((node) => (
@@ -555,9 +565,12 @@ function ImageGrid({
 }) {
   if (images.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
-        ยังไม่มีรูปภาพ
-      </p>
+      <EmptyState
+        variant="inline"
+        icon={<ImageIcon />}
+        title="ยังไม่มีรูปภาพ"
+        description="อัปโหลดได้จากหน้าไอเท็มในฟอร์ม LIFF"
+      />
     )
   }
 

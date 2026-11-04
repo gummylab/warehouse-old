@@ -2,7 +2,10 @@
 
 import { useOptimistic, useState } from 'react'
 
+import { InboxIcon, UserCheckIcon } from 'lucide-react'
+
 import { DataTable } from '@/components/data-table/data-table'
+import { EmptyState } from '@/components/layout/empty-state'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type RegisterUser } from '@/lib/db/types'
 
@@ -66,6 +69,24 @@ export function RegisterView({ approvedUsers, pendingUsers }: RegisterViewProps)
               <TabsTrigger value="approved">ผู้ใช้ที่อนุมัติแล้ว</TabsTrigger>
               <TabsTrigger value="pending">รอตรวจสอบ ({pending.length})</TabsTrigger>
             </TabsList>
+          }
+          emptySlot={
+            // The two tabs mean different things, so they get different
+            // messages instead of the table's generic "ไม่พบข้อมูล".
+            <EmptyState
+              variant="page"
+              icon={tab === 'pending' ? <InboxIcon /> : <UserCheckIcon />}
+              title={
+                tab === 'pending'
+                  ? 'ไม่มีคำขอรอตรวจสอบ'
+                  : 'ยังไม่มีผู้ใช้ที่อนุมัติแล้ว'
+              }
+              description={
+                tab === 'pending'
+                  ? 'คำขอใหม่จะปรากฏที่นี่เมื่อพนักงานขอสิทธิ์ผ่าน LINE'
+                  : 'เมื่ออนุมัติคำขอ ผู้ใช้จะย้ายมาแสดงในแท็บนี้'
+              }
+            />
           }
         />
       </Tabs>

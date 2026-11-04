@@ -2,8 +2,17 @@
 
 import { Fragment, startTransition, useOptimistic, useRef, useState } from 'react'
 
-import { ImagePlusIcon, PlusIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react'
+import {
+  ImagePlusIcon,
+  PackageIcon,
+  PlusIcon,
+  SearchIcon,
+  SearchXIcon,
+  Trash2Icon,
+  XIcon,
+} from 'lucide-react'
 
+import { EmptyState } from '@/components/layout/empty-state'
 import { TileButton, TileGrid } from '@/components/layout/tile-grid'
 import { Button, ButtonLink } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -196,7 +205,7 @@ export function OrderItemsStep({
               variant="ghost"
               size="icon-sm"
               className="absolute right-1 top-1/2 -translate-y-1/2"
-              aria-label="ล้างคำค้นหา"
+              aria-label="ล้างช่องค้นหา"
               onClick={() => setQuery('')}>
               <XIcon />
             </Button>
@@ -213,29 +222,53 @@ export function OrderItemsStep({
         </Button>
       </div>
 
-      {visibleItems.map((entry, index) => (
-        <Fragment key={entry.node.id}>
-          {index > 0 ? <Separator /> : null}
-          <ItemCard
-            node={entry.node}
-            varieties={entry.varieties}
-            showPack={entry.showPack}
-            filtering={filtering}
-            pendingAddKeys={pendingAddKeys}
-            deletePending={pendingDeleteId !== null}
-            onAdd={handleAdd}
-            onDelete={setConfirmItem}
-          />
-        </Fragment>
-      ))}
+      {optimisticDetail.items.length === 0 ? (
+        <EmptyState
+          variant="section"
+          icon={<PackageIcon />}
+          title="ยังไม่มีไอเท็ม"
+          description="เพิ่มไอเท็มแรกด้วยปุ่มด้านบน แล้วแนบรูปภาพในหน้าไอเท็ม"
+        />
+      ) : (
+        <>
+          {visibleItems.map((entry, index) => (
+            <Fragment key={entry.node.id}>
+              {index > 0 ? <Separator /> : null}
+              <ItemCard
+                node={entry.node}
+                varieties={entry.varieties}
+                showPack={entry.showPack}
+                filtering={filtering}
+                pendingAddKeys={pendingAddKeys}
+                deletePending={pendingDeleteId !== null}
+                onAdd={handleAdd}
+                onDelete={setConfirmItem}
+              />
+            </Fragment>
+          ))}
 
-      {/* Only a search can empty the list: with no query the page shows the
-          add button alone, which is the "no item yet" state. */}
-      {query.trim() && visibleItems.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          ไม่พบไอเท็มที่ตรงกับเลข {query.trim()}
-        </p>
-      ) : null}
+          {/* The order has items, but the search hid them all. The no-item
+              state above takes precedence, so this only reports a filter
+              miss. */}
+          {query.trim() && visibleItems.length === 0 ? (
+            <EmptyState
+              variant="inline"
+              announce
+              icon={<SearchXIcon />}
+              title={`ไม่พบไอเท็มที่ตรงกับเลข ${query.trim()}`}
+              actions={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuery('')}>
+                  ล้างคำค้นหา
+                </Button>
+              }
+            />
+          ) : null}
+        </>
+      )}
 
       <Dialog
         open={confirmItem !== null}
