@@ -185,7 +185,7 @@ describe('POST /api/liff/order-images/orders', () => {
   }
 
   it('refuses a caller with no session', async () => {
-    const response = await post({ orderNumber: '1234', orderDate: ORDER_DATE, line: 'x' })
+    const response = await post({ orderNumber: '123456789', orderDate: ORDER_DATE, line: 'x' })
 
     expect(response.status).toBe(401)
     expect(await response.json()).toEqual({ error: 'unauthorized' })
@@ -195,7 +195,7 @@ describe('POST /api/liff/order-images/orders', () => {
     seededUser('U-pending', 'pending')
 
     const response = await post(
-      { orderNumber: '1234', orderDate: ORDER_DATE, line: 'x' },
+      { orderNumber: '123456789', orderDate: ORDER_DATE, line: 'x' },
       await cookieHeadersFor('U-pending'),
     )
 
@@ -218,7 +218,7 @@ describe('POST /api/liff/order-images/orders', () => {
     seededUser('U-approved', 'approved')
 
     const response = await post(
-      { orderNumber: '1234', orderDate: '2026-02-30', line: 'x' },
+      { orderNumber: '123456789', orderDate: '2026-02-30', line: 'x' },
       await cookieHeadersFor('U-approved'),
     )
 
@@ -230,7 +230,7 @@ describe('POST /api/liff/order-images/orders', () => {
     seededUser('U-approved', 'approved')
 
     const response = await post(
-      { orderNumber: '1234', orderDate: ORDER_DATE, line: 'not-a-line' },
+      { orderNumber: '123456789', orderDate: ORDER_DATE, line: 'not-a-line' },
       await cookieHeadersFor('U-approved'),
     )
 
@@ -243,7 +243,7 @@ describe('POST /api/liff/order-images/orders', () => {
     const [line] = listLines()
 
     const response = await post(
-      { orderNumber: ' 1234 ', orderDate: ORDER_DATE, line },
+      { orderNumber: ' 123456789 ', orderDate: ORDER_DATE, line },
       await cookieHeadersFor('U-approved'),
     )
 

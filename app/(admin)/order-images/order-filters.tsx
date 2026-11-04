@@ -137,7 +137,8 @@ export function OrderFilters({
           type="search"
           name="q"
           defaultValue={filters.query ?? ''}
-          placeholder="เช่น 12345"
+          placeholder="เช่น 123456789"
+          inputMode="numeric"
           autoComplete="off"
           disabled={pending}
         />

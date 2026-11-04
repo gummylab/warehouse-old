@@ -2,30 +2,19 @@
 // route (authoritative, after auth). One implementation means the client
 // and server can never disagree about what is valid.
 
-export const MAX_ORDER_NUMBER_LENGTH = 60
+// The warehouse prints nine digits on every order. Keeping the rule here
+// means the form, the lookup route and the admin confirmation all reject the
+// same values. Digits are also safe as a storage-key segment by construction.
+export const ORDER_NUMBER_LENGTH = 9
 
-// Trimming happens in one place so "1234 " and "1234" are the same order
-// key client-side and server-side.
+// Trimming happens in one place so "123456789 " and "123456789" are the same
+// order key client-side and server-side.
 export function normalizeOrderNumber(value: string): string {
   return value.trim()
 }
 
-// A segment made only of dots is a path instruction, not a name: '.' and '..'
-// mean "this folder" and "the parent folder". The storage key is built from
-// the order number, so an order called ".." would write its photo into the
-// parent folder and two such orders would overwrite each other. Reject them
-// at the input boundary, where the message can still tell the user.
-export function isDotOnlySegment(value: string): boolean {
-  return /^\.+$/.test(value)
-}
-
 export function isValidOrderNumber(value: string): boolean {
-  const normalized = normalizeOrderNumber(value)
-  return (
-    normalized.length > 0 &&
-    normalized.length <= MAX_ORDER_NUMBER_LENGTH &&
-    !isDotOnlySegment(normalized)
-  )
+  return /^\d{9}$/.test(normalizeOrderNumber(value))
 }
 
 // 'YYYY-MM-DD' that is also a real calendar date: 2026-02-30 must fail

@@ -134,7 +134,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'unknown-error': 'เกิดข้อผิดพลาด กรุณาลองใหม่',
   'session-failed': 'ไม่สามารถเข้าสู่ระบบได้ กรุณาเปิดหน้านี้ใหม่',
   'line-required': 'กรุณาเลือกไลน์ผลิต',
-  'invalid-order-number': 'กรุณาระบุเลขออเดอร์',
+  'invalid-order-number': 'กรุณากรอกเลขออเดอร์ 9 หลัก',
   'invalid-order-date': 'วันที่ไม่ถูกต้อง',
   'unknown-line': 'ไม่มีไลน์ผลิตนี้',
   'order-not-found': 'ไม่พบออเดอร์นี้',

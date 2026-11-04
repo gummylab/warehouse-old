@@ -7,7 +7,7 @@ import { toAbsolute } from '../../lib/order-images/storage'
 import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
-import { seedOrder } from './support/data'
+import { seedOrder, uniqueOrderNumber } from './support/data'
 
 // The admin side of the order-image journey: the form writes the rows, this
 // page reads the summary, opens one order, relabels a photo and deletes the
@@ -15,7 +15,7 @@ import { seedOrder } from './support/data'
 test('summarizes, inspects and deletes an uploaded order', async ({
   page,
 }) => {
-  const orderNumber = `E2E-ADMIN-${Date.now()}`
+  const orderNumber = uniqueOrderNumber()
   const today = todayBangkok()
   const seeded = seedOrder({ orderNumber, orderDate: today })
   const consoleErrors = collectConsoleErrors(page)
@@ -161,7 +161,7 @@ test('picks a day, a month and a year from the filter pickers', async ({
   // appears after the picker changes the filter.
   const otherDay = today.endsWith('-01') ? '02' : '01'
   const pickedDate = `${year}-${month}-${otherDay}`
-  const orderNumber = `E2E-PICK-${Date.now()}`
+  const orderNumber = uniqueOrderNumber()
   seedOrder({ orderNumber, orderDate: pickedDate })
   const consoleErrors = collectConsoleErrors(page)
 
@@ -220,7 +220,9 @@ test('switches the KPI between the filtered view and all', async ({ page }) => {
 })
 
 test('scrolls the table on desktop and the page on mobile', async ({ page }) => {
-  const prefix = `E2E-SCROLL-${Date.now()}`
+  // Six shared digits plus a three-digit index keeps every order number nine
+  // digits, while the prefix still matches all 26 rows in the text search.
+  const prefix = String(Date.now()).slice(-6)
   const today = todayBangkok()
 
   // More rows than one page (25) and more than the viewport, so the table has
@@ -228,7 +230,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   // mobile.
   for (let index = 0; index < 26; index += 1) {
     findOrCreateOrder({
-      orderNumber: `${prefix}-${String(index).padStart(2, '0')}`,
+      orderNumber: `${prefix}${String(index).padStart(3, '0')}`,
       orderDate: today,
       line: 'ดอกแค',
       createdBy: 'local-device',
@@ -243,7 +245,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   // The oldest of the 26 rows sits on page two, so match any row from this
   // run instead of a specific number.
   await expect(
-    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+    page.getByRole('link', { name: new RegExp(`^${prefix}`) }).first(),
   ).toBeVisible()
 
   expect(
@@ -275,7 +277,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   await page.setViewportSize({ width: 393, height: 851 })
   await page.reload()
   await expect(
-    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+    page.getByRole('link', { name: new RegExp(`^${prefix}`) }).first(),
   ).toBeVisible()
 
   expect(

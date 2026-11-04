@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { OrderNumberInput } from '@/components/order-number-input'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { isValidOrderNumber } from '@/lib/order-images/validation'
 
 // Deleting an order removes every item and every photo, so a single click is
 // not enough. The operator types the order number; the server action checks
@@ -37,6 +39,10 @@ export function DeleteOrderDialog({
 }) {
   const [confirmation, setConfirmation] = useState('')
   const matches = confirmation.trim() === orderNumber
+  // Nine-digit orders use the same slot input as the LIFF form. A row that
+  // predates the rule still gets a text field, so an old order remains
+  // deletable without a migration.
+  const useOtp = isValidOrderNumber(orderNumber)
 
   function handleOpenChange(next: boolean) {
     if (!next) setConfirmation('')
@@ -54,17 +60,34 @@ export function DeleteOrderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <label className="flex flex-col gap-1.5 text-sm">
-          พิมพ์เลขออเดอร์เพื่อยืนยัน
-          <Input
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            placeholder={orderNumber}
-            autoComplete="off"
-            autoFocus
-            disabled={pending}
-          />
-        </label>
+        <div className="flex flex-col gap-1.5 text-sm">
+          <label htmlFor="delete-order-confirmation">
+            พิมพ์เลขออเดอร์เพื่อยืนยัน
+          </label>
+          {useOtp ? (
+            <OrderNumberInput
+              id="delete-order-confirmation"
+              label="พิมพ์เลขออเดอร์เพื่อยืนยัน"
+              value={confirmation}
+              onChange={setConfirmation}
+              disabled={pending}
+              invalid={Boolean(error)}
+              autoFocus
+            />
+          ) : (
+            <Input
+              id="delete-order-confirmation"
+              aria-label="พิมพ์เลขออเดอร์เพื่อยืนยัน"
+              aria-invalid={Boolean(error) || undefined}
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              placeholder={orderNumber}
+              autoComplete="off"
+              autoFocus
+              disabled={pending}
+            />
+          )}
+        </div>
 
         {error ? (
           <p role="alert" className="text-sm text-destructive">

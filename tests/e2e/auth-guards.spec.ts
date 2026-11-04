@@ -108,7 +108,7 @@ test.describe('session cookie as a remote caller', () => {
   test('refuses to create an order without a session', async ({ request }) => {
     const response = await request.post('/api/liff/order-images/orders', {
       headers: asRemote(),
-      data: { orderNumber: '1', orderDate: '2026-01-15', line: 'anything' },
+      data: { orderNumber: '123456789', orderDate: '2026-01-15', line: 'anything' },
     })
 
     expect(response.status()).toBe(401)

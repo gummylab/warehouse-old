@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 
+import { uniqueOrderNumber } from './support/data'
+
 // A one-pixel PNG, the same idea as the order-image spec: the server only
 // stores and serves the bytes, so the content does not need to be a real photo.
 const PNG_BYTES = Buffer.from(
@@ -13,7 +15,7 @@ const LINE = 'ดอกแค'
 async function createOrder(
   request: APIRequestContext,
 ): Promise<{ orderId: string; itemId: string }> {
-  const orderNumber = `E2E-OPT-${Date.now()}`
+  const orderNumber = uniqueOrderNumber()
 
   const orderResponse = await request.post('/api/liff/order-images/orders', {
     data: { orderNumber, orderDate: ORDER_DATE, line: LINE },
