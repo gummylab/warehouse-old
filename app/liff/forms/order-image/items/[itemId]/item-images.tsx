@@ -5,10 +5,12 @@ import { startTransition, useEffect, useOptimistic, useRef, useState } from 'rea
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  ImagePlusIcon,
   MoreVerticalIcon,
   Trash2Icon,
 } from 'lucide-react'
 
+import { EmptyState } from '@/components/layout/empty-state'
 import { FormPage } from '@/components/layout/form-page'
 import { TileButton, TileGrid } from '@/components/layout/tile-grid'
 import { Button, ButtonLink } from '@/components/ui/button'
@@ -190,38 +192,54 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
       }>
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* The photo grid, framed like the item cards on the order page. The
-          add cell is the last one, so it always sits where the next photo
-          will appear. */}
-      <TileGrid label="รูปภาพของไอเท็ม" className="border-0 p-0">
-        {optimisticImages.map((image) => (
-          <PhotoTile
-            key={image.id}
-            image={image}
-            pending={pendingPackageId !== null}
-            deletePending={pendingDeleteId !== null}
-            onPreview={() => setPreviewImageId(image.id)}
-            onPackageChange={(pkg) => changePackage(image, pkg)}
-            onDelete={() => setDeletingImageId(image.id)}
-          />
-        ))}
-
-        {uploading && (
-          <span aria-hidden="true" className="flex flex-col gap-1 rounded-xl border border-dashed p-1">
-            <span className="block aspect-square w-full animate-pulse rounded-lg bg-muted" />
-            <span className="text-xs text-muted-foreground">กำลังอัปโหลด...</span>
-          </span>
-        )}
-
-        {/* The add cell is the last tile, so it always sits where the next
-            photo will appear. Height and layout live in TileButton. */}
-        <TileButton
-          height="tall"
-          label="เพิ่มรูปภาพ"
-          disabled={uploading}
-          onClick={() => setUploadOpen(true)}
+      {/* With no photos the grid holds only its add cell, which says nothing
+          about what to do. Replace it with the empty state's single upload
+          action; the grid returns as soon as the first photo lands or an
+          upload starts. */}
+      {optimisticImages.length === 0 && !uploading ? (
+        <EmptyState
+          variant="section"
+          icon={<ImagePlusIcon />}
+          title="ยังไม่มีรูปภาพ"
+          description="อัปโหลดรูปแรกของไอเท็มนี้ แล้วติดป้ายแพ็กเกจจากเมนูบนการ์ด"
+          actions={
+            <Button type="button" onClick={() => setUploadOpen(true)}>
+              <ImagePlusIcon />
+              เพิ่มรูปภาพ
+            </Button>
+          }
         />
-      </TileGrid>
+      ) : (
+        <TileGrid label="รูปภาพของไอเท็ม" className="border-0 p-0">
+          {optimisticImages.map((image) => (
+            <PhotoTile
+              key={image.id}
+              image={image}
+              pending={pendingPackageId !== null}
+              deletePending={pendingDeleteId !== null}
+              onPreview={() => setPreviewImageId(image.id)}
+              onPackageChange={(pkg) => changePackage(image, pkg)}
+              onDelete={() => setDeletingImageId(image.id)}
+            />
+          ))}
+
+          {uploading && (
+            <span aria-hidden="true" className="flex flex-col gap-1 rounded-xl border border-dashed p-1">
+              <span className="block aspect-square w-full animate-pulse rounded-lg bg-muted" />
+              <span className="text-xs text-muted-foreground">กำลังอัปโหลด...</span>
+            </span>
+          )}
+
+          {/* The add cell is the last tile, so it always sits where the next
+              photo will appear. Height and layout live in TileButton. */}
+          <TileButton
+            height="tall"
+            label="เพิ่มรูปภาพ"
+            disabled={uploading}
+            onClick={() => setUploadOpen(true)}
+          />
+        </TileGrid>
+      )}
 
       {/* The upload dialog owns the file list and the upload loop. Closing
           it refetches the item, so the grid shows whatever landed, even

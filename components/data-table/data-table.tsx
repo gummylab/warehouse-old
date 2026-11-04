@@ -22,11 +22,24 @@ interface DataTableProps<TData extends RowData> {
   searchColumn?: string
   /** Rendered at the right end of the search row (e.g. a view switcher). */
   searchSlot?: React.ReactNode
+  /**
+   * Replaces the table area when the data set is empty. A table header and a
+   * "no data" cell add nothing above a richer message, so the whole block
+   * steps aside. A filtered-to-zero table keeps its own cell instead. Omit
+   * the prop to always use the plain cell.
+   */
+  emptySlot?: React.ReactNode
 }
 
 // Reusable data table: search box + table + pagination. Pages only pass their
 // own columns and data; sorting/filtering/pagination state lives here.
-export function DataTable<TData extends RowData>({ columns, data, searchColumn, searchSlot }: DataTableProps<TData>) {
+export function DataTable<TData extends RowData>({
+  columns,
+  data,
+  searchColumn,
+  searchSlot,
+  emptySlot,
+}: DataTableProps<TData>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 
@@ -47,6 +60,10 @@ export function DataTable<TData extends RowData>({ columns, data, searchColumn, 
     },
   })
 
+  // Read once so the empty branch and the body branch cannot disagree when
+  // TanStack re-renders between them.
+  const rows = table.getRowModel().rows
+
   return (
     // flex-1 lets the page stretch the table to the viewport bottom; pages
     // must wrap it in a flex column for that to take effect.
@@ -64,48 +81,58 @@ export function DataTable<TData extends RowData>({ columns, data, searchColumn, 
           {searchSlot}
         </div>
       )}
-      {/* flex-1 fills the leftover height; the data-slot variant passes h-full
-          down to shadcn's wrapper div, which className on <Table> cannot reach.
-          h-full makes the table distribute spare height across rows, so cells
-          get align-top! to pin content up top instead of floating mid-row. */}
-      <div className="flex-1 overflow-hidden rounded-md border *:data-[slot=table-container]:h-full">
-        <Table className="h-full">
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
-                  </TableHead>
+      {data.length === 0 && emptySlot ? (
+        // Only a truly empty data set replaces the table block. When a search
+        // filters every row out, the table keeps its own "ไม่พบข้อมูล" cell:
+        // a page-level message such as "no requests waiting" would be wrong
+        // while the rows still exist behind the filter.
+        <div className="flex flex-1 flex-col">{emptySlot}</div>
+      ) : (
+        <>
+          {/* flex-1 fills the leftover height; the data-slot variant passes h-full
+              down to shadcn's wrapper div, which className on <Table> cannot reach.
+              h-full makes the table distribute spare height across rows, so cells
+              get align-top! to pin content up top instead of floating mid-row. */}
+          <div className="flex-1 overflow-hidden rounded-md border *:data-[slot=table-container]:h-full">
+            <Table className="h-full">
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                      </TableHead>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {/* getAllCells (core) instead of getVisibleCells: the
-                      column-visibility feature is not registered, so no column
-                      can be hidden and every cell renders. */}
-                  {row.getAllCells().map((cell) => (
-                    <TableCell key={cell.id} className="align-top!">
-                      <table.FlexRender cell={cell} />
+              </TableHeader>
+              <TableBody>
+                {rows.length ? (
+                  rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {/* getAllCells (core) instead of getVisibleCells: the
+                          column-visibility feature is not registered, so no column
+                          can be hidden and every cell renders. */}
+                      {row.getAllCells().map((cell) => (
+                        <TableCell key={cell.id} className="align-top!">
+                          <table.FlexRender cell={cell} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      ไม่พบข้อมูล
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  ไม่พบข้อมูล
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <DataTablePagination table={table} />
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DataTablePagination table={table} />
+        </>
+      )}
     </div>
   )
 }

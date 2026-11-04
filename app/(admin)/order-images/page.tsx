@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import { io } from 'next/cache'
 import { Suspense } from 'react'
 
-import { PlusIcon } from 'lucide-react'
+import { InboxIcon, PlusIcon } from 'lucide-react'
 
+import { EmptyState } from '@/components/layout/empty-state'
 import { StateScreen } from '@/components/layout/state-screen'
 import { ButtonLink } from '@/components/ui/button'
 import { getOrderSummary, listLines, listOrders } from '@/lib/db/order-images'
@@ -65,9 +66,10 @@ async function OrderImagesData({ params }: { params: Record<string, string | str
       <OrderFilters key={orderListHref(filters, 1)} lines={lines} filters={filters} />
 
       {result.total === 0 ? (
-        <StateScreen
+        <EmptyState
+          variant="page"
           className="md:min-h-0 md:overflow-y-auto"
-          headingLevel="h2"
+          icon={<InboxIcon />}
           title={
             filtered
               ? 'ไม่พบออเดอร์ตามเงื่อนไข'
