@@ -31,6 +31,15 @@ export function uniqueSuffix(): string {
   return randomUUID().slice(0, 8)
 }
 
+// Order numbers are nine digits now, so the specs need a unique value in that
+// shape. The timestamp gives the first six digits and the random tail keeps
+// two specs that start in the same millisecond apart.
+export function uniqueOrderNumber(): string {
+  const stamp = String(Date.now()).slice(-6)
+  const tail = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+  return `${stamp}${tail}`
+}
+
 export function seedUser({
   status,
   displayName = `E2E User ${uniqueSuffix()}`,
@@ -69,7 +78,7 @@ export type SeededOrder = {
 // photo on each, written through the same data layer the server uses. The
 // run's database and upload folder are already isolated by the harness.
 export function seedOrder({
-  orderNumber = `E2E-ORDER-${uniqueSuffix()}`,
+  orderNumber = uniqueOrderNumber(),
   orderDate = '2026-10-19',
   line = 'ดอกแค',
   createdBy = 'local-device',

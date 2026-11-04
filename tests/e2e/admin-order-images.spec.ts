@@ -7,7 +7,7 @@ import { toAbsolute } from '../../lib/order-images/storage'
 import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
-import { seedOrder } from './support/data'
+import { seedOrder, uniqueOrderNumber } from './support/data'
 
 // The admin side of the order-image journey: the form writes the rows, this
 // page reads the summary, opens one order, relabels a photo and deletes the
@@ -15,7 +15,7 @@ import { seedOrder } from './support/data'
 test('summarizes, inspects and deletes an uploaded order', async ({
   page,
 }) => {
-  const orderNumber = `E2E-ADMIN-${Date.now()}`
+  const orderNumber = uniqueOrderNumber()
   const today = todayBangkok()
   const seeded = seedOrder({ orderNumber, orderDate: today })
   const consoleErrors = collectConsoleErrors(page)
@@ -29,7 +29,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
     page.getByRole('link', { name: 'สร้างออเดอร์' }),
   ).toHaveAttribute('href', '/liff/forms/order-image')
   // The first view is today, by day.
-  await expect(page.getByLabel('วันที่')).toHaveValue(today)
+  await expect(page.getByLabel('วันที่', { exact: true })).toHaveAttribute('data-date', today)
   // The line select still uses Base UI's items so the trigger shows Thai.
   await expect(page.getByRole('combobox', { name: 'ไลน์ผลิต' })).toContainText(
     'ทั้งหมด',
@@ -57,6 +57,10 @@ test('summarizes, inspects and deletes an uploaded order', async ({
 
   // The same order stays visible when the view widens to the month and year.
   await periodGroup.getByRole('button', { name: 'รายเดือน' }).click()
+  await expect(page.getByLabel('เดือน', { exact: true })).toHaveAttribute(
+    'data-month',
+    today.slice(0, 7),
+  )
   await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(orderLink).toBeVisible()
   await expect(
@@ -64,6 +68,10 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   ).toBeVisible()
 
   await periodGroup.getByRole('button', { name: 'รายปี' }).click()
+  await expect(page.getByLabel('ปี', { exact: true })).toHaveAttribute(
+    'data-year',
+    today.slice(0, 4),
+  )
   await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(orderLink).toBeVisible()
 
@@ -93,6 +101,20 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   ).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 100' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'ไอเท็ม 110' })).toBeVisible()
+
+  // Let the thumbnail that will be deleted finish loading before the action
+  // unlinks its file. An in-flight request would 404 after the unlink and the
+  // console collector would flag it, even though the delete itself worked.
+  // The second tile can stay lazy: the page navigates away when the whole
+  // order is deleted, so its request never lands after the unlink.
+  await expect
+    .poll(() =>
+      page
+        .locator('img[alt="รูปที่ 1"]')
+        .first()
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0)
 
   // Relabel the first photo through the same submenu the LIFF page uses.
   await page.getByRole('button', { name: 'ตั้งค่ารูปที่ 1' }).first().click()
@@ -130,6 +152,56 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   expect(consoleErrors).toEqual([])
 })
 
+test('picks a day, a month and a year from the filter pickers', async ({
+  page,
+}) => {
+  const today = todayBangkok()
+  const [year, month] = today.split('-')
+  // Pick a day in the same month that is not today, so the seeded order only
+  // appears after the picker changes the filter.
+  const otherDay = today.endsWith('-01') ? '02' : '01'
+  const pickedDate = `${year}-${month}-${otherDay}`
+  const orderNumber = uniqueOrderNumber()
+  seedOrder({ orderNumber, orderDate: pickedDate })
+  const consoleErrors = collectConsoleErrors(page)
+
+  await page.goto('/order-images')
+  await page.getByLabel('วันที่', { exact: true }).click()
+  await page.locator(`[data-iso="${pickedDate}"]`).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
+  await expect(page.getByRole('link', { name: orderNumber })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`date=${pickedDate}`))
+
+  const periodGroup = page.getByRole('group', { name: 'ช่วงเวลา' })
+
+  // The month picker starts on the month of the current filter.
+  await periodGroup.getByRole('button', { name: 'รายเดือน' }).click()
+  await expect(page.getByLabel('เดือน', { exact: true })).toHaveAttribute(
+    'data-month',
+    `${year}-${month}`,
+  )
+  await page.getByLabel('เดือน', { exact: true }).click()
+  await page.locator(`[data-month-value="${year}-${month}"]`).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
+  await expect(page).toHaveURL(
+    new RegExp(`period=month.*date=${year}-${month}-01`),
+  )
+  await expect(page.getByRole('link', { name: orderNumber })).toBeVisible()
+
+  // The year picker keeps the stored Gregorian year and shows the Buddhist one.
+  await periodGroup.getByRole('button', { name: 'รายปี' }).click()
+  await expect(page.getByLabel('ปี', { exact: true })).toHaveAttribute('data-year', year)
+  await page.getByLabel('ปี', { exact: true }).click()
+  await page.locator(`[data-year-value="${year}"]`).click()
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
+  await expect(page).toHaveURL(
+    new RegExp(`period=year.*date=${year}-01-01`),
+  )
+  await expect(page.getByRole('link', { name: orderNumber })).toBeVisible()
+
+  expect(consoleErrors).toEqual([])
+})
+
 test('switches the KPI between the filtered view and all', async ({ page }) => {
   await page.goto('/order-images')
   const scope = page.getByRole('group', { name: 'ขอบเขต KPI' })
@@ -148,7 +220,9 @@ test('switches the KPI between the filtered view and all', async ({ page }) => {
 })
 
 test('scrolls the table on desktop and the page on mobile', async ({ page }) => {
-  const prefix = `E2E-SCROLL-${Date.now()}`
+  // Six shared digits plus a three-digit index keeps every order number nine
+  // digits, while the prefix still matches all 26 rows in the text search.
+  const prefix = String(Date.now()).slice(-6)
   const today = todayBangkok()
 
   // More rows than one page (25) and more than the viewport, so the table has
@@ -156,7 +230,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   // mobile.
   for (let index = 0; index < 26; index += 1) {
     findOrCreateOrder({
-      orderNumber: `${prefix}-${String(index).padStart(2, '0')}`,
+      orderNumber: `${prefix}${String(index).padStart(3, '0')}`,
       orderDate: today,
       line: 'ดอกแค',
       createdBy: 'local-device',
@@ -171,7 +245,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   // The oldest of the 26 rows sits on page two, so match any row from this
   // run instead of a specific number.
   await expect(
-    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+    page.getByRole('link', { name: new RegExp(`^${prefix}`) }).first(),
   ).toBeVisible()
 
   expect(
@@ -203,7 +277,7 @@ test('scrolls the table on desktop and the page on mobile', async ({ page }) => 
   await page.setViewportSize({ width: 393, height: 851 })
   await page.reload()
   await expect(
-    page.getByRole('link', { name: new RegExp(`^${prefix}-`) }).first(),
+    page.getByRole('link', { name: new RegExp(`^${prefix}`) }).first(),
   ).toBeVisible()
 
   expect(

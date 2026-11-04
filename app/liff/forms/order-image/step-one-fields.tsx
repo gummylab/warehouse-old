@@ -2,9 +2,16 @@
 
 import { useState } from 'react'
 
+import { OrderNumberInput } from '@/components/order-number-input'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { todayBangkok } from '@/lib/order-images/validation'
 
 import type { LookupInput } from './order-image-api'
@@ -42,26 +49,27 @@ export function StepOneFields({
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto flex w-full flex-col gap-4">
-      <label className="flex flex-col gap-1.5 text-sm">
-        เลขออเดอร์
-        <Input
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label htmlFor="order-number">เลขออเดอร์</label>
+        <OrderNumberInput
+          id="order-number"
+          label="เลขออเดอร์"
           value={orderNumber}
-          onChange={(event) => setOrderNumber(event.target.value)}
-          placeholder="เช่น 12345"
-          autoComplete="off"
+          onChange={setOrderNumber}
           disabled={submitting}
         />
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        วันที่ออเดอร์
-        <Input
-          type="date"
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label htmlFor="order-date">วันที่ออเดอร์</label>
+        <DatePicker
+          id="order-date"
+          label="วันที่ออเดอร์"
           value={orderDate}
-          onChange={(event) => setOrderDate(event.target.value)}
+          onChange={setOrderDate}
           disabled={submitting}
         />
-      </label>
+      </div>
 
       <label className="flex flex-col gap-1.5 text-sm">
         ไลน์ผลิต

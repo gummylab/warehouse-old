@@ -23,13 +23,13 @@ function postRequest(body: unknown) {
 describe('parseJsonBody', () => {
   it('returns the parsed body when it fits the schema', async () => {
     const result = await parseJsonBody(
-      postRequest({ orderNumber: '1234', orderDate: '2026-10-19', line: 'line-a' }),
+      postRequest({ orderNumber: '123456789', orderDate: '2026-10-19', line: 'line-a' }),
       orderLookupSchema,
     )
 
     expect(result).toEqual({
       ok: true,
-      data: { orderNumber: '1234', orderDate: '2026-10-19', line: 'line-a' },
+      data: { orderNumber: '123456789', orderDate: '2026-10-19', line: 'line-a' },
     })
   })
 
@@ -50,7 +50,7 @@ describe('parseJsonBody', () => {
 
   it('rejects a body that is missing a field', async () => {
     const result = await parseJsonBody(
-      postRequest({ orderNumber: '1234', orderDate: '2026-10-19' }),
+      postRequest({ orderNumber: '123456789', orderDate: '2026-10-19' }),
       orderLookupSchema,
     )
 

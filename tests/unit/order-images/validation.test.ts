@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  isDotOnlySegment,
   isValidCalendarDate,
   isValidOrderNumber,
-  MAX_ORDER_NUMBER_LENGTH,
   normalizeOrderNumber,
+  ORDER_NUMBER_LENGTH,
   todayBangkok,
 } from '@/lib/order-images/validation'
 
@@ -14,9 +13,15 @@ import {
 // up as an error message the server disagrees with.
 describe('order-image validation', () => {
   describe('order number', () => {
-    it('trims so " 1234 " and "1234" are the same order key', () => {
-      expect(normalizeOrderNumber(' 1234 ')).toBe('1234')
-      expect(normalizeOrderNumber('1234')).toBe('1234')
+    it('trims so " 123456789 " and "123456789" are the same order key', () => {
+      expect(normalizeOrderNumber(' 123456789 ')).toBe('123456789')
+      expect(normalizeOrderNumber('123456789')).toBe('123456789')
+    })
+
+    it('accepts exactly nine digits, including leading zeros', () => {
+      expect(isValidOrderNumber('123456789')).toBe(true)
+      expect(isValidOrderNumber('000000001')).toBe(true)
+      expect(isValidOrderNumber(' 123456789 ')).toBe(true)
     })
 
     it('rejects empty and whitespace-only input', () => {
@@ -24,41 +29,19 @@ describe('order-image validation', () => {
       expect(isValidOrderNumber('   ')).toBe(false)
     })
 
-    it('accepts the maximum length and rejects one character more', () => {
-      expect(isValidOrderNumber('a'.repeat(MAX_ORDER_NUMBER_LENGTH))).toBe(true)
-      expect(isValidOrderNumber('a'.repeat(MAX_ORDER_NUMBER_LENGTH + 1))).toBe(false)
+    it('rejects anything shorter or longer than nine digits', () => {
+      const shorter = '1'.repeat(ORDER_NUMBER_LENGTH - 1)
+      const longer = '1'.repeat(ORDER_NUMBER_LENGTH + 1)
+      expect(isValidOrderNumber(shorter)).toBe(false)
+      expect(isValidOrderNumber(longer)).toBe(false)
     })
 
-    it('accepts a padded value because the length check runs after trimming', () => {
-      expect(isValidOrderNumber(' 1234 ')).toBe(true)
-    })
-
-    it('rejects an order number made only of dots', () => {
-      // "." and ".." are path instructions, not names. The storage key is
-      // built from the order number, so allowing them would write a photo
-      // into the parent folder and let two such orders overwrite each other.
-      expect(isValidOrderNumber('.')).toBe(false)
-      expect(isValidOrderNumber('..')).toBe(false)
+    it('rejects letters, separators, dots and full-width digits', () => {
+      expect(isValidOrderNumber('12345678a')).toBe(false)
+      expect(isValidOrderNumber('1234-5678')).toBe(false)
+      expect(isValidOrderNumber('1234 5678')).toBe(false)
       expect(isValidOrderNumber('...')).toBe(false)
-      expect(isValidOrderNumber('  ..  ')).toBe(false)
-    })
-
-    it('accepts an order number that merely contains dots', () => {
-      // Only a segment made entirely of dots is a path instruction.
-      expect(isValidOrderNumber('1234.5')).toBe(true)
-      expect(isValidOrderNumber('.1234')).toBe(true)
-      expect(isValidOrderNumber('12..34')).toBe(true)
-    })
-  })
-
-  describe('isDotOnlySegment', () => {
-    it('matches only a segment of nothing but dots', () => {
-      expect(isDotOnlySegment('.')).toBe(true)
-      expect(isDotOnlySegment('..')).toBe(true)
-      expect(isDotOnlySegment('...')).toBe(true)
-      expect(isDotOnlySegment('a')).toBe(false)
-      expect(isDotOnlySegment('')).toBe(false)
-      expect(isDotOnlySegment('..a')).toBe(false)
+      expect(isValidOrderNumber('１２３４５６７８９')).toBe(false)
     })
   })
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { Button, ButtonLink } from '@/components/ui/button'
+import { DatePicker, MonthPicker, YearPicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -85,14 +86,6 @@ export function OrderFilters({
     filters.line === null &&
     filters.query === null
 
-  const currentYear = Number(todayBangkok().slice(0, 4))
-  const years = Array.from(
-    new Set([
-      ...Array.from({ length: 30 }, (_, index) => currentYear - index),
-      Number(year),
-    ]),
-  ).sort((a, b) => b - a)
-
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -128,8 +121,7 @@ export function OrderFilters({
     if (/^\d{4}-\d{2}$/.test(value)) setDate(`${value}-01`)
   }
 
-  function changeYear(value: string | null) {
-    if (!value) return
+  function changeYear(value: string) {
     setYear(value)
     setDate(`${value}-01-01`)
   }
@@ -145,43 +137,40 @@ export function OrderFilters({
           type="search"
           name="q"
           defaultValue={filters.query ?? ''}
-          placeholder="เช่น 12345"
+          placeholder="เช่น 123456789"
+          inputMode="numeric"
           autoComplete="off"
           disabled={pending}
         />
       </label>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        {period === 'day' ? 'วันที่' : period === 'month' ? 'เดือน' : 'ปี'}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        <span>
+          {period === 'day' ? 'วันที่' : period === 'month' ? 'เดือน' : 'ปี'}
+        </span>
         {period === 'day' ? (
-          <Input
-            type="date"
+          <DatePicker
+            label="วันที่"
             value={date}
-            onChange={(event) => setDate(event.target.value || filters.date)}
+            onChange={(next) => setDate(next || filters.date)}
             disabled={pending}
           />
         ) : period === 'month' ? (
-          <Input
-            type="month"
+          <MonthPicker
+            label="เดือน"
             value={month}
-            onChange={(event) => changeMonth(event.target.value)}
+            onChange={changeMonth}
             disabled={pending}
           />
         ) : (
-          <Select value={year} onValueChange={changeYear} disabled={pending}>
-            <SelectTrigger className="w-full" aria-label="ปี">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((value) => (
-                <SelectItem key={value} value={String(value)}>
-                  {value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <YearPicker
+            label="ปี"
+            value={year}
+            onChange={changeYear}
+            disabled={pending}
+          />
         )}
-      </label>
+      </div>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
         ไลน์ผลิต
