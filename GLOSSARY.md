@@ -42,6 +42,10 @@ _Avoid_: upload page, chat upload
 One `(order_number, order_date)` pair. `order_date` is the Bangkok calendar date stored as plain `YYYY-MM-DD` text, never a timestamp, so no timezone math exists anywhere downstream. The line chosen in step 1 only applies when the order is first created.
 _Avoid_: order record, order timestamp
 
+**Order number**:
+The nine digits printed on the warehouse's order, always `0`-`9` and always exactly nine. Stored as text so a leading zero survives.
+_Avoid_: order id (the internal identifier), order code, reference number
+
 **Item (ไอเท็ม)**:
 A numbered unit inside an order, in two shapes: singles are multiples of 100 (100, 200, …) and varieties sit +10 to +90 under their pack (110 to 190 under 100, at most 9 per pack). The numbering rules are inherited from eu-shipment.
 _Avoid_: ไอเต็ม (old eu-shipment wording), product, line item
