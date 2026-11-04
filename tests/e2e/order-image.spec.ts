@@ -9,7 +9,6 @@ import { collectConsoleErrors } from './support/console'
 // The whole order-image journey in a browser, against the harness's own
 // database and upload folder. Every value it creates is unique, because the
 // specs share one database.
-const ORDER_DATE = '2026-01-15'
 
 // A one-pixel PNG. The server never decodes an upload (it stores and serves
 // the bytes), so this only has to be recognisable on the way back out.
@@ -34,9 +33,14 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
 
   await page.goto('/liff/forms/order-image')
 
+  // The form defaults to today in Bangkok; read the value the picker actually
+  // shows instead of recomputing the clock in the test process.
+  const orderDate =
+    (await page.getByLabel('วันที่ออเดอร์').getAttribute('data-date')) ?? ''
+  expect(orderDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+
   // ---- step 1: identify the order -------------------------------------
   await page.getByLabel('เลขออเดอร์').fill(orderNumber)
-  await page.getByLabel('วันที่ออเดอร์').fill(ORDER_DATE)
   await page.getByLabel('ไลน์ผลิต').click()
   const firstLine = page.getByRole('option').first()
   // The line name is read from the catalog instead of hard-coded, so the
@@ -86,7 +90,7 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // ---- the key on disk matches the documented layout -------------------
   // Built with the same helper the server writes with, so this asserts the
   // layout (date/order/line/item/seq-package.ext) rather than a copy of it.
-  const key = buildKey(ORDER_DATE, orderNumber, line, 100, 1, null, 'png')
+  const key = buildKey(orderDate, orderNumber, line, 100, 1, null, 'png')
   expect(key.endsWith('/100/1-Primary.png')).toBe(true)
   const storedFile = toAbsolute(key)
   expect(existsSync(storedFile)).toBe(true)
@@ -177,7 +181,6 @@ test('filters the item cards as a number is typed', async ({ page }) => {
   await page.goto('/liff/forms/order-image')
 
   await page.getByLabel('เลขออเดอร์').fill(orderNumber)
-  await page.getByLabel('วันที่ออเดอร์').fill(ORDER_DATE)
   await page.getByLabel('ไลน์ผลิต').click()
   await page.getByRole('option').first().click()
   await page.getByRole('button', { name: 'ถัดไป' }).click()
@@ -230,15 +233,10 @@ test('rejects an incomplete step 1 before it reaches the network', async ({ page
   await expect(page.getByText('กรุณาระบุเลขออเดอร์')).toBeVisible()
 
   await page.getByLabel('เลขออเดอร์').fill('1234')
-  await page.getByLabel('วันที่ออเดอร์').fill('')
-  await page.getByRole('button', { name: 'ถัดไป' }).click()
-  await expect(page.getByText('วันที่ไม่ถูกต้อง')).toBeVisible()
-
-  await page.getByLabel('วันที่ออเดอร์').fill(ORDER_DATE)
   await page.getByRole('button', { name: 'ถัดไป' }).click()
   await expect(page.getByText('กรุณาเลือกไลน์ผลิต')).toBeVisible()
 
-  // All three checks run client-side with the same helpers the route uses.
+  // Both checks run client-side with the same helpers the route uses.
   expect(orderImageCalls).toEqual([])
 })
 

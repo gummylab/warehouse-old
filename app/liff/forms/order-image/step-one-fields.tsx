@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { todayBangkok } from '@/lib/order-images/validation'
@@ -53,15 +54,16 @@ export function StepOneFields({
         />
       </label>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        วันที่ออเดอร์
-        <Input
-          type="date"
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label htmlFor="order-date">วันที่ออเดอร์</label>
+        <DatePicker
+          id="order-date"
+          label="วันที่ออเดอร์"
           value={orderDate}
-          onChange={(event) => setOrderDate(event.target.value)}
+          onChange={setOrderDate}
           disabled={submitting}
         />
-      </label>
+      </div>
 
       <label className="flex flex-col gap-1.5 text-sm">
         ไลน์ผลิต
