@@ -25,7 +25,7 @@ const chartConfig = {
 } satisfies ChartConfig
 
 const GRAIN_LABEL: Record<TrendGrain, string> = {
-  day: 'รายชั่วโมง',
+  day: 'รายวัน',
   month: 'รายวัน',
   year: 'รายเดือน',
 }

@@ -217,15 +217,13 @@ test('switches the overview window and keeps it out of the URL', async ({
   await expect(chart).toBeHidden()
   await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
   await expect(
-    page.getByRole('img', { name: /กราฟออเดอร์รายชั่วโมง/ }),
+    page.getByRole('img', { name: /7 วันล่าสุด/ }),
   ).toBeVisible()
 
   await range.click()
   await page.getByRole('option', { name: 'เดือน' }).click()
   await expect(range).toContainText('เดือน')
-  await expect(
-    page.getByRole('img', { name: /กราฟออเดอร์รายวัน/ }),
-  ).toBeVisible()
+  await expect(chart).toBeVisible()
 
   await range.click()
   await page.getByRole('option', { name: 'ปี' }).click()

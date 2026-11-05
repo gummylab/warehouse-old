@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { getDb } from '@/lib/db'
 import {
   addItem,
   deleteOrderCascade,
@@ -56,15 +55,6 @@ function upload(itemId: string, size = 4, createdBy = CREATED_BY) {
     createdBy,
     buffer: bytes,
   })
-}
-
-// The day window reads created_at, which the data layer stamps with the
-// current time. A test needs a fixed Bangkok hour, so it rewrites the column
-// after the insert.
-function setCreatedAt(orderId: string, createdAt: string) {
-  getDb()
-    .prepare('UPDATE orders SET created_at = ? WHERE id = ?')
-    .run(createdAt, orderId)
 }
 
 function filters(overrides: Partial<Parameters<typeof listOrders>[0]> = {}) {
@@ -133,9 +123,25 @@ describe('getOrderOverview', () => {
   it('returns the three calendar windows for the given day', () => {
     const overview = getOrderOverview('2026-11-05')
 
-    expect(overview.day.points).toHaveLength(24)
+    expect(overview.day.points).toHaveLength(7)
     expect(overview.month.points).toHaveLength(30)
     expect(overview.year.points).toHaveLength(12)
+  })
+
+  it('counts orders dated inside the seven-day window', () => {
+    newOrder('D-1', '2026-11-05')
+    newOrder('D-2', '2026-10-30') // six days before the anchor
+    newOrder('D-3', '2026-10-29') // seven days before: outside
+
+    const overview = getOrderOverview('2026-11-05')
+    const day = Object.fromEntries(
+      overview.day.points.map((point) => [point.bucket, point.count]),
+    )
+
+    expect(day['2026-11-05']).toBe(1)
+    expect(day['2026-10-30']).toBe(1)
+    expect(day['2026-10-29']).toBeUndefined()
+    expect(overview.day.summary.orders).toBe(2)
   })
 
   it('counts orders dated in the month and year windows', () => {
@@ -161,22 +167,6 @@ describe('getOrderOverview', () => {
     expect(year['2026-12']).toBe(0)
   })
 
-  it('counts the day window by creation time in Bangkok', () => {
-    const morning = newOrder('C-1', '2026-11-05')
-    const evening = newOrder('C-2', '2026-11-05')
-    setCreatedAt(morning.id, '2026-11-05T02:30:00.000Z') // 09:30 Bangkok
-    setCreatedAt(evening.id, '2026-11-05T18:00:00.000Z') // 01:00 next day
-
-    const overview = getOrderOverview('2026-11-05')
-    const day = Object.fromEntries(
-      overview.day.points.map((point) => [point.bucket, point.count]),
-    )
-
-    expect(day['2026-11-05T09']).toBe(1)
-    expect(day['2026-11-05T01']).toBe(0)
-    expect(overview.day.summary).toEqual({ orders: 1, items: 0, images: 0 })
-  })
-
   it('summarizes the same range as the points', () => {
     const order = newOrder('U-1', '2026-11-05')
     const pack = addPack(order.id)
@@ -184,14 +174,16 @@ describe('getOrderOverview', () => {
 
     const overview = getOrderOverview('2026-11-05')
 
+    expect(overview.day.summary).toEqual({ orders: 1, items: 1, images: 1 })
     expect(overview.month.summary).toEqual({ orders: 1, items: 1, images: 1 })
   })
 
-  it('leaves future-dated orders out of the month and year windows', () => {
+  it('leaves future-dated orders out of every window', () => {
     newOrder('F-1', '2026-11-06')
 
     const overview = getOrderOverview('2026-11-05')
 
+    expect(overview.day.summary.orders).toBe(0)
     expect(overview.month.summary.orders).toBe(0)
     expect(overview.year.summary.orders).toBe(0)
   })
