@@ -335,10 +335,16 @@ export function listOrders(filters: OrderListFilters): OrderListResult {
 // Orders + items
 // ---------------------------------------------------------------------------
 
-function findOrder(orderNumber: string, orderDate: string): OrderRecord | undefined {
+function findOrder(
+  orderNumber: string,
+  orderDate: string,
+  line: string,
+): OrderRecord | undefined {
   const row = getDb()
-    .prepare('SELECT * FROM orders WHERE order_number = ? AND order_date = ?')
-    .get(orderNumber, orderDate) as OrderRow | undefined
+    .prepare(
+      'SELECT * FROM orders WHERE order_number = ? AND order_date = ? AND line = ?',
+    )
+    .get(orderNumber, orderDate, line) as OrderRow | undefined
   return row ? toOrder(row) : undefined
 }
 
@@ -392,8 +398,8 @@ function insertItem(input: {
 }
 
 // Cross-process insert race (dev + prod server open on the same file): the
-// UNIQUE guards on (order_number, order_date), (order_id, item_number) and
-// (item_id, seq) reject the loser, and re-running the whole transaction
+// UNIQUE guards on (order_number, order_date, line), (order_id, item_number)
+// and (item_id, seq) reject the loser, and re-running the whole transaction
 // re-reads the existing row or the next free number — the same idea as
 // eu-shipment's withRetry around Prisma P2002. In-process races cannot
 // happen: better-sqlite3 executes transactions synchronously.
@@ -413,10 +419,11 @@ function withRetry<T>(fn: () => T): T {
   throw lastError
 }
 
-// Step 1 of the form: find the order by number+date, creating it on first
-// sight. An existing order keeps its original line — the line input only
-// matters at creation time. No item logic runs here: items are created
-// exclusively in step 2 through addItem's auto-numbering.
+// Step 1 of the form: find the order by number+date+line, creating it on
+// first sight. The same number and date on another line is a different order,
+// so a changed dropdown starts a fresh one instead of rewriting the old row.
+// No item logic runs here: items are created exclusively in step 2 through
+// addItem's auto-numbering.
 export function findOrCreateOrder(input: {
   orderNumber: string
   orderDate: string
@@ -424,7 +431,9 @@ export function findOrCreateOrder(input: {
   createdBy: string
 }): OrderRecord {
   const run = getDb().transaction(
-    () => findOrder(input.orderNumber, input.orderDate) ?? createOrder(input),
+    () =>
+      findOrder(input.orderNumber, input.orderDate, input.line) ??
+      createOrder(input),
   )
   return withRetry(run)
 }

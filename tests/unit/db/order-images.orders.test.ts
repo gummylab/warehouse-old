@@ -10,9 +10,10 @@ import {
 
 import { isolateTestData } from '../setup/db'
 
-// Lines catalog and orders. Order identity is the (order_number, order_date)
-// pair, which is also the unique index, so most of these cases are about what
-// happens on the second visit to the same order.
+// Lines catalog and orders. Order identity is the
+// (order_number, order_date, line) triple, which is also the unique index, so
+// most of these cases are about what happens on the second visit to the same
+// order.
 isolateTestData()
 
 const LINE = 'line-a'
@@ -86,7 +87,7 @@ describe('findOrCreateOrder', () => {
     expect(countRows('orders')).toBe(1)
   })
 
-  it('keeps the line chosen when the order was first created', () => {
+  it('creates a separate order when the same number and date use another line', () => {
     const first = findOrCreateOrder({
       orderNumber: '3000',
       orderDate: '2026-10-19',
@@ -100,10 +101,11 @@ describe('findOrCreateOrder', () => {
       createdBy: 'U-1',
     })
 
-    // Step 1 re-runs on every visit, so a changed dropdown must not fork or
-    // rewrite the order.
-    expect(second.id).toBe(first.id)
-    expect(second.line).toBe(LINE)
+    // The line is part of the identity, so the same printed number on another
+    // production line is its own order with its own items and photos.
+    expect(second.id).not.toBe(first.id)
+    expect(second.line).toBe(OTHER_LINE)
+    expect(countRows('orders')).toBe(2)
   })
 
   it('treats the same number on another date as another order', () => {

@@ -46,9 +46,14 @@ const SCHEMA = `
     created_by   TEXT NOT NULL,
     created_at   TEXT NOT NULL
   );
-  -- Order identity = number + date; a line change must not fork the order.
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_number_date
-    ON orders (order_number, order_date);
+  -- Order identity = number + date + line: the same printed number can appear
+  -- on more than one production line on the same day.
+  --
+  -- DROP first: older databases carry the two-column index under its old
+  -- name, and CREATE INDEX IF NOT EXISTS would leave it in place.
+  DROP INDEX IF EXISTS idx_orders_number_date;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_number_date_line
+    ON orders (order_number, order_date, line);
   CREATE INDEX IF NOT EXISTS idx_orders_order_number
     ON orders (order_number);
   CREATE INDEX IF NOT EXISTS idx_orders_line ON orders (line);
