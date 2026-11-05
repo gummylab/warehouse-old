@@ -28,6 +28,8 @@ type LineWalkSection = {
   line: string | null
   brand: string
   packStyle: string
+  people: string
+  amount: string
 }
 
 // Ids are generated from a counter instead of randomUUID so the server and the
@@ -39,6 +41,8 @@ function newSection(id: string): LineWalkSection {
     line: null,
     brand: '',
     packStyle: '',
+    people: '',
+    amount: '',
   }
 }
 
@@ -93,6 +97,13 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
         className="mx-auto flex w-full flex-col gap-4">
         {sections.map((section, index) => {
           const position = index + 1
+          // The count fields only make sense once the row names a real
+          // (date, line, brand, pack style) record, which is also the key the
+          // future lookup and save will use.
+          const complete =
+            section.line !== null &&
+            section.brand.trim() !== '' &&
+            section.packStyle.trim() !== ''
 
           return (
             <section
@@ -180,6 +191,44 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
                   autoComplete="off"
                 />
               </div>
+
+              {complete ? (
+                <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    <label htmlFor={`walk-people-${section.id}`}>
+                      จำนวนคน <span className="text-destructive">*</span>
+                    </label>
+                    <Input
+                      id={`walk-people-${section.id}`}
+                      inputMode="numeric"
+                      value={section.people}
+                      onChange={(event) =>
+                        updateSection(section.id, {
+                          people: event.target.value.replace(/\D/g, ''),
+                        })
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    <label htmlFor={`walk-amount-${section.id}`}>
+                      ยอดสินค้า <span className="text-destructive">*</span>
+                    </label>
+                    <Input
+                      id={`walk-amount-${section.id}`}
+                      inputMode="numeric"
+                      value={section.amount}
+                      onChange={(event) =>
+                        updateSection(section.id, {
+                          amount: event.target.value.replace(/\D/g, ''),
+                        })
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </section>
           )
         })}

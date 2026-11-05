@@ -84,6 +84,28 @@ test.describe('LIFF routing', () => {
     await expect(page.getByRole('region', { name: 'รายการที่ 2' })).toHaveCount(0)
     await expect(page.getByLabel(/วันที่ รายการที่/)).toHaveCount(1)
 
+    // The count fields appear only once the row names a real record.
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+
+    await page
+      .getByRole('combobox', { name: /ไลน์ผลิต รายการที่ 1/ })
+      .click()
+    await page.getByRole('option').first().click()
+    await page.getByLabel(/ชื่อแบรนด์/).fill('แบรนด์ทดสอบ')
+    await page.getByLabel(/Pack style/).fill('ถุง')
+
+    await expect(page.getByLabel(/จำนวนคน/)).toBeVisible()
+    await expect(page.getByLabel(/ยอดสินค้า/)).toBeVisible()
+
+    // Both counts keep integers only.
+    await page.getByLabel(/จำนวนคน/).fill('12a3')
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveValue('123')
+
+    // Clearing a required field hides the block again.
+    await page.getByLabel(/ชื่อแบรนด์/).fill('')
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+    await expect(page.getByLabel(/ยอดสินค้า/)).toHaveCount(0)
+
     await expect(
       page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา ยังไม่บันทึกข้อมูล'),
     ).toBeVisible()
