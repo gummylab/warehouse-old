@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
+import { getDb } from '@/lib/db'
 import {
   addItem,
   deleteOrderCascade,
@@ -55,6 +56,15 @@ function upload(itemId: string, size = 4, createdBy = CREATED_BY) {
     createdBy,
     buffer: bytes,
   })
+}
+
+// The day window reads created_at, which the data layer stamps with the
+// current time. A test needs a fixed Bangkok hour, so it rewrites the column
+// after the insert.
+function setCreatedAt(orderId: string, createdAt: string) {
+  getDb()
+    .prepare('UPDATE orders SET created_at = ? WHERE id = ?')
+    .run(createdAt, orderId)
 }
 
 function filters(overrides: Partial<Parameters<typeof listOrders>[0]> = {}) {
@@ -120,38 +130,51 @@ describe('getOrderSummary', () => {
 })
 
 describe('getOrderOverview', () => {
-  it('returns the three windows ending on the given day', () => {
+  it('returns the three calendar windows for the given day', () => {
     const overview = getOrderOverview('2026-11-05')
 
-    expect(overview.day.from).toBe('2026-10-07')
-    expect(overview.day.to).toBe('2026-11-05')
-    expect(overview.day.points).toHaveLength(30)
-
-    expect(overview.month.from).toBe('2025-12-01')
-    expect(overview.month.points).toHaveLength(12)
-
-    expect(overview.year.from).toBe('2022-01-01')
-    expect(overview.year.points).toHaveLength(5)
+    expect(overview.day.points).toHaveLength(24)
+    expect(overview.month.points).toHaveLength(30)
+    expect(overview.year.points).toHaveLength(12)
   })
 
-  it('counts orders into their bucket and fills quiet days with zero', () => {
-    newOrder('T-1', '2026-11-05')
+  it('counts orders dated in the month and year windows', () => {
+    newOrder('T-1', '2026-11-03')
     newOrder('T-2', '2026-11-05')
-    newOrder('T-3', '2026-11-03')
+    // Dated after the anchor day: on the axis, outside the range.
+    newOrder('T-3', '2026-11-06')
+    newOrder('T-4', '2026-09-15')
+
+    const overview = getOrderOverview('2026-11-05')
+    const month = Object.fromEntries(
+      overview.month.points.map((point) => [point.bucket, point.count]),
+    )
+    const year = Object.fromEntries(
+      overview.year.points.map((point) => [point.bucket, point.count]),
+    )
+
+    expect(month['2026-11-03']).toBe(1)
+    expect(month['2026-11-05']).toBe(1)
+    expect(month['2026-11-06']).toBe(0)
+    expect(year['2026-09']).toBe(1)
+    expect(year['2026-11']).toBe(2)
+    expect(year['2026-12']).toBe(0)
+  })
+
+  it('counts the day window by creation time in Bangkok', () => {
+    const morning = newOrder('C-1', '2026-11-05')
+    const evening = newOrder('C-2', '2026-11-05')
+    setCreatedAt(morning.id, '2026-11-05T02:30:00.000Z') // 09:30 Bangkok
+    setCreatedAt(evening.id, '2026-11-05T18:00:00.000Z') // 01:00 next day
 
     const overview = getOrderOverview('2026-11-05')
     const day = Object.fromEntries(
       overview.day.points.map((point) => [point.bucket, point.count]),
     )
 
-    expect(day['2026-11-05']).toBe(2)
-    expect(day['2026-11-03']).toBe(1)
-    expect(day['2026-11-04']).toBe(0)
-    expect(overview.month.points.at(-1)).toEqual({
-      bucket: '2026-11',
-      count: 3,
-    })
-    expect(overview.year.points.at(-1)).toEqual({ bucket: '2026', count: 3 })
+    expect(day['2026-11-05T09']).toBe(1)
+    expect(day['2026-11-05T01']).toBe(0)
+    expect(overview.day.summary).toEqual({ orders: 1, items: 0, images: 0 })
   })
 
   it('summarizes the same range as the points', () => {
@@ -161,15 +184,14 @@ describe('getOrderOverview', () => {
 
     const overview = getOrderOverview('2026-11-05')
 
-    expect(overview.day.summary).toEqual({ orders: 1, items: 1, images: 1 })
+    expect(overview.month.summary).toEqual({ orders: 1, items: 1, images: 1 })
   })
 
-  it('leaves future-dated orders out of every window', () => {
+  it('leaves future-dated orders out of the month and year windows', () => {
     newOrder('F-1', '2026-11-06')
 
     const overview = getOrderOverview('2026-11-05')
 
-    expect(overview.day.summary.orders).toBe(0)
     expect(overview.month.summary.orders).toBe(0)
     expect(overview.year.summary.orders).toBe(0)
   })

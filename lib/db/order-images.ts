@@ -26,7 +26,12 @@ import type {
   TrendPoint,
 } from './types'
 import { nextSingleNumber, nextVarietyNumber } from '../order-images/item-number'
-import { fillTrend, TREND_GRAINS, trendWindow } from '../order-images/trend'
+import {
+  fillTrend,
+  TREND_GRAINS,
+  trendWindow,
+  type TrendWindow,
+} from '../order-images/trend'
 import {
   buildKey,
   ensureDirForFile,
@@ -251,28 +256,58 @@ export function getOrderSummary(range: {
   }
 }
 
-// The grouping key per grain. It lives next to the query so it cannot drift
-// from the bucket strings trendWindow produces.
-const TREND_BUCKET_SQL: Record<TrendGrain, string> = {
-  day: 'o.order_date',
-  month: 'substr(o.order_date, 1, 7)',
-  year: 'substr(o.order_date, 1, 4)',
-}
-
+// The day window counts arrival time, so its bucket column and filter differ
+// from the month and year windows, which count the stored business date.
 function getTrendPoints(
   grain: TrendGrain,
-  from: string,
-  to: string,
+  window: TrendWindow,
 ): TrendPoint[] {
-  return getDb()
+  const db = getDb()
+
+  if (window.kind === 'created') {
+    return db
+      .prepare(
+        `SELECT strftime('%Y-%m-%dT%H', created_at, '+7 hours') AS bucket,
+                COUNT(*) AS count
+         FROM orders
+         WHERE created_at >= ? AND created_at < ?
+         GROUP BY bucket
+         ORDER BY bucket`,
+      )
+      .all(window.from, window.to) as TrendPoint[]
+  }
+
+  const bucketSql =
+    grain === 'month' ? 'o.order_date' : 'substr(o.order_date, 1, 7)'
+
+  return db
     .prepare(
-      `SELECT ${TREND_BUCKET_SQL[grain]} AS bucket, COUNT(*) AS count
+      `SELECT ${bucketSql} AS bucket, COUNT(*) AS count
        FROM orders o
        WHERE o.order_date BETWEEN ? AND ?
        GROUP BY bucket
        ORDER BY bucket`,
     )
-    .all(from, to) as TrendPoint[]
+    .all(window.from, window.to) as TrendPoint[]
+}
+
+// The KPI cells follow the same source as the chart: the day window counts
+// orders created in the Bangkok day, the month and year windows count the
+// stored order date.
+function getCreatedSummary(from: string, to: string): OrderSummary {
+  return getDb()
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM orders o
+            WHERE o.created_at >= ? AND o.created_at < ?) AS orders,
+         (SELECT COUNT(*) FROM items i
+            JOIN orders o ON o.id = i.order_id
+            WHERE o.created_at >= ? AND o.created_at < ?) AS items,
+         (SELECT COUNT(*) FROM images img
+            JOIN orders o ON o.id = img.order_id
+            WHERE o.created_at >= ? AND o.created_at < ?) AS images`,
+    )
+    .get(from, to, from, to, from, to) as OrderSummary
 }
 
 // Everything the overview needs for all three grains in one call, so the page
@@ -283,13 +318,11 @@ export function getOrderOverview(today: string): OrderOverview {
   for (const grain of TREND_GRAINS) {
     const window = trendWindow(grain, today)
     overview[grain] = {
-      from: window.from,
-      to: window.to,
-      points: fillTrend(
-        window.buckets,
-        getTrendPoints(grain, window.from, window.to),
-      ),
-      summary: getOrderSummary(window),
+      points: fillTrend(window.buckets, getTrendPoints(grain, window)),
+      summary:
+        window.kind === 'created'
+          ? getCreatedSummary(window.from, window.to)
+          : getOrderSummary(window),
     }
   }
 

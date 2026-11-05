@@ -55,7 +55,7 @@ async function OrderImagesData({ params }: { params: Record<string, string | str
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-hidden">
-      <OrderOverview overview={overview} />
+      <OrderOverview overview={overview} today={today} />
 
       <OrderFilters key={orderListHref(filters, 1)} lines={lines} filters={filters} />
 

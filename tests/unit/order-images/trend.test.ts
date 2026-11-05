@@ -1,52 +1,55 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  bucketKey,
   fillTrend,
   formatTrendLabel,
-  formatTrendRange,
+  formatTrendPeriod,
   formatTrendTick,
   trendWindow,
 } from '@/lib/order-images/trend'
 
-// The windows are calendar based and end on the anchor day, never on the end
-// of the month or year: the KPI strip and the chart must stop at today and
-// leave future-dated orders out.
+// The windows are anchored on today: the day window is today's 24 hours (an
+// entry-time range), the month window is every day of this month, and the year
+// window is every month of this year. Buckets that have not arrived yet stay
+// in the list and render as zero.
 describe('trendWindow', () => {
-  it('returns 30 consecutive days ending today', () => {
+  it('covers the Bangkok day as a UTC instant range', () => {
     const window = trendWindow('day', '2026-11-05')
 
-    expect(window.from).toBe('2026-10-07')
-    expect(window.to).toBe('2026-11-05')
-    expect(window.buckets).toHaveLength(30)
-    expect(window.buckets[0]).toBe('2026-10-07')
-    expect(window.buckets.at(-1)).toBe('2026-11-05')
-    expect(new Set(window.buckets).size).toBe(30)
+    expect(window.kind).toBe('created')
+    // 00:00 in Bangkok is 17:00 UTC the evening before.
+    expect(window.from).toBe('2026-11-04T17:00:00.000Z')
+    expect(window.to).toBe('2026-11-05T17:00:00.000Z')
+    expect(window.buckets).toHaveLength(24)
+    expect(window.buckets[0]).toBe('2026-11-05T00')
+    expect(window.buckets.at(-1)).toBe('2026-11-05T23')
   })
 
-  it('crosses a year boundary without losing a day', () => {
-    const window = trendWindow('day', '2026-01-15')
-
-    expect(window.from).toBe('2025-12-17')
-    expect(window.buckets).toContain('2026-01-01')
-    expect(window.buckets).toHaveLength(30)
-  })
-
-  it('keeps 29 February in a leap-year window', () => {
-    const window = trendWindow('day', '2028-03-01')
-
-    expect(window.from).toBe('2028-02-01')
-    expect(window.buckets).toContain('2028-02-29')
-    expect(window.buckets).toHaveLength(30)
-  })
-
-  it('returns 12 calendar months ending with the current one', () => {
+  it('covers every day of the current month', () => {
     const window = trendWindow('month', '2026-11-05')
 
-    expect(window.from).toBe('2025-12-01')
+    expect(window.kind).toBe('order')
+    expect(window.from).toBe('2026-11-01')
+    expect(window.to).toBe('2026-11-05')
+    expect(window.buckets).toHaveLength(30)
+    expect(window.buckets[0]).toBe('2026-11-01')
+    expect(window.buckets.at(-1)).toBe('2026-11-30')
+  })
+
+  it('keeps 29 February in a leap-year month', () => {
+    const window = trendWindow('month', '2028-02-10')
+
+    expect(window.buckets).toHaveLength(29)
+    expect(window.buckets).toContain('2028-02-29')
+  })
+
+  it('covers every month of the current year', () => {
+    const window = trendWindow('year', '2026-11-05')
+
+    expect(window.kind).toBe('order')
+    expect(window.from).toBe('2026-01-01')
     expect(window.to).toBe('2026-11-05')
     expect(window.buckets).toEqual([
-      '2025-12',
       '2026-01',
       '2026-02',
       '2026-03',
@@ -58,23 +61,8 @@ describe('trendWindow', () => {
       '2026-09',
       '2026-10',
       '2026-11',
+      '2026-12',
     ])
-  })
-
-  it('returns five calendar years ending with the current one', () => {
-    const window = trendWindow('year', '2026-11-05')
-
-    expect(window.from).toBe('2022-01-01')
-    expect(window.to).toBe('2026-11-05')
-    expect(window.buckets).toEqual(['2022', '2023', '2024', '2025', '2026'])
-  })
-})
-
-describe('bucketKey', () => {
-  it('cuts a date down to the selected grain', () => {
-    expect(bucketKey('day', '2026-11-05')).toBe('2026-11-05')
-    expect(bucketKey('month', '2026-11-05')).toBe('2026-11')
-    expect(bucketKey('year', '2026-11-05')).toBe('2026')
   })
 })
 
@@ -100,27 +88,22 @@ describe('fillTrend', () => {
 })
 
 describe('trend labels', () => {
-  it('shows the day and month on a day axis and the full date in the tooltip', () => {
-    expect(formatTrendTick('day', '2026-11-05')).toBe('5 พ.ย.')
-    expect(formatTrendLabel('day', '2026-11-05')).toContain('2569')
+  it('shows the hour on a day axis and the date and hour in the tooltip', () => {
+    expect(formatTrendTick('day', '2026-11-05T09')).toBe('09:00')
+    expect(formatTrendLabel('day', '2026-11-05T09')).toContain('09:00')
+    expect(formatTrendLabel('day', '2026-11-05T09')).toContain('2569')
   })
 
-  it('shows the month name for a month bucket and the year for a year bucket', () => {
-    expect(formatTrendTick('month', '2026-11')).toBe('พ.ย.')
-    expect(formatTrendLabel('month', '2026-11')).toContain('2569')
-    expect(formatTrendTick('year', '2026')).toBe('2569')
-    expect(formatTrendLabel('year', '2026')).toBe('2569')
+  it('shows the day on a month axis and the month name on a year axis', () => {
+    expect(formatTrendTick('month', '2026-11-05')).toBe('5 พ.ย.')
+    expect(formatTrendLabel('month', '2026-11-05')).toContain('2569')
+    expect(formatTrendTick('year', '2026-11')).toBe('พ.ย.')
+    expect(formatTrendLabel('year', '2026-11')).toContain('2569')
   })
 
-  it('describes the whole range in Thai', () => {
-    expect(formatTrendRange('day', '2026-10-07', '2026-11-05')).toContain(
-      'ถึง',
-    )
-    expect(formatTrendRange('month', '2025-12-01', '2026-11-05')).toContain(
-      '2568',
-    )
-    expect(formatTrendRange('year', '2022-01-01', '2026-11-05')).toBe(
-      '2565 ถึง 2569',
-    )
+  it('describes the period for the chart accessible name', () => {
+    expect(formatTrendPeriod('day', '2026-11-05')).toContain('2569')
+    expect(formatTrendPeriod('month', '2026-11-05')).toContain('2569')
+    expect(formatTrendPeriod('year', '2026-11-05')).toBe('2569')
   })
 })

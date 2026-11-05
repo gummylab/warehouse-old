@@ -81,9 +81,6 @@ export type TrendPoint = {
 }
 
 export type OrderOverviewRange = {
-  // The exact date range the summary and the points cover.
-  from: string
-  to: string
   points: TrendPoint[]
   summary: OrderSummary
 }

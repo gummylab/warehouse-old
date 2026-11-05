@@ -6,18 +6,12 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import type { OrderSummary } from '@/lib/db/types'
 import { cn } from '@/lib/utils'
 
-// The values follow the day/month/year window chosen next to the trend chart;
-// the table below still narrows by its own filter bar. This strip never counts
-// the line or search filters, so it always agrees with the chart.
-//
-// One strip with dividers rather than three free-floating cards: the three
-// numbers belong to one set, and the shared surface keeps the row from
-// leaving an orphan card on the second line at medium widths.
+// The KPI cells inside the overview card. The card owns the border, the
+// background and the aria-label; this grid only lays the three numbers out and
+// draws the line between them and the chart below.
 export function SummaryCards({ summary }: { summary: OrderSummary }) {
   return (
-    <section
-      aria-label="ภาพรวมออเดอร์"
-      className="grid shrink-0 grid-cols-3 divide-x divide-border overflow-hidden rounded-xl border bg-card text-card-foreground">
+    <div className="grid grid-cols-3 divide-x divide-border border-t">
       <SummaryCard
         icon={<ShoppingCartIcon />}
         label="ออเดอร์"
@@ -33,7 +27,7 @@ export function SummaryCards({ summary }: { summary: OrderSummary }) {
         label="รูปภาพ"
         value={summary.images}
       />
-    </section>
+    </div>
   )
 }
 

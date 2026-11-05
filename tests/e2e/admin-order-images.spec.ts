@@ -9,16 +9,6 @@ import { todayBangkok } from '../../lib/order-images/validation'
 import { collectConsoleErrors } from './support/console'
 import { seedOrder, uniqueOrderNumber } from './support/data'
 
-// The overview windows count Bangkok calendar days. A UTC day offset keeps a
-// seed on the same order_date whatever timezone the runner uses, which matters
-// for the 40-day row that must fall outside the 30-day window.
-function daysAgo(days: number): string {
-  const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(date.getUTCDate()).padStart(2, '0')
-  return `${date.getUTCFullYear()}-${month}-${day}`
-}
-
 // The admin side of the order-image journey: the form writes the rows, this
 // page reads the summary, opens one order, relabels a photo and deletes the
 // order with its files.
@@ -215,63 +205,49 @@ test('picks a day, a month and a year from the filter pickers', async ({
 test('switches the overview window and keeps it out of the URL', async ({
   page,
 }) => {
-  // One row inside the 30-day window and one outside it: the month and year
-  // windows must count more orders than the day window.
-  seedOrder({
-    orderNumber: uniqueOrderNumber(),
-    orderDate: todayBangkok(),
-    imageCount: 1,
-  })
-  seedOrder({
-    orderNumber: uniqueOrderNumber(),
-    orderDate: daysAgo(40),
-    imageCount: 1,
-  })
-
   const consoleErrors = collectConsoleErrors(page)
   await page.goto('/order-images')
 
-  const range = page.getByRole('group', { name: 'ช่วงภาพรวม' })
-  await expect(range.getByRole('button', { name: '30 วัน' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  await expect(page.getByText('แนวโน้มออเดอร์')).toBeVisible()
+  const range = page.getByRole('combobox', { name: 'ช่วงภาพรวม' })
+  await expect(range).toContainText('วัน')
 
-  const summaryRegion = page.getByRole('region', { name: 'ภาพรวมออเดอร์' })
-  const ordersValue = summaryRegion
-    .locator('[data-slot="summary-value"]')
-    .first()
-  const readOrders = async () =>
-    Number((await ordersValue.textContent())?.replace(/\D/g, '') ?? '0')
+  // The chart starts collapsed, so the KPI stays visible and the table keeps
+  // the height. Opening it must not disturb the window or the URL.
+  const chart = page.getByRole('img', { name: /กราฟออเดอร์/ })
+  await expect(chart).toBeHidden()
+  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
+  await expect(
+    page.getByRole('img', { name: /กราฟออเดอร์รายชั่วโมง/ }),
+  ).toBeVisible()
 
-  const dayOrders = await readOrders()
+  await range.click()
+  await page.getByRole('option', { name: 'เดือน' }).click()
+  await expect(range).toContainText('เดือน')
+  await expect(
+    page.getByRole('img', { name: /กราฟออเดอร์รายวัน/ }),
+  ).toBeVisible()
 
-  await range.getByRole('button', { name: '12 เดือน' }).click()
-  await expect(range.getByRole('button', { name: '12 เดือน' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  const monthOrders = await readOrders()
-  expect(monthOrders).toBeGreaterThan(dayOrders)
-
-  await range.getByRole('button', { name: '5 ปี' }).click()
-  await expect(range.getByRole('button', { name: '5 ปี' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
-  expect(await readOrders()).toBeGreaterThanOrEqual(monthOrders)
+  await range.click()
+  await page.getByRole('option', { name: 'ปี' }).click()
+  await expect(range).toContainText('ปี')
+  await expect(
+    page.getByRole('img', { name: /กราฟออเดอร์รายเดือน/ }),
+  ).toBeVisible()
 
   // The switch is client state on purpose: it must not add a query parameter.
   expect(page.url()).toMatch(/\/order-images$/)
   expect(consoleErrors).toEqual([])
 })
 
-test('collapses and reopens the trend chart', async ({ page }) => {
+test('opens and collapses the trend chart', async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page)
   await page.goto('/order-images')
 
   const chart = page.getByRole('img', { name: /กราฟออเดอร์/ })
+  // Collapsed by default: the KPI strip is the first thing the page shows.
+  await expect(chart).toBeHidden()
+
+  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
   await expect(chart).toBeVisible()
 
   await page.getByRole('button', { name: 'ซ่อนกราฟ' }).click()
@@ -279,9 +255,6 @@ test('collapses and reopens the trend chart', async ({ page }) => {
   await expect(
     page.getByRole('region', { name: 'ภาพรวมออเดอร์' }),
   ).toBeVisible()
-
-  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
-  await expect(chart).toBeVisible()
 
   expect(consoleErrors).toEqual([])
 })
