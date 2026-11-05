@@ -3,42 +3,34 @@
 import { ImageIcon, PackageIcon, ShoppingCartIcon } from 'lucide-react'
 
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { OrderSummary, SummaryScope } from '@/lib/db/types'
+import type { OrderSummary } from '@/lib/db/types'
 import { cn } from '@/lib/utils'
 
-// The values follow the selected KPI scope: filtered counts only the orders
-// matching the filter bar; all counts the whole system. The table below stays
-// narrowed by the filter bar in both cases.
+// The values follow the day/month/year window chosen next to the trend chart;
+// the table below still narrows by its own filter bar. This strip never counts
+// the line or search filters, so it always agrees with the chart.
 //
 // One strip with dividers rather than three free-floating cards: the three
 // numbers belong to one set, and the shared surface keeps the row from
 // leaving an orphan card on the second line at medium widths.
-export function SummaryCards({
-  summary,
-  scope,
-}: {
-  summary: OrderSummary
-  scope: SummaryScope
-}) {
-  const all = scope === 'all'
-
+export function SummaryCards({ summary }: { summary: OrderSummary }) {
   return (
     <section
       aria-label="ภาพรวมออเดอร์"
       className="grid shrink-0 grid-cols-3 divide-x divide-border overflow-hidden rounded-xl border bg-card text-card-foreground">
       <SummaryCard
         icon={<ShoppingCartIcon />}
-        label={all ? 'ออเดอร์ทั้งหมด' : 'ออเดอร์'}
+        label="ออเดอร์"
         value={summary.orders}
       />
       <SummaryCard
         icon={<PackageIcon />}
-        label={all ? 'ไอเท็มทั้งหมด' : 'ไอเท็ม'}
+        label="ไอเท็ม"
         value={summary.items}
       />
       <SummaryCard
         icon={<ImageIcon />}
-        label={all ? 'รูปภาพทั้งหมด' : 'รูปภาพ'}
+        label="รูปภาพ"
         value={summary.images}
       />
     </section>
@@ -62,6 +54,7 @@ function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: str
       <div className={cn(!mobile && 'flex', 'min-w-0 flex-1 gap-4 items-center')}>
         <p className="text-center truncate text-xs text-muted-foreground">{label}</p>
         <p
+          data-slot="summary-value"
           className={cn(
             'text-xl font-semibold tabular-nums sm:text-2xl text-center',
             // A zero is a real answer, but it should not compete with the

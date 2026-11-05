@@ -9,6 +9,16 @@ import { todayBangkok } from '../../lib/order-images/validation'
 import { collectConsoleErrors } from './support/console'
 import { seedOrder, uniqueOrderNumber } from './support/data'
 
+// The overview windows count Bangkok calendar days. A UTC day offset keeps a
+// seed on the same order_date whatever timezone the runner uses, which matters
+// for the 40-day row that must fall outside the 30-day window.
+function daysAgo(days: number): string {
+  const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${month}-${day}`
+}
+
 // The admin side of the order-image journey: the form writes the rows, this
 // page reads the summary, opens one order, relabels a photo and deletes the
 // order with its files.
@@ -202,21 +212,78 @@ test('picks a day, a month and a year from the filter pickers', async ({
   expect(consoleErrors).toEqual([])
 })
 
-test('switches the KPI between the filtered view and all', async ({ page }) => {
+test('switches the overview window and keeps it out of the URL', async ({
+  page,
+}) => {
+  // One row inside the 30-day window and one outside it: the month and year
+  // windows must count more orders than the day window.
+  seedOrder({
+    orderNumber: uniqueOrderNumber(),
+    orderDate: todayBangkok(),
+    imageCount: 1,
+  })
+  seedOrder({
+    orderNumber: uniqueOrderNumber(),
+    orderDate: daysAgo(40),
+    imageCount: 1,
+  })
+
+  const consoleErrors = collectConsoleErrors(page)
   await page.goto('/order-images')
-  const scope = page.getByRole('group', { name: 'ขอบเขต KPI' })
-  await expect(
-    scope.getByRole('button', { name: 'ตามตัวกรอง' }),
-  ).toHaveAttribute('aria-pressed', 'true')
 
-  await scope.getByRole('button', { name: 'ทั้งหมด' }).click()
-  await expect(page).toHaveURL(/summary=all/)
-  await expect(
-    scope.getByRole('button', { name: 'ทั้งหมด' }),
-  ).toHaveAttribute('aria-pressed', 'true')
+  const range = page.getByRole('group', { name: 'ช่วงภาพรวม' })
+  await expect(range.getByRole('button', { name: '30 วัน' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByText('แนวโน้มออเดอร์')).toBeVisible()
 
-  await scope.getByRole('button', { name: 'ตามตัวกรอง' }).click()
-  await expect(page).not.toHaveURL(/summary=all/)
+  const summaryRegion = page.getByRole('region', { name: 'ภาพรวมออเดอร์' })
+  const ordersValue = summaryRegion
+    .locator('[data-slot="summary-value"]')
+    .first()
+  const readOrders = async () =>
+    Number((await ordersValue.textContent())?.replace(/\D/g, '') ?? '0')
+
+  const dayOrders = await readOrders()
+
+  await range.getByRole('button', { name: '12 เดือน' }).click()
+  await expect(range.getByRole('button', { name: '12 เดือน' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  const monthOrders = await readOrders()
+  expect(monthOrders).toBeGreaterThan(dayOrders)
+
+  await range.getByRole('button', { name: '5 ปี' }).click()
+  await expect(range.getByRole('button', { name: '5 ปี' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  expect(await readOrders()).toBeGreaterThanOrEqual(monthOrders)
+
+  // The switch is client state on purpose: it must not add a query parameter.
+  expect(page.url()).toMatch(/\/order-images$/)
+  expect(consoleErrors).toEqual([])
+})
+
+test('collapses and reopens the trend chart', async ({ page }) => {
+  const consoleErrors = collectConsoleErrors(page)
+  await page.goto('/order-images')
+
+  const chart = page.getByRole('img', { name: /กราฟออเดอร์/ })
+  await expect(chart).toBeVisible()
+
+  await page.getByRole('button', { name: 'ซ่อนกราฟ' }).click()
+  await expect(chart).toBeHidden()
+  await expect(
+    page.getByRole('region', { name: 'ภาพรวมออเดอร์' }),
+  ).toBeVisible()
+
+  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
+  await expect(chart).toBeVisible()
+
+  expect(consoleErrors).toEqual([])
 })
 
 test('scrolls the table on desktop and the page on mobile', async ({ page }) => {

@@ -18,7 +18,6 @@ describe('parseOrderListParams', () => {
       to: today,
       line: null,
       query: null,
-      summary: 'filtered',
       page: 1,
       pageSize: ORDER_PAGE_SIZE,
     })
@@ -90,9 +89,12 @@ describe('parseOrderListParams', () => {
     expect(parseOrderListParams({ page: '3' }).page).toBe(3)
   })
 
-  it('defaults the KPI scope to filtered and reads the all scope', () => {
-    expect(parseOrderListParams({}).summary).toBe('filtered')
-    expect(parseOrderListParams({ summary: 'all' }).summary).toBe('all')
+  it('ignores a legacy summary parameter', () => {
+    // The KPI follows its own day/month/year window now. An old bookmark
+    // keeps working; the parameter simply has no meaning.
+    expect(parseOrderListParams({ summary: 'all' })).not.toHaveProperty(
+      'summary',
+    )
   })
 })
 
@@ -139,9 +141,9 @@ describe('orderListHref', () => {
     )
   })
 
-  it('keeps the all KPI scope in the URL', () => {
-    expect(
-      orderListHref(parseOrderListParams({ summary: 'all' }), 1),
-    ).toBe('/order-images?summary=all')
+  it('drops a legacy summary parameter from the URL', () => {
+    expect(orderListHref(parseOrderListParams({ summary: 'all' }), 1)).toBe(
+      '/order-images',
+    )
   })
 })
