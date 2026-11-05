@@ -21,8 +21,10 @@ export const metadata: Metadata = {
 export default function LineWalkPage() {
   return (
     <FormPage
+      width="full"
       header={
         <FormNavbar
+          width="full"
           title="บันทึกจำนวนการเดินไลน์"
           action={
             <ButtonLink
