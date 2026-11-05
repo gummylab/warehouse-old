@@ -59,7 +59,7 @@ The label on an uploaded photo: `Primary`, `Inner Box`, `Sleeve Box`, `Tray`, or
 _Avoid_: box type, packaging level
 
 **Overview window (ช่วงภาพรวม)**:
-The time window the order overview reads: the last 30 consecutive days ("30 วัน"), the last 12 calendar months ("12 เดือน"), or the last 5 calendar years ("5 ปี"), each one ending today in Bangkok. It covers the whole system and ignores the order list's period, line and search filters, so the KPI numbers and the trend chart always describe the same stretch of time (ADR 0010). Orders dated in the future fall outside it.
+The calendar window the order overview reads, anchored on today in Bangkok: วัน is the 24 hours of today, เดือน every day of the current month, and ปี every month of the current year. The day window counts arrival time, while the month and year windows count the order date and end today; all three cover the whole system and ignore the order list's period, line and search filters (ADR 0010).
 _Avoid_: KPI filter, summary scope, ตามตัวกรอง
 
 **Session cookie**:
