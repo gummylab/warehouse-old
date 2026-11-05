@@ -160,6 +160,16 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
     setSections((current) => current.filter((section) => section.id !== id))
   }
 
+  // The route keeps its client state while it is hidden, so leaving the
+  // success screen without clearing it would show the same screen the next
+  // time the form is opened. Resetting here makes the exit a fresh start.
+  function resetForm() {
+    setSaved(null)
+    setSaveError(null)
+    nextId.current = 2
+    setSections([newSection('section-1')])
+  }
+
   // The first complete row owns a key; a later row with the same key is a
   // duplicate and never runs a lookup.
   const keys = sections.map((section) => lineWalkKey(section))
@@ -247,7 +257,8 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
                 variant="ghost"
                 size="icon"
                 aria-label="กลับไปหน้าแบบฟอร์ม"
-                href="/liff/forms">
+                href="/liff/forms"
+                onClick={resetForm}>
                 <ChevronLeftIcon />
               </ButtonLink>
             }
@@ -268,7 +279,10 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
             <Button type="button" onClick={() => setSaved(null)}>
               ตรวจสอบ
             </Button>
-            <ButtonLink href="/liff/forms" variant="outline">
+            <ButtonLink
+              href="/liff/forms"
+              variant="outline"
+              onClick={resetForm}>
               กลับไปหน้าหลัก
             </ButtonLink>
           </div>

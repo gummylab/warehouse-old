@@ -49,8 +49,37 @@ test('saves a line-walk entry, reloads it and updates it', async ({ page }) => {
   expect(consoleErrors).toEqual([])
 })
 
-test('flags a duplicate key before saving', async ({ page }) => {
+test('starts fresh after leaving the success screen', async ({ page }) => {
   const brand = `brand-${uniqueSuffix()}`
+  const consoleErrors = collectConsoleErrors(page)
+
+  await page.goto('/liff/forms/line-walk')
+
+  const first = page.getByRole('region', { name: 'รายการที่ 1' })
+  await fillKey(page, first, brand)
+  await expect(first.getByText('ยังไม่มีข้อมูล')).toBeVisible()
+  await first.getByLabel(/จำนวนคน/).fill('2')
+  await first.getByLabel(/ยอดสินค้า/).fill('20')
+  await page.getByRole('button', { name: 'บันทึกทั้งหมด' }).click()
+  await expect(page.getByText('บันทึกแล้ว 1 รายการ')).toBeVisible()
+
+  await page.getByRole('link', { name: 'กลับไปหน้าหลัก' }).click()
+  await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
+
+  await page.getByRole('link', { name: /บันทึกจำนวนการเดินไลน์/ }).click()
+  await expect(
+    page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
+  ).toBeVisible()
+  await expect(page.getByText('บันทึกแล้ว 1 รายการ')).toHaveCount(0)
+  await expect(page.getByLabel(/ชื่อแบรนด์/)).toHaveValue('')
+  await expect(
+    page.getByRole('button', { name: 'บันทึกทั้งหมด' }),
+  ).toBeDisabled()
+
+  expect(consoleErrors).toEqual([])
+})
+
+test('flags a duplicate key before saving', async ({ page }) => {  const brand = `brand-${uniqueSuffix()}`
   const consoleErrors = collectConsoleErrors(page)
 
   await page.goto('/liff/forms/line-walk')
