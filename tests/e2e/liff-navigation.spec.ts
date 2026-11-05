@@ -47,4 +47,23 @@ test.describe('LIFF routing', () => {
 
     expect(consoleErrors).toEqual([])
   })
+
+  test('opens the line-walk form from the hub', async ({ page }) => {
+    const consoleErrors = collectConsoleErrors(page)
+    await page.goto('/liff/forms')
+
+    await page.getByRole('link', { name: /บันทึกจำนวนการเดินไลน์/ }).click()
+
+    await expect(page).toHaveURL(/\/liff\/forms\/line-walk$/)
+    await expect(
+      page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
+    ).toBeVisible()
+    await expect(page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา')).toBeVisible()
+
+    await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
+    await expect(page).toHaveURL(/\/liff\/forms$/)
+    await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
+
+    expect(consoleErrors).toEqual([])
+  })
 })

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { ImagePlusIcon } from 'lucide-react'
+import { FootprintsIcon, ImagePlusIcon } from 'lucide-react'
 
 import { FormPage } from '@/components/layout/form-page'
 import { PAGE_TITLES } from '@/lib/page-titles'
@@ -27,18 +27,45 @@ export default function FormsPage() {
     <FormPage
       width="full"
       header={<FormNavbar width="full" title="แบบฟอร์ม" />}>
-      <Link
+      <FormCard
         href="/liff/forms/order-image"
-        className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted"
-      >
-        <ImagePlusIcon className="size-5 text-muted-foreground" />
-        <span className="flex flex-col">
-          <span className="font-medium">อัปโหลดรูปภาพออเดอร์</span>
-          <span className="text-sm text-muted-foreground">
-            แนบรูปภาพแพ็กเกจของไอเท็มตามเลขออเดอร์
-          </span>
-        </span>
-      </Link>
+        icon={<ImagePlusIcon />}
+        title="อัปโหลดรูปภาพออเดอร์"
+        description="แนบรูปภาพแพ็กเกจของไอเท็มตามเลขออเดอร์"
+      />
+      <FormCard
+        href="/liff/forms/line-walk"
+        icon={<FootprintsIcon />}
+        title="บันทึกจำนวนการเดินไลน์"
+        description="บันทึกจำนวนรอบที่เดินตรวจไลน์ผลิต"
+      />
     </FormPage>
+  )
+}
+
+// The whole card is the link, so the phone target is the full row and the
+// browser's own navigation keeps working. Two forms already share the layout,
+// so it lives here until a third surface needs it.
+function FormCard({
+  href,
+  icon,
+  title,
+  description,
+}: {
+  href: string
+  icon: React.ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted">
+      <span className="text-muted-foreground [&_svg]:size-5">{icon}</span>
+      <span className="flex flex-col">
+        <span className="font-medium">{title}</span>
+        <span className="text-sm text-muted-foreground">{description}</span>
+      </span>
+    </Link>
   )
 }
