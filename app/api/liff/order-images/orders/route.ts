@@ -9,8 +9,8 @@ import {
   normalizeOrderNumber,
 } from '@/lib/order-images/validation'
 
-// Step 1 of the form: find the order by number+date, creating it on first
-// sight. Items are created in step 2 through the auto-numbered add
+// Step 1 of the form: find the order by number+date+line, creating it on
+// first sight. Items are created in step 2 through the auto-numbered add
 // buttons, so this response carries the order id only. Errors are machine
 // codes; the form maps them to Thai copy so wording stays in one place.
 export async function POST(request: Request) {

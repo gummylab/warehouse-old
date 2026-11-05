@@ -251,4 +251,25 @@ describe('POST /api/liff/order-images/orders', () => {
     const body = (await response.json()) as { orderId: string }
     expect(body.orderId).toEqual(expect.any(String))
   })
+
+  it('creates a second order when the same number and date use another line', async () => {
+    seededUser('U-approved', 'approved')
+    const [firstLine, secondLine] = listLines()
+    const headers = await cookieHeadersFor('U-approved')
+
+    const firstResponse = await post(
+      { orderNumber: '123456789', orderDate: ORDER_DATE, line: firstLine },
+      headers,
+    )
+    const secondResponse = await post(
+      { orderNumber: '123456789', orderDate: ORDER_DATE, line: secondLine },
+      headers,
+    )
+
+    expect(firstResponse.status).toBe(200)
+    expect(secondResponse.status).toBe(200)
+    const first = (await firstResponse.json()) as { orderId: string }
+    const second = (await secondResponse.json()) as { orderId: string }
+    expect(second.orderId).not.toBe(first.orderId)
+  })
 })

@@ -74,8 +74,8 @@ export type LookupInput = {
   line: string
 }
 
-// Finds the order by number+date (creating it once). Items are not part of
-// step 1 — they come and go in step 2 through the auto-numbered add
+// Finds the order by number+date+line (creating it once). Items are not part
+// of step 1 — they come and go in step 2 through the auto-numbered add
 // buttons, so the response is the order id only.
 export function lookupOrder(input: LookupInput) {
   return request<{ orderId: string }>('/api/liff/order-images/orders', jsonInit('POST', input))
