@@ -117,6 +117,25 @@ export type OrderSummary = {
   images: number
 }
 
+// The line-walk log: one row per (date, shift, line, brand, pack style).
+export type LineWalkShift = 'day' | 'night'
+
+export type LineWalkInput = {
+  walkDate: string // Bangkok calendar date 'YYYY-MM-DD'
+  shift: LineWalkShift
+  line: string
+  brand: string
+  packStyle: string
+  people: number
+  amount: number
+}
+
+export type LineWalkRecord = LineWalkInput & {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+
 // One item with the order it belongs to: everything the item-images page
 // needs, scoped to a single item instead of the whole order tree.
 export type ItemDetail = {

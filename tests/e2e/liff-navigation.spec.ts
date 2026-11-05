@@ -94,6 +94,13 @@ test.describe('LIFF routing', () => {
     await page.getByLabel(/ชื่อแบรนด์/).fill('แบรนด์ทดสอบ')
     await page.getByLabel(/Pack style/).fill('ถุง')
 
+    // The shift is part of the record, so the counts wait for it too.
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+    await page
+      .getByRole('group', { name: /กะ รายการที่ 1/ })
+      .getByRole('button', { name: 'กลางคืน' })
+      .click()
+
     await expect(page.getByLabel(/จำนวนคน/)).toBeVisible()
     await expect(page.getByLabel(/ยอดสินค้า/)).toBeVisible()
 
@@ -105,10 +112,6 @@ test.describe('LIFF routing', () => {
     await page.getByLabel(/ชื่อแบรนด์/).fill('')
     await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
     await expect(page.getByLabel(/ยอดสินค้า/)).toHaveCount(0)
-
-    await expect(
-      page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา ยังไม่บันทึกข้อมูล'),
-    ).toBeVisible()
 
     await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
     await expect(page).toHaveURL(/\/liff\/forms$/)

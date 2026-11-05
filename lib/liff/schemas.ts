@@ -39,6 +39,33 @@ export const imagePackageSchema = z.object({
   package: z.string().nullable(),
 })
 
+// The line-walk lookup carries its composite key in query params.
+export const lineWalkLookupSchema = z.object({
+  date: z.string(code('invalid-date')),
+  shift: z.string(code('invalid-shift')),
+  line: z.string(code('unknown-line')),
+  brand: z.string(code('invalid-brand')),
+  packStyle: z.string(code('invalid-pack-style')),
+})
+
+const lineWalkEntrySchema = z.object({
+  walkDate: z.string(code('invalid-date')),
+  shift: z.string(code('invalid-shift')),
+  line: z.string(code('unknown-line')),
+  brand: z.string(code('invalid-brand')),
+  packStyle: z.string(code('invalid-pack-style')),
+  people: z.number(code('invalid-people')),
+  amount: z.number(code('invalid-amount')),
+})
+
+// A save is a batch, upserted in one transaction.
+export const lineWalkSaveSchema = z.object({
+  entries: z
+    .array(lineWalkEntrySchema, code('invalid-entries'))
+    .min(1, code('invalid-entries'))
+    .max(50, code('invalid-entries')),
+})
+
 // Reads a JSON body and checks it against a schema. A body that is not
 // JSON, or that does not fit the schema, comes back as the error code the
 // schema named.
