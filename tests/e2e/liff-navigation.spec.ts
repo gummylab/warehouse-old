@@ -59,14 +59,31 @@ test.describe('LIFF routing', () => {
       page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
     ).toBeVisible()
 
-    // The shell exposes the four fields even before the save path exists.
-    await expect(page.getByLabel('วันที่', { exact: true })).toBeVisible()
+    // The shell starts with one section and exposes its four fields.
     await expect(
-      page.getByRole('combobox', { name: 'ไลน์ผลิต' }),
+      page.getByRole('region', { name: 'รายการที่ 1' }),
     ).toBeVisible()
-    await expect(page.getByLabel('ชื่อแบรนด์')).toBeVisible()
-    await expect(page.getByLabel('Pack style')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'บันทึก' })).toBeDisabled()
+    await expect(page.getByLabel(/วันที่ รายการที่ 1/)).toBeVisible()
+    await expect(
+      page.getByRole('combobox', { name: /ไลน์ผลิต รายการที่ 1/ }),
+    ).toBeVisible()
+    await expect(page.getByLabel(/ชื่อแบรนด์/)).toBeVisible()
+    await expect(page.getByLabel(/Pack style/)).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: /บันทึกทั้งหมด/ }),
+    ).toBeDisabled()
+
+    // The dashed card appends a section, and the second can be removed.
+    await page.getByRole('button', { name: /เพิ่มรายการ/ }).click()
+    await expect(
+      page.getByRole('region', { name: 'รายการที่ 2' }),
+    ).toBeVisible()
+    await expect(page.getByLabel(/วันที่ รายการที่/)).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'ลบรายการที่ 2' }).click()
+    await expect(page.getByRole('region', { name: 'รายการที่ 2' })).toHaveCount(0)
+    await expect(page.getByLabel(/วันที่ รายการที่/)).toHaveCount(1)
+
     await expect(
       page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา ยังไม่บันทึกข้อมูล'),
     ).toBeVisible()
