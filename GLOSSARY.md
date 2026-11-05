@@ -39,7 +39,7 @@ The two-step form at `/liff/forms/order-image`, linked from `/liff/forms`: step 
 _Avoid_: upload page, chat upload
 
 **Order**:
-One `(order_number, order_date)` pair. `order_date` is the Bangkok calendar date stored as plain `YYYY-MM-DD` text, never a timestamp, so no timezone math exists anywhere downstream. The line chosen in step 1 only applies when the order is first created.
+One `(order_number, order_date, line)` triple; the same number and date on a different production line is a different order with its own items and photos (ADR 0011). `order_date` is the Bangkok calendar date stored as plain `YYYY-MM-DD` text, never a timestamp, so no timezone math exists anywhere downstream.
 _Avoid_: order record, order timestamp
 
 **Order number**:
