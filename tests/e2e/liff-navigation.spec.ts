@@ -47,4 +47,76 @@ test.describe('LIFF routing', () => {
 
     expect(consoleErrors).toEqual([])
   })
+
+  test('opens the line-walk form from the hub', async ({ page }) => {
+    const consoleErrors = collectConsoleErrors(page)
+    await page.goto('/liff/forms')
+
+    await page.getByRole('link', { name: /บันทึกจำนวนการเดินไลน์/ }).click()
+
+    await expect(page).toHaveURL(/\/liff\/forms\/line-walk$/)
+    await expect(
+      page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
+    ).toBeVisible()
+
+    // The shell starts with one section and exposes its four fields.
+    await expect(
+      page.getByRole('region', { name: 'รายการที่ 1' }),
+    ).toBeVisible()
+    await expect(page.getByLabel(/วันที่ รายการที่ 1/)).toBeVisible()
+    await expect(
+      page.getByRole('combobox', { name: /ไลน์ผลิต รายการที่ 1/ }),
+    ).toBeVisible()
+    await expect(page.getByLabel(/ชื่อแบรนด์/)).toBeVisible()
+    await expect(page.getByLabel(/Pack style/)).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: /บันทึกทั้งหมด/ }),
+    ).toBeDisabled()
+
+    // The dashed card appends a section, and the second can be removed.
+    await page.getByRole('button', { name: /เพิ่มรายการ/ }).click()
+    await expect(
+      page.getByRole('region', { name: 'รายการที่ 2' }),
+    ).toBeVisible()
+    await expect(page.getByLabel(/วันที่ รายการที่/)).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'ลบรายการที่ 2' }).click()
+    await expect(page.getByRole('region', { name: 'รายการที่ 2' })).toHaveCount(0)
+    await expect(page.getByLabel(/วันที่ รายการที่/)).toHaveCount(1)
+
+    // The count fields appear only once the row names a real record.
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+
+    await page
+      .getByRole('combobox', { name: /ไลน์ผลิต รายการที่ 1/ })
+      .click()
+    await page.getByRole('option').first().click()
+    await page.getByLabel(/ชื่อแบรนด์/).fill('แบรนด์ทดสอบ')
+    await page.getByLabel(/Pack style/).fill('ถุง')
+
+    // The shift is part of the record, so the counts wait for it too.
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+    await page
+      .getByRole('group', { name: /กะ รายการที่ 1/ })
+      .getByRole('button', { name: 'กลางคืน' })
+      .click()
+
+    await expect(page.getByLabel(/จำนวนคน/)).toBeVisible()
+    await expect(page.getByLabel(/ยอดสินค้า/)).toBeVisible()
+
+    // Both counts keep integers only.
+    await page.getByLabel(/จำนวนคน/).fill('12a3')
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveValue('123')
+
+    // Clearing a required field hides the block again.
+    await page.getByLabel(/ชื่อแบรนด์/).fill('')
+    await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+    await expect(page.getByLabel(/ยอดสินค้า/)).toHaveCount(0)
+
+    await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
+    await expect(page).toHaveURL(/\/liff\/forms$/)
+    await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
+
+    expect(consoleErrors).toEqual([])
+  })
 })

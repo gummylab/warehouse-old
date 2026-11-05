@@ -95,6 +95,26 @@ const SCHEMA = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_images_item_seq
     ON images (item_id, seq);
   CREATE INDEX IF NOT EXISTS idx_images_order ON images (order_id);
+
+  -- Line-walk log. The composite key is the record's identity: re-saving the
+  -- same date, shift, line, brand and pack style updates its counts instead of
+  -- creating a second row.
+  CREATE TABLE IF NOT EXISTS line_walks (
+    id          TEXT PRIMARY KEY,
+    walk_date   TEXT NOT NULL,
+    shift       TEXT NOT NULL CHECK (shift IN ('day', 'night')),
+    line        TEXT NOT NULL,
+    brand       TEXT NOT NULL,
+    pack_style  TEXT NOT NULL,
+    people      INTEGER NOT NULL CHECK (people >= 0),
+    amount      INTEGER NOT NULL CHECK (amount >= 0),
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_line_walks_key
+    ON line_walks (walk_date, shift, line, brand, pack_style);
+  CREATE INDEX IF NOT EXISTS idx_line_walks_date ON line_walks (walk_date);
 `
 
 type GlobalWithDb = typeof globalThis & { __whDb?: Database.Database }

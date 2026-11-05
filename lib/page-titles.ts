@@ -6,6 +6,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/liff/authorization': 'ตรวจสอบสิทธิ์การใช้งาน',
   '/liff/forms': 'แบบฟอร์ม',
   '/liff/forms/order-image': 'อัปโหลดรูปภาพออเดอร์',
+  '/liff/forms/line-walk': 'บันทึกจำนวนการเดินไลน์',
 }
 
 // Nested admin routes keep their section title. Without this, the detail
