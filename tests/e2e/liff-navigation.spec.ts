@@ -39,6 +39,12 @@ test.describe('LIFF routing', () => {
     await expect(page).toHaveURL(/\/liff\/forms\/order-image$/)
     await expect(page.getByRole('heading', { name: 'อัปโหลดรูปภาพออเดอร์' })).toBeVisible()
 
+    // The form sits one level below the hub, so its navbar carries the way
+    // back to the hub.
+    await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
+    await expect(page).toHaveURL(/\/liff\/forms$/)
+    await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
+
     expect(consoleErrors).toEqual([])
   })
 })
