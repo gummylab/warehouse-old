@@ -128,7 +128,9 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
               </div>
 
               <label className="flex flex-col gap-1.5 text-sm">
-                ไลน์ผลิต <span className="text-destructive">*</span>
+                <span>
+                  ไลน์ผลิต <span className="text-destructive">*</span>
+                </span>
                 <Select
                   value={section.line}
                   onValueChange={(value) =>
