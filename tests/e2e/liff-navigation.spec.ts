@@ -58,7 +58,18 @@ test.describe('LIFF routing', () => {
     await expect(
       page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
     ).toBeVisible()
-    await expect(page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา')).toBeVisible()
+
+    // The shell exposes the four fields even before the save path exists.
+    await expect(page.getByLabel('วันที่', { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('combobox', { name: 'ไลน์ผลิต' }),
+    ).toBeVisible()
+    await expect(page.getByLabel('ชื่อแบรนด์')).toBeVisible()
+    await expect(page.getByLabel('Pack style')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'บันทึก' })).toBeDisabled()
+    await expect(
+      page.getByText('ฟอร์มนี้อยู่ระหว่างพัฒนา ยังไม่บันทึกข้อมูล'),
+    ).toBeVisible()
 
     await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
     await expect(page).toHaveURL(/\/liff\/forms$/)
