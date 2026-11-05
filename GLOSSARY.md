@@ -58,6 +58,10 @@ _Avoid_: lane, channel
 The label on an uploaded photo: `Primary`, `Inner Box`, `Sleeve Box`, `Tray`, or `Carton` (stored as the display string itself). NULL means not yet labelled; filenames then fall back to `Primary`.
 _Avoid_: box type, packaging level
 
+**Overview window (ช่วงภาพรวม)**:
+The time window the order overview reads: the last 30 consecutive days ("30 วัน"), the last 12 calendar months ("12 เดือน"), or the last 5 calendar years ("5 ปี"), each one ending today in Bangkok. It covers the whole system and ignores the order list's period, line and search filters, so the KPI numbers and the trend chart always describe the same stretch of time (ADR 0010). Orders dated in the future fall outside it.
+_Avoid_: KPI filter, summary scope, ตามตัวกรอง
+
 **Session cookie**:
 The httpOnly, 12-hour cookie `wh_order_image_session`, which the form exchanges its LINE token for so `<img src>` requests can authenticate; approval is still re-checked on every request (ADR 0005).
 _Avoid_: LIFF session, auth token (the token is exchanged away, never kept)
