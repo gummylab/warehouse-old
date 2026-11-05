@@ -19,10 +19,18 @@ import type {
   OrderListFilters,
   OrderListResult,
   OrderListRow,
+  OrderOverview,
   OrderRecord,
   OrderSummary,
+  TrendGrain,
+  TrendPoint,
 } from './types'
 import { nextSingleNumber, nextVarietyNumber } from '../order-images/item-number'
+import {
+  fillTrend,
+  TREND_GRAINS,
+  trendWindow,
+} from '../order-images/trend'
 import {
   buildKey,
   ensureDirForFile,
@@ -44,9 +52,12 @@ export type {
   OrderListFilters,
   OrderListResult,
   OrderListRow,
+  OrderOverview,
   OrderPeriod,
   OrderRecord,
   OrderSummary,
+  TrendGrain,
+  TrendPoint,
 } from './types'
 
 // Expected failures of the auto-numbered add; unexpected failures still
@@ -171,8 +182,9 @@ export function lineExists(name: string): boolean {
 // Admin order list
 // ---------------------------------------------------------------------------
 
-// Shared WHERE for the admin list and the KPI summary: both must narrow the
-// same way, so the filter rules live in one place.
+// Shared WHERE for the admin list: the table narrows by period, line and
+// order-number search. The KPI strip does not use it; it follows its own
+// day/month/year window (getOrderOverview).
 function buildOrderWhere(filters: OrderListFilters): {
   whereSql: string
   params: (string | number)[]
@@ -204,48 +216,33 @@ function buildOrderWhere(filters: OrderListFilters): {
   }
 }
 
-export function getOrderSummary(filters?: OrderListFilters): OrderSummary {
-  const db = getDb()
-
-  // No filters means the whole-system totals, used by the "all" KPI scope.
-  if (!filters) {
-    const row = db
-      .prepare(
-        `SELECT
-           (SELECT COUNT(*) FROM orders) AS orders,
-           (SELECT COUNT(*) FROM items) AS items,
-           (SELECT COUNT(*) FROM images) AS images`,
-      )
-      .get() as {
-      orders: number
-      items: number
-      images: number
-    }
-
-    return {
-      orders: row.orders,
-      items: row.items,
-      images: row.images,
-    }
-  }
-
-  // The filtered totals count items and images that belong to the matching
-  // orders, not every row in their tables.
-  const { whereSql, params } = buildOrderWhere(filters)
-  const row = db
+// The KPI strip and the trend chart share one window, so the summary takes
+// that range and nothing else. A line or a search term belongs to the table
+// below, not to the overview.
+export function getOrderSummary(range: {
+  from: string
+  to: string
+}): OrderSummary {
+  const row = getDb()
     .prepare(
-      `WITH filtered AS (
-         SELECT o.id FROM orders o
-         ${whereSql}
-       )
-       SELECT
-         (SELECT COUNT(*) FROM filtered) AS orders,
+      `SELECT
+         (SELECT COUNT(*) FROM orders o
+            WHERE o.order_date BETWEEN ? AND ?) AS orders,
          (SELECT COUNT(*) FROM items i
-            JOIN filtered f ON f.id = i.order_id) AS items,
+            JOIN orders o ON o.id = i.order_id
+            WHERE o.order_date BETWEEN ? AND ?) AS items,
          (SELECT COUNT(*) FROM images img
-            JOIN filtered f ON f.id = img.order_id) AS images`,
+            JOIN orders o ON o.id = img.order_id
+            WHERE o.order_date BETWEEN ? AND ?) AS images`,
     )
-    .get(...params) as {
+    .get(
+      range.from,
+      range.to,
+      range.from,
+      range.to,
+      range.from,
+      range.to,
+    ) as {
     orders: number
     items: number
     images: number
@@ -256,6 +253,46 @@ export function getOrderSummary(filters?: OrderListFilters): OrderSummary {
     items: row.items,
     images: row.images,
   }
+}
+
+// The daily windows group by the stored date; the year window groups by its
+// month prefix. Every grain counts `order_date`, the date the table uses.
+function getTrendPoints(
+  grain: TrendGrain,
+  from: string,
+  to: string,
+): TrendPoint[] {
+  const bucketSql =
+    grain === 'year' ? 'substr(o.order_date, 1, 7)' : 'o.order_date'
+
+  return getDb()
+    .prepare(
+      `SELECT ${bucketSql} AS bucket, COUNT(*) AS count
+       FROM orders o
+       WHERE o.order_date BETWEEN ? AND ?
+       GROUP BY bucket
+       ORDER BY bucket`,
+    )
+    .all(from, to) as TrendPoint[]
+}
+
+// Everything the overview needs for all three grains in one call, so the page
+// can hand the whole thing to the client and the switch needs no refetch.
+export function getOrderOverview(today: string): OrderOverview {
+  const overview = {} as OrderOverview
+
+  for (const grain of TREND_GRAINS) {
+    const window = trendWindow(grain, today)
+    overview[grain] = {
+      points: fillTrend(
+        window.buckets,
+        getTrendPoints(grain, window.from, window.to),
+      ),
+      summary: getOrderSummary(window),
+    }
+  }
+
+  return overview
 }
 
 // LIKE treats % and _ as wildcards; a user typing them means the literal

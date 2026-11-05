@@ -68,9 +68,24 @@ export type OrderDetail = {
 // better-sqlite3.
 export type OrderPeriod = 'day' | 'month' | 'year'
 
-// The KPI scope is a view option, not a table filter: 'filtered' follows the
-// filter bar, 'all' counts the whole system. The default is 'filtered'.
-export type SummaryScope = 'filtered' | 'all'
+// The overview grain doubles as the KPI window and the trend chart step. It is
+// a view option, not a table filter: the strip and the chart always cover the
+// whole system and ignore the line and search controls.
+export type TrendGrain = 'day' | 'month' | 'year'
+
+// One point in the trend chart. `bucket` is 'YYYY-MM-DD', 'YYYY-MM' or 'YYYY',
+// matching the grain the point belongs to.
+export type TrendPoint = {
+  bucket: string
+  count: number
+}
+
+export type OrderOverviewRange = {
+  points: TrendPoint[]
+  summary: OrderSummary
+}
+
+export type OrderOverview = Record<TrendGrain, OrderOverviewRange>
 
 export type OrderListFilters = {
   period: OrderPeriod
@@ -80,7 +95,6 @@ export type OrderListFilters = {
   to: string
   line: string | null
   query: string | null
-  summary: SummaryScope
   page: number
   pageSize: number
 }

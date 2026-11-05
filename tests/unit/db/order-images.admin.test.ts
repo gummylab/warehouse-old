@@ -8,6 +8,7 @@ import {
   findOrCreateOrder,
   getImageFile,
   getOrderDetail,
+  getOrderOverview,
   getOrderSummary,
   listOrders,
   saveImage,
@@ -65,7 +66,6 @@ function filters(overrides: Partial<Parameters<typeof listOrders>[0]> = {}) {
     to: '2999-12-31',
     line: null,
     query: null,
-    summary: 'filtered' as const,
     page: 1,
     pageSize: 25,
     ...overrides,
@@ -73,7 +73,7 @@ function filters(overrides: Partial<Parameters<typeof listOrders>[0]> = {}) {
 }
 
 describe('getOrderSummary', () => {
-  it('counts orders, items and images', () => {
+  it('counts orders, items and images in the range', () => {
     const order = newOrder('A-1')
     const pack = addPack(order.id)
     const variety = addVariety(order.id, pack.id)
@@ -81,30 +81,111 @@ describe('getOrderSummary', () => {
     upload(pack.id, 4)
     upload(variety.id, 6)
 
-    expect(getOrderSummary()).toEqual({
+    expect(getOrderSummary({ from: ORDER_DATE, to: ORDER_DATE })).toEqual({
       orders: 1,
       items: 3,
       images: 2,
     })
   })
 
-  it('counts only the orders that match the filters', () => {
+  it('counts only the orders inside the range', () => {
     const first = newOrder('S-1', '2026-10-19')
     newOrder('S-2', '2026-10-20')
+    newOrder('S-3', '2099-01-01')
     const pack = addPack(first.id)
     const variety = addVariety(first.id, pack.id)
     upload(pack.id, 4)
     upload(variety.id, 6)
 
-    expect(
-      getOrderSummary(filters({ from: '2026-10-19', to: '2026-10-19' })),
-    ).toEqual({ orders: 1, items: 2, images: 2 })
-    expect(getOrderSummary(filters({ query: 'S-2' }))).toEqual({
+    expect(getOrderSummary({ from: '2026-10-19', to: '2026-10-19' })).toEqual({
       orders: 1,
+      items: 2,
+      images: 2,
+    })
+    expect(getOrderSummary({ from: '2026-10-19', to: '2026-10-20' })).toEqual({
+      orders: 2,
+      items: 2,
+      images: 2,
+    })
+  })
+
+  it('returns zeros for a range with no orders', () => {
+    newOrder('Z-1', '2026-10-19')
+    expect(getOrderSummary({ from: '1999-01-01', to: '1999-12-31' })).toEqual({
+      orders: 0,
       items: 0,
       images: 0,
     })
-    expect(getOrderSummary()).toEqual({ orders: 2, items: 2, images: 2 })
+  })
+})
+
+describe('getOrderOverview', () => {
+  it('returns the three calendar windows for the given day', () => {
+    const overview = getOrderOverview('2026-11-05')
+
+    expect(overview.day.points).toHaveLength(7)
+    expect(overview.month.points).toHaveLength(30)
+    expect(overview.year.points).toHaveLength(12)
+  })
+
+  it('counts orders dated inside the seven-day window', () => {
+    newOrder('D-1', '2026-11-05')
+    newOrder('D-2', '2026-10-30') // six days before the anchor
+    newOrder('D-3', '2026-10-29') // seven days before: outside
+
+    const overview = getOrderOverview('2026-11-05')
+    const day = Object.fromEntries(
+      overview.day.points.map((point) => [point.bucket, point.count]),
+    )
+
+    expect(day['2026-11-05']).toBe(1)
+    expect(day['2026-10-30']).toBe(1)
+    expect(day['2026-10-29']).toBeUndefined()
+    expect(overview.day.summary.orders).toBe(2)
+  })
+
+  it('counts orders dated in the month and year windows', () => {
+    newOrder('T-1', '2026-11-03')
+    newOrder('T-2', '2026-11-05')
+    // Dated after the anchor day: on the axis, outside the range.
+    newOrder('T-3', '2026-11-06')
+    newOrder('T-4', '2026-09-15')
+
+    const overview = getOrderOverview('2026-11-05')
+    const month = Object.fromEntries(
+      overview.month.points.map((point) => [point.bucket, point.count]),
+    )
+    const year = Object.fromEntries(
+      overview.year.points.map((point) => [point.bucket, point.count]),
+    )
+
+    expect(month['2026-11-03']).toBe(1)
+    expect(month['2026-11-05']).toBe(1)
+    expect(month['2026-11-06']).toBe(0)
+    expect(year['2026-09']).toBe(1)
+    expect(year['2026-11']).toBe(2)
+    expect(year['2026-12']).toBe(0)
+  })
+
+  it('summarizes the same range as the points', () => {
+    const order = newOrder('U-1', '2026-11-05')
+    const pack = addPack(order.id)
+    upload(pack.id)
+
+    const overview = getOrderOverview('2026-11-05')
+
+    expect(overview.day.summary).toEqual({ orders: 1, items: 1, images: 1 })
+    expect(overview.month.summary).toEqual({ orders: 1, items: 1, images: 1 })
+  })
+
+  it('leaves future-dated orders out of every window', () => {
+    newOrder('F-1', '2026-11-06')
+
+    const overview = getOrderOverview('2026-11-05')
+
+    expect(overview.day.summary.orders).toBe(0)
+    expect(overview.month.summary.orders).toBe(0)
+    expect(overview.year.summary.orders).toBe(0)
   })
 })
 
@@ -183,7 +264,7 @@ describe('deleteOrderCascade', () => {
 
     expect(getOrderDetail(order.id)).toBeUndefined()
     for (const file of files) expect(existsSync(file)).toBe(false)
-    expect(getOrderSummary()).toMatchObject({
+    expect(getOrderSummary({ from: ORDER_DATE, to: ORDER_DATE })).toMatchObject({
       orders: 0,
       items: 0,
       images: 0,

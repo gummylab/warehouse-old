@@ -202,21 +202,59 @@ test('picks a day, a month and a year from the filter pickers', async ({
   expect(consoleErrors).toEqual([])
 })
 
-test('switches the KPI between the filtered view and all', async ({ page }) => {
+test('switches the overview window and keeps it out of the URL', async ({
+  page,
+}) => {
+  const consoleErrors = collectConsoleErrors(page)
   await page.goto('/order-images')
-  const scope = page.getByRole('group', { name: 'ขอบเขต KPI' })
-  await expect(
-    scope.getByRole('button', { name: 'ตามตัวกรอง' }),
-  ).toHaveAttribute('aria-pressed', 'true')
 
-  await scope.getByRole('button', { name: 'ทั้งหมด' }).click()
-  await expect(page).toHaveURL(/summary=all/)
-  await expect(
-    scope.getByRole('button', { name: 'ทั้งหมด' }),
-  ).toHaveAttribute('aria-pressed', 'true')
+  const range = page.getByRole('combobox', { name: 'ช่วงภาพรวม' })
+  await expect(range).toContainText('วัน')
 
-  await scope.getByRole('button', { name: 'ตามตัวกรอง' }).click()
-  await expect(page).not.toHaveURL(/summary=all/)
+  // The chart starts collapsed, so the KPI stays visible and the table keeps
+  // the height. Opening it must not disturb the window or the URL.
+  const chart = page.getByRole('img', { name: /กราฟออเดอร์/ })
+  await expect(chart).toBeHidden()
+  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
+  await expect(
+    page.getByRole('img', { name: /7 วันล่าสุด/ }),
+  ).toBeVisible()
+
+  await range.click()
+  await page.getByRole('option', { name: 'เดือน' }).click()
+  await expect(range).toContainText('เดือน')
+  await expect(chart).toBeVisible()
+
+  await range.click()
+  await page.getByRole('option', { name: 'ปี' }).click()
+  await expect(range).toContainText('ปี')
+  await expect(
+    page.getByRole('img', { name: /กราฟออเดอร์รายเดือน/ }),
+  ).toBeVisible()
+
+  // The switch is client state on purpose: it must not add a query parameter.
+  expect(page.url()).toMatch(/\/order-images$/)
+  expect(consoleErrors).toEqual([])
+})
+
+test('opens and collapses the trend chart', async ({ page }) => {
+  const consoleErrors = collectConsoleErrors(page)
+  await page.goto('/order-images')
+
+  const chart = page.getByRole('img', { name: /กราฟออเดอร์/ })
+  // Collapsed by default: the KPI strip is the first thing the page shows.
+  await expect(chart).toBeHidden()
+
+  await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
+  await expect(chart).toBeVisible()
+
+  await page.getByRole('button', { name: 'ซ่อนกราฟ' }).click()
+  await expect(chart).toBeHidden()
+  await expect(
+    page.getByRole('region', { name: 'ภาพรวมออเดอร์' }),
+  ).toBeVisible()
+
+  expect(consoleErrors).toEqual([])
 })
 
 test('scrolls the table on desktop and the page on mobile', async ({ page }) => {
