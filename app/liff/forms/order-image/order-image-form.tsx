@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 import { FormPage } from '@/components/layout/form-page'
-import { Button } from '@/components/ui/button'
+import { Button, ButtonLink } from '@/components/ui/button'
 import type { OrderDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { isValidCalendarDate, isValidOrderNumber, normalizeOrderNumber } from '@/lib/order-images/validation'
@@ -23,8 +23,8 @@ import { StepOneFields } from './step-one-fields'
 // manages its own mutations and errors and reports the refreshed tree back
 // through onDetailChange.
 // The navbar lives here because only this component knows whether an order
-// exists yet: before the lookup it carries the form's name, after it
-// carries the order itself.
+// exists yet: before the lookup it carries the form's name and the way back
+// to the hub, after it carries the order itself.
 // The page keys this component by orderId (see page.tsx): every URL change
 // remounts it fresh from server props, which is how back/forward and the
 // step 1 → 2 transition stay correct without any prop-to-state sync.
@@ -113,7 +113,18 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
                 onClick={() => router.push('/liff/forms/order-image')}>
                 <ChevronLeftIcon />
               </Button>
-            ) : undefined
+            ) : (
+              // Step 1 is one level below the form hub. A link keeps the
+              // destination explicit and works with the browser's own
+              // navigation, unlike router.back().
+              <ButtonLink
+                variant="ghost"
+                size="icon"
+                aria-label="กลับไปหน้าแบบฟอร์ม"
+                href="/liff/forms">
+                <ChevronLeftIcon />
+              </ButtonLink>
+            )
           }
         />
       }>
