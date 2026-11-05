@@ -58,6 +58,10 @@ _Avoid_: lane, channel
 The label on an uploaded photo: `Primary`, `Inner Box`, `Sleeve Box`, `Tray`, or `Carton` (stored as the display string itself). NULL means not yet labelled; filenames then fall back to `Primary`.
 _Avoid_: box type, packaging level
 
+**Line walk (การเดินไลน์)**:
+One record in the line-walk log, identified by `(date, shift, line, brand, pack style)` and holding a people count and an amount. The shift is `day` or `night`, because a line can be walked on both in one day. Saving a key that already exists updates its two counts; it does not add a second row (ADR 0012).
+_Avoid_: walk log row, line visit, duplicate walk
+
 **Overview window (ช่วงภาพรวม)**:
 The calendar window the order overview reads, anchored on today in Bangkok: วัน is the last seven days ending today, เดือน every day of the current month, and ปี every month of the current year. All three count the order date, not the time an order was entered, and all three cover the whole system and ignore the order list's period, line and search filters (ADR 0010).
 _Avoid_: KPI filter, summary scope, ตามตัวกรอง
