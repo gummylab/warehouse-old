@@ -9,7 +9,13 @@ import path from 'node:path'
 // STORAGE_PATH at a throwaway directory before the first write
 // (tests/unit/setup/db.ts), which a module-level constant could never see.
 export function storageRoot(): string {
-  const base = path.resolve(process.env.STORAGE_PATH ?? './')
+  // The base comes from the environment, so Turbopack cannot know it at build
+  // time and traces the whole project into the server output to cover any
+  // path it might resolve to. This folder holds runtime uploads, never
+  // imported modules, so opting this call out of tracing is safe.
+  const base = path.resolve(
+    /*turbopackIgnore: true*/ process.env.STORAGE_PATH ?? './',
+  )
   return base.endsWith('wh-order-images-storage')
     ? base
     : path.join(base, 'wh-order-images-storage')
