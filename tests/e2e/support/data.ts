@@ -9,13 +9,18 @@ import { randomUUID } from 'node:crypto'
 // the LIFF endpoints would write, through the same data layer the server
 // uses. The paths those modules read are set by playwright.config.ts before
 // any worker starts.
+import { saveLineWalks } from '../../../lib/db/line-walks'
 import {
   addItem,
   findOrCreateOrder,
   getImageFile,
   saveImage,
 } from '../../../lib/db/order-images'
-import type { ImageRecord } from '../../../lib/db/types'
+import type {
+  ImageRecord,
+  LineWalkRecord,
+  LineWalkShift,
+} from '../../../lib/db/types'
 import { approvePendingUser, createPendingUser } from '../../../lib/db/users'
 
 export type SeededUser = {
@@ -131,4 +136,31 @@ export function seedOrder({
       (image) => getImageFile(image.id)?.storageKey ?? '',
     ),
   }
+}
+
+// A line-walk row written through the data layer, the way the LIFF form saves
+// it. The brand gets a random suffix because the specs share one database.
+export function seedLineWalk({
+  walkDate = '2026-11-05',
+  shift = 'day',
+  line = 'ดอกแค',
+  brand = `E2E Walk ${uniqueSuffix()}`,
+  packStyle = 'box',
+  people = 5,
+  amount = 100,
+  createdBy = 'local-device',
+}: {
+  walkDate?: string
+  shift?: LineWalkShift
+  line?: string
+  brand?: string
+  packStyle?: string
+  people?: number
+  amount?: number
+  createdBy?: string
+} = {}): LineWalkRecord {
+  return saveLineWalks(
+    [{ walkDate, shift, line, brand, packStyle, people, amount }],
+    createdBy,
+  )[0]
 }
