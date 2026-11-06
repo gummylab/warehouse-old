@@ -291,7 +291,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
             <>
               {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
               <img
-                src={`/api/liff/order-images/images/${previewImage.id}/file`}
+                src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
                 alt={`รูปที่ ${previewImage.seq}`}
                 className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
               />
@@ -399,7 +399,7 @@ function PhotoTile({
             fetch carries no session cookie and would be rejected 403. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
         <img
-          src={`/api/liff/order-images/images/${image.id}/file`}
+          src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
           alt={`รูปที่ ${image.seq}`}
           loading="lazy"
           className="aspect-square w-full bg-muted object-cover"

@@ -324,7 +324,7 @@ export function OrderDetail({
             <>
               {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src */}
               <img
-                src={`/api/liff/order-images/images/${previewImage.id}/file`}
+                src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
                 alt={`รูปที่ ${previewImage.seq}`}
                 className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
               />

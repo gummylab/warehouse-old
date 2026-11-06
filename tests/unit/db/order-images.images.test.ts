@@ -12,7 +12,7 @@ import {
   saveImage,
   setImagePackage,
 } from '@/lib/db/order-images'
-import { buildKey, toAbsolute } from '@/lib/order-images/storage'
+import { buildKey, derivativePath, originalPath } from '@/lib/order-images/storage'
 
 import { isolateTestData } from '../setup/db'
 
@@ -25,9 +25,12 @@ const LINE = 'line-a'
 const ORDER_DATE = '2026-10-19'
 const CREATED_BY = 'U-1'
 
-// Arbitrary bytes on purpose: nothing in the server decodes an upload, so the
-// tests only need to recognise their own payload.
+// Arbitrary bytes on purpose: nothing in the server decodes bytes here, so the
+// tests only need to recognise their own payload. The two derivative buffers
+// are distinct so a test can prove the right one landed in the right folder.
 const BYTES = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
+const WEB_BYTES = Buffer.from('web-derivative')
+const THUMB_BYTES = Buffer.from('thumb-derivative')
 
 function newOrder(orderNumber: string) {
   return findOrCreateOrder({ orderNumber, orderDate: ORDER_DATE, line: LINE, createdBy: CREATED_BY })
@@ -56,6 +59,8 @@ function upload(itemId: string, options: { mimeType?: string | null; bytes?: Buf
     fileSize: bytes.length,
     createdBy: CREATED_BY,
     buffer: bytes,
+    web: WEB_BYTES,
+    thumb: THUMB_BYTES,
   })
 }
 
@@ -76,9 +81,16 @@ describe('saveImage', () => {
     expect(saved.createdBy).toBe(CREATED_BY)
     expect(getImageFile(saved.id)?.storageKey).toBe(expectedKey)
 
-    const absolute = toAbsolute(expectedKey)
+    const absolute = originalPath(expectedKey)
     expect(existsSync(absolute)).toBe(true)
     expect(readFileSync(absolute).equals(BYTES)).toBe(true)
+
+    // The two display sizes land under their own kind folders and carry the
+    // bytes the caller handed over, not a copy of the original.
+    const web = derivativePath(expectedKey, 'web')
+    const thumb = derivativePath(expectedKey, 'thumb')
+    expect(readFileSync(web).equals(WEB_BYTES)).toBe(true)
+    expect(readFileSync(thumb).equals(THUMB_BYTES)).toBe(true)
   })
 
   it('increments seq for the same item', () => {
@@ -172,14 +184,19 @@ describe('setImagePackage', () => {
 })
 
 describe('deleteImage', () => {
-  it('removes the row and the file together', () => {
+  it('removes the row and every file together', () => {
     const order = newOrder('3700')
     const saved = upload(addTop(order.id).id)
-    const absolute = toAbsolute(getImageFile(saved.id)?.storageKey ?? '')
+    const key = getImageFile(saved.id)?.storageKey ?? ''
+    const original = originalPath(key)
+    const web = derivativePath(key, 'web')
+    const thumb = derivativePath(key, 'thumb')
 
     expect(deleteImage(saved.id)).toBe(true)
     expect(getImage(saved.id)).toBeUndefined()
-    expect(existsSync(absolute)).toBe(false)
+    expect(existsSync(original)).toBe(false)
+    expect(existsSync(web)).toBe(false)
+    expect(existsSync(thumb)).toBe(false)
   })
 
   it('reports a miss for an unknown image', () => {
@@ -195,8 +212,8 @@ describe('deleteItemCascade with files', () => {
     const packImage = upload(pack.id)
     const varietyImage = upload(variety.id)
 
-    const packFile = toAbsolute(getImageFile(packImage.id)?.storageKey ?? '')
-    const varietyFile = toAbsolute(getImageFile(varietyImage.id)?.storageKey ?? '')
+    const packFile = originalPath(getImageFile(packImage.id)?.storageKey ?? '')
+    const varietyFile = originalPath(getImageFile(varietyImage.id)?.storageKey ?? '')
     expect(existsSync(packFile)).toBe(true)
     expect(existsSync(varietyFile)).toBe(true)
 

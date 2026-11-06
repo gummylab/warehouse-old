@@ -5,7 +5,7 @@ import { uniqueOrderNumber } from './support/data'
 // A one-pixel PNG, the same idea as the order-image spec: the server only
 // stores and serves the bytes, so the content does not need to be a real photo.
 const PNG_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=',
   'base64',
 )
 

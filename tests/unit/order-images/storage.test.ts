@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildKey,
+  derivativeKey,
+  derivativePath,
   isInsideRoot,
+  originalPath,
   sanitize,
   storageRoot,
-  toAbsolute,
 } from '@/lib/order-images/storage'
 
 // STORAGE_PATH is read on every call, so each test can point it wherever it
@@ -29,20 +31,27 @@ afterEach(() => {
 })
 
 describe('storage root', () => {
-  it('appends the wh folder name to the configured base', () => {
-    expect(storageRoot()).toBe(path.join(path.resolve(BASE), 'wh-order-images-storage'))
+  it('appends the app folder name to the configured base', () => {
+    expect(storageRoot()).toBe(path.join(path.resolve(BASE), 'order-images'))
   })
 
   it('does not append the folder name twice when the base already ends with it', () => {
-    const alreadyRoot = path.join(path.resolve(BASE), 'wh-order-images-storage')
+    const alreadyRoot = path.join(path.resolve(BASE), 'order-images')
     vi.stubEnv('STORAGE_PATH', alreadyRoot)
     expect(storageRoot()).toBe(alreadyRoot)
+  })
+
+  it('does not mistake a base that merely ends with the folder name for the root', () => {
+    // A string suffix check would treat this as the root and write there.
+    const lookalike = path.join(path.resolve(BASE), 'backup-order-images')
+    vi.stubEnv('STORAGE_PATH', lookalike)
+    expect(storageRoot()).toBe(path.join(lookalike, 'order-images'))
   })
 
   it('follows a changed STORAGE_PATH immediately, without a re-import', () => {
     const other = path.resolve('tests', '.tmp', 'other-base')
     vi.stubEnv('STORAGE_PATH', other)
-    expect(storageRoot()).toBe(path.join(other, 'wh-order-images-storage'))
+    expect(storageRoot()).toBe(path.join(other, 'order-images'))
   })
 })
 
@@ -167,23 +176,61 @@ describe('buildKey', () => {
   })
 })
 
-describe('toAbsolute', () => {
-  it('resolves a storage key under the storage root', () => {
-    expect(toAbsolute('2026-10-19/1234/100/1-Primary.jpg')).toBe(
-      path.join(storageRoot(), '2026-10-19', '1234', '100', '1-Primary.jpg'),
+describe('originalPath', () => {
+  it('resolves a storage key under the originals folder', () => {
+    expect(originalPath('2026-10-19/1234/100/1-Primary.jpg')).toBe(
+      path.join(
+        storageRoot(),
+        'originals',
+        '2026-10-19',
+        '1234',
+        '100',
+        '1-Primary.jpg',
+      ),
     )
   })
 
   it('resolves a key that carries a non-ASCII line segment', () => {
-    expect(toAbsolute(`2026-10-19/1234/${THAI_LINE}/100/1-Primary.jpg`)).toBe(
-      path.join(storageRoot(), '2026-10-19', '1234', THAI_LINE, '100', '1-Primary.jpg'),
+    expect(originalPath(`2026-10-19/1234/${THAI_LINE}/100/1-Primary.jpg`)).toBe(
+      path.join(
+        storageRoot(),
+        'originals',
+        '2026-10-19',
+        '1234',
+        THAI_LINE,
+        '100',
+        '1-Primary.jpg',
+      ),
+    )
+  })
+})
+
+describe('derivatives', () => {
+  it('keeps the key folders, swaps the extension and adds the size folder', () => {
+    expect(derivativeKey('2026-10-19/1234/100/1-Primary.png', 'web')).toBe(
+      'web/2026-10-19/1234/100/1-Primary.webp',
+    )
+    expect(derivativeKey('2026-10-19/1234/100/1-Primary.jpg', 'thumb')).toBe(
+      'thumb/2026-10-19/1234/100/1-Primary.webp',
+    )
+  })
+
+  it('resolves under the storage root, not under originals', () => {
+    expect(derivativePath('2026-10-19/1234/100/1-Primary.jpg', 'web')).toBe(
+      path.join(storageRoot(), 'web', '2026-10-19', '1234', '100', '1-Primary.webp'),
+    )
+  })
+
+  it('handles a key whose file name already ends in webp', () => {
+    expect(derivativeKey('2026-10-19/1234/100/1-Primary.webp', 'thumb')).toBe(
+      'thumb/2026-10-19/1234/100/1-Primary.webp',
     )
   })
 })
 
 describe('isInsideRoot', () => {
   it('accepts a file inside the root', () => {
-    expect(isInsideRoot(toAbsolute('2026-10-19/1234/100/1-Primary.jpg'))).toBe(true)
+    expect(isInsideRoot(originalPath('2026-10-19/1234/100/1-Primary.jpg'))).toBe(true)
   })
 
   it('accepts the root itself', () => {

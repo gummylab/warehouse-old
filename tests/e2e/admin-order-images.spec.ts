@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 
 import { findOrCreateOrder } from '../../lib/db/order-images'
-import { toAbsolute } from '../../lib/order-images/storage'
+import { derivativePath, originalPath } from '../../lib/order-images/storage'
 import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
@@ -17,7 +17,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
 }) => {
   const orderNumber = uniqueOrderNumber()
   const today = todayBangkok()
-  const seeded = seedOrder({ orderNumber, orderDate: today })
+  const seeded = await seedOrder({ orderNumber, orderDate: today })
   const consoleErrors = collectConsoleErrors(page)
 
   await page.goto('/order-images')
@@ -131,8 +131,11 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   })
   await imageDialog.getByRole('button', { name: 'ยืนยันลบ' }).click()
   await expect
-    .poll(() => existsSync(toAbsolute(seeded.storageKeys[0])))
+    .poll(() => existsSync(originalPath(seeded.storageKeys[0])))
     .toBe(false)
+  // The delete unlinks the derivatives too; a leftover would outlive the row.
+  expect(existsSync(derivativePath(seeded.storageKeys[0], 'web'))).toBe(false)
+  expect(existsSync(derivativePath(seeded.storageKeys[0], 'thumb'))).toBe(false)
 
   // Delete the whole order with the typed confirmation.
   await page.getByRole('button', { name: 'ลบออเดอร์' }).click()
@@ -146,7 +149,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   await page.waitForURL('**/order-images')
   await expect(page.getByRole('link', { name: orderNumber })).toHaveCount(0)
   await expect
-    .poll(() => existsSync(toAbsolute(seeded.storageKeys[1])))
+    .poll(() => existsSync(originalPath(seeded.storageKeys[1])))
     .toBe(false)
 
   expect(consoleErrors).toEqual([])
@@ -162,7 +165,7 @@ test('picks a day, a month and a year from the filter pickers', async ({
   const otherDay = today.endsWith('-01') ? '02' : '01'
   const pickedDate = `${year}-${month}-${otherDay}`
   const orderNumber = uniqueOrderNumber()
-  seedOrder({ orderNumber, orderDate: pickedDate })
+  await seedOrder({ orderNumber, orderDate: pickedDate })
   const consoleErrors = collectConsoleErrors(page)
 
   await page.goto('/order-images')

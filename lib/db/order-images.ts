@@ -34,10 +34,11 @@ import type { PackageName } from '../order-images/packages'
 import { fillTrend, TREND_GRAINS, trendWindow } from '@/lib/trend'
 import {
   buildKey,
+  derivativePath,
   ensureDirForFile,
   isInsideRoot,
-  removeStoredFile,
-  toAbsolute,
+  originalPath,
+  removeStoredFiles,
 } from '../order-images/storage'
 
 // The domain types live in lib/db/types.ts, apart from this module, so the
@@ -598,7 +599,7 @@ export function deleteItemCascade(itemId: string): boolean {
     .all()
   const result = orm.delete(items).where(eq(items.id, itemId)).run()
   if (result.changes === 0) return false
-  for (const row of keys) removeStoredFile(toAbsolute(row.storageKey))
+  for (const row of keys) removeStoredFiles(row.storageKey)
   return true
 }
 
@@ -618,7 +619,7 @@ export function deleteOrderCascade(orderId: string): boolean {
   })
 
   if (!keys) return false
-  for (const key of keys) removeStoredFile(toAbsolute(key))
+  for (const key of keys) removeStoredFiles(key)
   return true
 }
 
@@ -626,10 +627,14 @@ export function deleteOrderCascade(orderId: string): boolean {
 // Images (row + file together)
 // ---------------------------------------------------------------------------
 
-// Allocates the next per-item seq, writes the file and inserts the row in
-// one synchronous transaction: a failed write rolls the row back too. In a
-// cross-process seq race the orphan file from the losing attempt is the
+// Allocates the next per-item seq, writes the three files and inserts the row
+// in one synchronous transaction: a failed write rolls the row back too. In a
+// cross-process seq race the orphan files from the losing attempt are the
 // accepted cost (withRetry then re-runs with the next seq).
+//
+// The derivatives are built before this call, outside the transaction: sharp
+// is async and awaiting it here would break the "all file work inside one
+// synchronous transaction" rule this module has always kept.
 export function saveImage(input: {
   itemId: string
   package: string | null
@@ -638,6 +643,8 @@ export function saveImage(input: {
   fileSize: number | null
   createdBy: string
   buffer: Buffer
+  web: Buffer
+  thumb: Buffer
 }): ImageRecord {
   const orm = getOrm()
   // Rebuilt per attempt: withRetry re-runs the transaction after a lost
@@ -681,16 +688,23 @@ export function saveImage(input: {
         input.package,
         ext,
       )
-      const absolute = toAbsolute(key)
+      const original = originalPath(key)
       // The write path needs the same guard as the read path: a key that
       // resolves outside the storage root would drop a file anywhere on the
       // disk. buildKey() already makes every segment a plain name, so this is
       // the second line of defence rather than the only one.
-      if (!isInsideRoot(absolute)) {
+      if (!isInsideRoot(original)) {
         throw new Error('saveImage: storage key escapes the storage root')
       }
-      ensureDirForFile(absolute)
-      writeFileSync(absolute, input.buffer)
+      ensureDirForFile(original)
+      writeFileSync(original, input.buffer)
+
+      const web = derivativePath(key, 'web')
+      const thumb = derivativePath(key, 'thumb')
+      ensureDirForFile(web)
+      ensureDirForFile(thumb)
+      writeFileSync(web, input.web)
+      writeFileSync(thumb, input.thumb)
 
       const row = {
         id: randomUUID(),
@@ -743,7 +757,7 @@ export function deleteImage(id: string): boolean {
   if (!row) return false
   const result = orm.delete(images).where(eq(images.id, id)).run()
   if (result.changes === 0) return false
-  removeStoredFile(toAbsolute(row.storageKey))
+  removeStoredFiles(row.storageKey)
   return true
 }
 
