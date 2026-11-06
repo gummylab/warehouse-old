@@ -2,21 +2,32 @@ import 'server-only'
 
 import { randomUUID } from 'node:crypto'
 
+import { and, eq } from 'drizzle-orm'
 import { io } from 'next/cache'
 
-import { getDb } from './index'
+import { getOrm } from './index'
+import { users } from './schema'
 import type { RegisterUser } from './types'
 
 export type { RegisterUser } from './types'
 
-// Raw column shape as SQLite returns it: snake_case with the nullable
-// columns typed explicitly so the mapping below must handle them.
+// The columns every read returns. Selecting them explicitly keeps the shape
+// stable if the table later grows a column the client must not see, such as
+// line_user_id.
+const USER_COLUMNS = {
+  id: users.id,
+  displayName: users.displayName,
+  avatarUrl: users.avatarUrl,
+  status: users.status,
+  requestedAt: users.requestedAt,
+}
+
 type UserRow = {
   id: string
-  display_name: string
-  avatar_url: string | null
+  displayName: string
+  avatarUrl: string | null
   status: RegisterUser['status']
-  requested_at: string
+  requestedAt: string
 }
 
 // The user list for the register screen.
@@ -33,20 +44,18 @@ type UserRow = {
 // exercise (cacheLife() throws outside a use-cache scope).
 export async function listUsers(): Promise<RegisterUser[]> {
   await io()
-  const rows = getDb()
-    .prepare('SELECT id, display_name, avatar_url, status, requested_at FROM users')
-    .all() as UserRow[]
+  const rows = getOrm().select(USER_COLUMNS).from(users).all()
   return rows.map(toRegisterUser)
 }
 
 // Used by the LIFF status endpoint. Sync and unaugmented: the caller has
 // already verified the LINE identity, only the lookup happens here.
 export function getUserByLineId(lineUserId: string): RegisterUser | undefined {
-  const row = getDb()
-    .prepare(
-      'SELECT id, display_name, avatar_url, status, requested_at FROM users WHERE line_user_id = ?',
-    )
-    .get(lineUserId) as UserRow | undefined
+  const row = getOrm()
+    .select(USER_COLUMNS)
+    .from(users)
+    .where(eq(users.lineUserId, lineUserId))
+    .get()
   return row ? toRegisterUser(row) : undefined
 }
 
@@ -64,18 +73,17 @@ export function createPendingUser(input: {
     status: 'pending',
     requestedAt: new Date().toISOString(),
   }
-  getDb()
-    .prepare(
-      'INSERT INTO users (id, display_name, avatar_url, status, requested_at, line_user_id) VALUES (?, ?, ?, ?, ?, ?)',
-    )
-    .run(
-      user.id,
-      user.displayName,
-      user.avatarUrl ?? null,
-      user.status,
-      user.requestedAt,
-      input.lineUserId,
-    )
+  getOrm()
+    .insert(users)
+    .values({
+      id: user.id,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl ?? null,
+      status: user.status,
+      requestedAt: user.requestedAt,
+      lineUserId: input.lineUserId,
+    })
+    .run()
   return user
 }
 
@@ -84,11 +92,11 @@ export function createPendingUser(input: {
 // status = 'pending' guard makes a double-click on a queue button
 // idempotent.
 export function approvePendingUser(id: string, decidedAt: string): boolean {
-  const result = getDb()
-    .prepare(
-      "UPDATE users SET status = 'approved', decided_at = ? WHERE id = ? AND status = 'pending'",
-    )
-    .run(decidedAt, id)
+  const result = getOrm()
+    .update(users)
+    .set({ status: 'approved', decidedAt })
+    .where(and(eq(users.id, id), eq(users.status, 'pending')))
+    .run()
   return result.changes > 0
 }
 
@@ -97,9 +105,10 @@ export function approvePendingUser(id: string, decidedAt: string): boolean {
 // ever stored. Guarded by status so an approved user cannot be deleted
 // through the queue path.
 export function deletePendingUser(id: string): boolean {
-  const result = getDb()
-    .prepare("DELETE FROM users WHERE id = ? AND status = 'pending'")
-    .run(id)
+  const result = getOrm()
+    .delete(users)
+    .where(and(eq(users.id, id), eq(users.status, 'pending')))
+    .run()
   return result.changes > 0
 }
 
@@ -108,19 +117,20 @@ export function deletePendingUser(id: string): boolean {
 // again on their next LIFF visit. Guarded by status so the queue path
 // (deletePendingUser) can never delete an approved row and vice versa.
 export function deleteApprovedUser(id: string): boolean {
-  const result = getDb()
-    .prepare("DELETE FROM users WHERE id = ? AND status = 'approved'")
-    .run(id)
+  const result = getOrm()
+    .delete(users)
+    .where(and(eq(users.id, id), eq(users.status, 'approved')))
+    .run()
   return result.changes > 0
 }
 
 function toRegisterUser(row: UserRow): RegisterUser {
   return {
     id: row.id,
-    displayName: row.display_name,
+    displayName: row.displayName,
     // NULL means no picture: omit the key so the optional prop stays honest.
-    avatarUrl: row.avatar_url ?? undefined,
+    avatarUrl: row.avatarUrl ?? undefined,
     status: row.status,
-    requestedAt: row.requested_at,
+    requestedAt: row.requestedAt,
   }
 }

@@ -37,7 +37,11 @@ export const users = sqliteTable(
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
     // 'rejected' is not a stored status: rejecting deletes the row (ADR 0003).
-    status: text('status').notNull().default('pending'),
+    // The enum option is type-level only; the CHECK below is what the file
+    // enforces.
+    status: text('status', { enum: ['pending', 'approved'] })
+      .notNull()
+      .default('pending'),
     requestedAt: text('requested_at').notNull(),
     decidedAt: text('decided_at'),
     lineUserId: text('line_user_id'),
@@ -125,7 +129,7 @@ export const images = sqliteTable(
       .notNull()
       .references(() => orders.id, { onDelete: 'cascade' }),
     seq: integer('seq').notNull(),
-    package: text('package'),
+    package: text('package', { enum: PACKAGE_OPTIONS }),
     fileName: text('file_name'),
     mimeType: text('mime_type'),
     fileSize: integer('file_size'),
@@ -151,7 +155,7 @@ export const lineWalks = sqliteTable(
   {
     id: text('id').primaryKey(),
     walkDate: text('walk_date').notNull(),
-    shift: text('shift').notNull(),
+    shift: text('shift', { enum: ['day', 'night'] }).notNull(),
     line: text('line').notNull(),
     brand: text('brand').notNull(),
     packStyle: text('pack_style').notNull(),
