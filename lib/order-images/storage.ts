@@ -5,17 +5,20 @@
 import { mkdirSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 
+import { storageBase } from '../settings/paths'
+
+// The effective upload root: the configured base with the app's own folder
+// name appended, so wh and eu-shipment never share files even when pointed at
+// the same base. A value that already ends with the folder name is used as-is,
+// which keeps a path saved from /settings looking like the one the operator
+// typed.
+//
 // Resolved per call rather than once at module load: the test harness points
 // STORAGE_PATH at a throwaway directory before the first write
-// (tests/unit/setup/db.ts), which a module-level constant could never see.
+// (tests/unit/setup/db.ts), and a value saved on /settings has to apply to the
+// next write without a restart.
 export function storageRoot(): string {
-  // The base comes from the environment, so Turbopack cannot know it at build
-  // time and traces the whole project into the server output to cover any
-  // path it might resolve to. This folder holds runtime uploads, never
-  // imported modules, so opting this call out of tracing is safe.
-  const base = path.resolve(
-    /*turbopackIgnore: true*/ process.env.STORAGE_PATH ?? './',
-  )
+  const base = storageBase()
   return base.endsWith('wh-order-images-storage')
     ? base
     : path.join(base, 'wh-order-images-storage')

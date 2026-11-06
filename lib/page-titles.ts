@@ -4,6 +4,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/order-images': 'จัดการรูปภาพออเดอร์',
   '/line-walks': 'รายการเดินไลน์',
   '/register': 'จัดการผู้ใช้',
+  '/settings': 'ตั้งค่า',
   '/liff/authorization': 'ตรวจสอบสิทธิ์การใช้งาน',
   '/liff/forms': 'แบบฟอร์ม',
   '/liff/forms/order-image': 'อัปโหลดรูปภาพออเดอร์',

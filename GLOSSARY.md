@@ -92,6 +92,20 @@ _Avoid_: schema script, bootstrap SQL, ALTER script
 The Drizzle object built on one connection (`getOrm()`); the data layer queries through it, and `getDb()` keeps the raw driver for row counts and the rare direct query. The handle is cached with its connection and dropped together by `closeDb()` (ADR 0013).
 _Avoid_: db object, connection pool, client
 
+## Settings
+
+**Settings file**:
+The JSON file at `config/settings.json` that holds the paths saved on `/settings`; it is gitignored because those paths are absolute and machine specific, and `WH_SETTINGS_PATH` moves it for the test harnesses. A value here outranks `WH_DB_PATH` and `STORAGE_PATH`, and the file is read on every call rather than cached (ADR 0014).
+_Avoid_: config file, .env, preferences
+
+**Effective path**:
+The path the app actually uses after the rules have run: the resolved database file, or the storage base with `wh-order-images-storage` appended unless it already ends with that folder. The card shows the effective path, which is why a saved storage base reads back with the folder on the end.
+_Avoid_: saved path, raw path, configured path
+
+**Database switch**:
+Changing the database path on `/settings`. The target is opened and migrated in a throwaway handle first, and the live connection is closed only after that succeeds; the previous file is left untouched, so pointing the field back returns to the old data (ADR 0014).
+_Avoid_: reconnect, database migration, restart
+
 ## Testing
 
 **Test database**:

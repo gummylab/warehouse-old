@@ -29,8 +29,8 @@ Two layers, split by what they can prove.
 
 Data isolation is the part to understand before adding a test:
 
-- `tests/unit/setup/db.ts` exports `isolateTestData()`. Call it at the top of any test file that touches the database or the upload folder: it points `WH_DB_PATH` and `STORAGE_PATH` at a temp dir and wipes both before every test, so counting rows is trustworthy and nothing reaches `database/wh.db`.
-- Those two variables are read lazily (`lib/db/index.ts` on open, `lib/order-images/storage.ts` per call), which is what makes the swap possible. The connection and the ORM built on it are cached together on `globalThis` (`__whDb`, `__whOrm`), and `closeDb()` drops both, so the helper calls it around every test.
+- `tests/unit/setup/db.ts` exports `isolateTestData()`. Call it at the top of any test file that touches the database or the upload folder: it points `WH_DB_PATH`, `STORAGE_PATH` and `WH_SETTINGS_PATH` at a temp dir and wipes all three before every test, so counting rows is trustworthy and nothing reaches `database/wh.db`. The settings file matters as much as the other two: a saved path outranks both env variables, so without it one test's save would point the next test at the operator's real database.
+- Those variables are read lazily (`lib/db/index.ts` on open, `lib/order-images/storage.ts` per call, `lib/settings/store.ts` on every read), which is what makes the swap possible. The connection and the ORM built on it are cached together on `globalThis` (`__whDb`, `__whOrm`), and `closeDb()` drops both, so the helper calls it around every test.
 - The e2e harness owns its own server, port, database, upload folder and Next build output (`tests/e2e/support/env.ts`, `playwright.config.ts`; `WH_DIST_DIR` in `next.config.ts`). It never touches port 8080, the real database or the developer's `.next`.
 - The e2e runner and the server it starts must agree on the run id (`WH_E2E_RUN_ID`), or they work on different database files and the specs see neither the seeded rows nor the deletions. `tests/e2e/support/env.ts` sets it on the runner's process and `playwright.config.ts` passes it on in `webServer.env`.
 - The e2e specs import the data layer, which carries the `server-only` marker. That package throws on import unless the `react-server` export condition is set, which Next sets for the server bundle but Playwright does not: the `test:e2e` scripts pass `--conditions=react-server` for that reason.
@@ -48,6 +48,15 @@ Data isolation is the part to understand before adding a test:
 - `drizzle/` is read at runtime, so it must ship with the app. It resolves from `process.cwd()` under `next start`; a future standalone build would have to trace it into the output.
 - A database file created before ADR 0013 has no `__drizzle_migrations` table, so `migrate()` tries to create tables that already exist and fails. Copy the file aside and start from an empty one rather than patching it.
 - Data-layer modules query through `getOrm()`; `getDb()` stays for row counts and the rare direct query. Raw `sql` fragments remain where the builder falls short: `ESCAPE '\'` on LIKE, `substr(walk_date, 1, 7)` buckets, `count(*)`, correlated item counts and `ORDER BY rowid` in `listLines`.
+
+## Settings
+
+- `/settings` is the only place the operator changes where the app keeps its data. The values live in `config/settings.json` (gitignored, absolute paths); a key there outranks the matching env variable, and the repo default applies when neither is set (ADR 0014).
+- Reads are uncached: `lib/settings/store.ts` reads the file on every call because `storageRoot()` runs on every upload and every file lookup. Writes go through a temporary file and a rename, so a crash cannot leave a truncated file.
+- `WH_SETTINGS_PATH` moves the settings file and exists for the test harnesses. A saved path outranks `WH_DB_PATH` and `STORAGE_PATH`, so a test that forgets to isolate it opens the operator's real database.
+- The database field goes through `applyDatabasePath` (`lib/db/index.ts`): the target is opened and migrated in a throwaway handle first, then the live connection is swapped, and a failed reopen restores the previous path. A missing or zero-byte target needs `confirm: true` from the client, so an empty database is never created by a typo.
+- The storage field saves the base; `storageRoot()` appends `wh-order-images-storage` unless the path already ends with it. Existing files are not moved, so old photos stop resolving until the operator copies the folder.
+- Both server actions start with `requireLocalAdminRequest()` (ADR 0007), like every other admin write.
 
 ## Layout architecture
 

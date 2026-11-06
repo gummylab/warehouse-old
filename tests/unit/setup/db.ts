@@ -26,12 +26,17 @@ export function isolateTestData({ env = {} }: { env?: Record<string, string> } =
   const root = mkdtempSync(join(tmpdir(), 'wh-unit-'))
   const dbPath = join(root, 'wh.db')
   const storagePath = join(root, 'storage')
+  // A saved path outranks WH_DB_PATH and STORAGE_PATH, so the suite needs its
+  // own settings file. Without it a save in one test would point the next
+  // test, or the whole run, at the operator's real database.
+  const settingsPath = join(root, 'settings.json')
   const previous = new Map<string, string | undefined>()
 
   beforeAll(() => {
     for (const [key, value] of Object.entries({
       WH_DB_PATH: dbPath,
       STORAGE_PATH: storagePath,
+      WH_SETTINGS_PATH: settingsPath,
       ...env,
     })) {
       previous.set(key, process.env[key])
@@ -52,6 +57,7 @@ export function isolateTestData({ env = {} }: { env?: Record<string, string> } =
     rmSync(`${dbPath}-wal`, { force: true })
     rmSync(`${dbPath}-shm`, { force: true })
     rmSync(storagePath, { recursive: true, force: true })
+    rmSync(settingsPath, { force: true })
   })
 
   afterAll(() => {
