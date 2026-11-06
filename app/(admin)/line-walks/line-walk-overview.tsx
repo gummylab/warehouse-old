@@ -17,16 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from '@/components/ui/toggle-group'
 import type { LineWalkOverview, TrendGrain } from '@/lib/db/types'
 import { formatTrendPeriod } from '@/lib/trend'
 import { cn } from '@/lib/utils'
 
 import { LineWalkSummaryCards } from './line-walk-summary'
-import { LineWalkTrend, type LineWalkMetric } from './line-walk-trend'
+import { LineWalkTrend } from './line-walk-trend'
 
 const GRAIN_ITEMS: { value: TrendGrain; label: string }[] = [
   { value: 'day', label: 'วัน' },
@@ -34,14 +30,9 @@ const GRAIN_ITEMS: { value: TrendGrain; label: string }[] = [
   { value: 'year', label: 'ปี' },
 ]
 
-const METRIC_ITEMS: { value: LineWalkMetric; label: string }[] = [
-  { value: 'amount', label: 'ยอดสินค้า' },
-  { value: 'people', label: 'จำนวนคน' },
-]
-
-// One card holds the KPI cells and the trend chart. The window and the metric
-// are view state; the three windows arrive precomputed, so switching is
-// instant. The card ignores the table filters by design.
+// One card holds the KPI cells and the trend chart. The grain is view state;
+// the three windows arrive precomputed, so switching is instant. The card
+// ignores the table filters by design.
 export function LineWalkOverview({
   overview,
   today,
@@ -50,7 +41,6 @@ export function LineWalkOverview({
   today: string
 }) {
   const [grain, setGrain] = useState<TrendGrain>('day')
-  const [metric, setMetric] = useState<LineWalkMetric>('amount')
   const [open, setOpen] = useState(false)
   const range = overview[grain]
 
@@ -81,26 +71,6 @@ export function LineWalkOverview({
             </SelectContent>
           </Select>
 
-          <ToggleGroup
-            aria-label="ตัวชี้วัดกราฟ"
-            value={[metric]}
-            onValueChange={(value) => {
-              const next = value[0]
-              if (next === 'amount' || next === 'people') setMetric(next)
-            }}
-            variant="outline"
-            spacing={0}
-            className="w-fit">
-            {METRIC_ITEMS.map((item) => (
-              <ToggleGroupItem
-                key={item.value}
-                value={item.value}
-                className="aria-pressed:bg-primary! aria-pressed:text-primary-foreground!">
-                {item.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-
           <CollapsibleTrigger
             render={
               <Button
@@ -123,7 +93,6 @@ export function LineWalkOverview({
           <LineWalkTrend
             grain={grain}
             points={range.points}
-            metric={metric}
             period={formatTrendPeriod(grain, today)}
           />
         </CollapsibleContent>

@@ -68,20 +68,22 @@ test('lists line walks with the overview and table filters', async ({
   await expect(page.getByText(dayBrand, { exact: true })).toBeVisible()
   await expect(page.getByText(nightBrand, { exact: true })).toHaveCount(0)
 
-  // The chart opens and switches grain and metric.
+  // The chart opens with both series and switches grain.
   await page.getByRole('link', { name: 'ล้างตัวกรอง' }).click()
   await page.getByRole('button', { name: 'แสดงกราฟ' }).click()
-  await expect(page.getByRole('img', { name: /กราฟ/ })).toBeVisible()
+  await expect(
+    page.getByRole('img', { name: /จำนวนคนและยอดสินค้า/ }),
+  ).toBeVisible()
+
+  const legend = page.locator('[data-slot="line-walk-chart-legend"]')
+  await expect(legend.getByText('ยอดสินค้า')).toBeVisible()
+  await expect(legend.getByText('จำนวนคน')).toBeVisible()
 
   await page.getByRole('combobox', { name: 'ช่วงภาพรวม' }).click()
   await page.getByRole('option', { name: 'เดือน' }).click()
-  await expect(page.getByRole('img', { name: /กราฟ/ })).toBeVisible()
-
-  await page
-    .getByRole('group', { name: 'ตัวชี้วัดกราฟ' })
-    .getByRole('button', { name: 'จำนวนคน' })
-    .click()
-  await expect(page.getByRole('img', { name: /จำนวนคน/ })).toBeVisible()
+  await expect(
+    page.getByRole('img', { name: /จำนวนคนและยอดสินค้า/ }),
+  ).toBeVisible()
 
   expect(consoleErrors).toEqual([])
 })

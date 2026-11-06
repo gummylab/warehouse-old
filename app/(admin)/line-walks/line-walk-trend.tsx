@@ -11,14 +11,18 @@ import {
 import type { LineWalkPoint, TrendGrain } from '@/lib/db/types'
 import { formatTrendLabel, formatTrendTick } from '@/lib/trend'
 
-export type LineWalkMetric = 'people' | 'amount'
-
-// Both metrics share the same grey line colour; the switch changes the series,
-// not the palette. `--chart-2` is the readable mid grey in the luma theme.
+// Two series with very different scales, so each gets its own Y axis: amount
+// on the left, people on the right. A shared axis would flatten the people
+// line against zero.
 const chartConfig = {
-  people: { label: 'จำนวนคน', color: 'var(--chart-2)' },
   amount: { label: 'ยอดสินค้า', color: 'var(--chart-2)' },
+  people: { label: 'จำนวนคน', color: 'var(--info)' },
 } satisfies ChartConfig
+
+const SERIES = [
+  { key: 'amount', label: 'ยอดสินค้า', color: 'var(--chart-2)' },
+  { key: 'people', label: 'จำนวนคน', color: 'var(--info)' },
+] as const
 
 const GRAIN_LABEL: Record<TrendGrain, string> = {
   day: 'รายวัน',
@@ -26,55 +30,79 @@ const GRAIN_LABEL: Record<TrendGrain, string> = {
   year: 'รายเดือน',
 }
 
-const METRIC_LABEL: Record<LineWalkMetric, string> = {
-  people: 'จำนวนคน',
-  amount: 'ยอดสินค้า',
-}
-
-// The chart body of the overview card. The metric switch lives in the card
-// header, so this component only draws the selected series.
+// The chart body of the overview card. The grain switch lives in the card
+// header; this component draws both metrics for the selected window.
 export function LineWalkTrend({
   grain,
   points,
-  metric,
   period,
 }: {
   grain: TrendGrain
   points: LineWalkPoint[]
-  metric: LineWalkMetric
   period: string
 }) {
-  const empty = points.every((point) => point[metric] === 0)
+  const empty = points.every(
+    (point) => point.people === 0 && point.amount === 0,
+  )
 
   return (
     <div className="relative border-t px-2 pb-4 pt-3 sm:px-4">
+      <div
+        data-slot="line-walk-chart-legend"
+        className="mb-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        {SERIES.map((series) => (
+          <span key={series.key} className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-[2px]"
+              style={{ backgroundColor: series.color }}
+            />
+            {series.label}
+          </span>
+        ))}
+      </div>
+
       <ChartContainer
         config={chartConfig}
         className="h-[180px] w-full"
         role="img"
-        aria-label={`กราฟ${METRIC_LABEL[metric]}${GRAIN_LABEL[grain]} ${period}`}>
-        <AreaChart data={points} margin={{ left: 0, right: 8, top: 8 }}>
+        aria-label={`กราฟจำนวนคนและยอดสินค้า${GRAIN_LABEL[grain]} ${period}`}>
+        <AreaChart data={points} margin={{ left: 0, right: 0, top: 8 }}>
           <defs>
-            {(['people', 'amount'] as const).map((key) => (
-              <linearGradient
-                key={key}
-                id={`fill-line-walk-${key}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1">
-                <stop
-                  offset="5%"
-                  stopColor={`var(--color-${key})`}
-                  stopOpacity={0.5}
-                />
-                <stop
-                  offset="95%"
-                  stopColor={`var(--color-${key})`}
-                  stopOpacity={0.05}
-                />
-              </linearGradient>
-            ))}
+            <linearGradient
+              id="fill-line-walk-amount"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1">
+              <stop
+                offset="5%"
+                stopColor="var(--color-amount)"
+                stopOpacity={0.35}
+              />
+              <stop
+                offset="95%"
+                stopColor="var(--color-amount)"
+                stopOpacity={0.04}
+              />
+            </linearGradient>
+            <linearGradient
+              id="fill-line-walk-people"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1">
+              <stop
+                offset="5%"
+                stopColor="var(--color-people)"
+                stopOpacity={0.25}
+              />
+              <stop
+                offset="95%"
+                stopColor="var(--color-people)"
+                stopOpacity={0.02}
+              />
+            </linearGradient>
           </defs>
           <CartesianGrid vertical={false} />
           <XAxis
@@ -86,6 +114,18 @@ export function LineWalkTrend({
             tickFormatter={(value) => formatTrendTick(grain, String(value))}
           />
           <YAxis
+            yAxisId="amount"
+            orientation="left"
+            width={36}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={4}
+            allowDecimals={false}
+            domain={[0, 'auto']}
+          />
+          <YAxis
+            yAxisId="people"
+            orientation="right"
             width={28}
             tickLine={false}
             axisLine={false}
@@ -104,10 +144,19 @@ export function LineWalkTrend({
             }
           />
           <Area
-            dataKey={metric}
-            type="natural"
-            fill={`url(#fill-line-walk-${metric})`}
-            stroke={`var(--color-${metric})`}
+            yAxisId="amount"
+            dataKey="amount"
+            type="monotone"
+            fill="url(#fill-line-walk-amount)"
+            stroke="var(--color-amount)"
+            strokeWidth={2}
+          />
+          <Area
+            yAxisId="people"
+            dataKey="people"
+            type="monotone"
+            fill="url(#fill-line-walk-people)"
+            stroke="var(--color-people)"
             strokeWidth={2}
           />
         </AreaChart>
