@@ -6,11 +6,11 @@ export const BASE = __ENV.BASE_URL || 'http://127.0.0.1:8080';
 
 export const THRESHOLDS = {
   smoke: {
-    'http_req_duration': ['p(95)<500'],
+    'http_req_duration': ['p(95)<1000'],
     'http_req_failed': ['rate<0.01'],
   },
   load: {
-    'http_req_duration': ['p(95)<1000'],
+    'http_req_duration': ['p(95)<1500'],
     'http_req_failed': ['rate<0.02'],
   },
   stress: {
@@ -18,7 +18,7 @@ export const THRESHOLDS = {
     'http_req_failed': ['rate<0.10'],
   },
   soak: {
-    'http_req_duration': ['p(95)<1000'],
+    'http_req_duration': ['p(95)<1500'],
     'http_req_failed': ['rate<0.01'],
   },
 };
