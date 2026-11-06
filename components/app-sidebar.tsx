@@ -1,6 +1,12 @@
 'use client'
 
-import { FootprintsIcon, ImageIcon, LayoutDashboardIcon, UsersIcon } from 'lucide-react'
+import {
+  FootprintsIcon,
+  ImageIcon,
+  LayoutDashboardIcon,
+  SettingsIcon,
+  UsersIcon,
+} from 'lucide-react'
 import Link from 'next/link'
 import * as React from 'react'
 
@@ -18,7 +24,8 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from 'cn'
 
-// Single responsibility: render main nav in content and user entry in footer.
+// Single responsibility: render main nav in content and the two admin entries
+// (users, settings) in the footer.
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { open } = useSidebar()
   return (
@@ -54,6 +61,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton tooltip="จัดการผู้ใช้" render={<Link href="/register" />}>
               <UsersIcon />
               <span>จัดการผู้ใช้</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="ตั้งค่า" render={<Link href="/settings" />}>
+              <SettingsIcon />
+              <span>ตั้งค่า</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
