@@ -1,18 +1,18 @@
-// The calendar windows the KPI strip and the trend chart share. Both read the
-// same window, so the number above the chart and the chart itself cannot
+// The calendar windows an admin overview shares between its KPI strip and its
+// trend chart. Both read the same window, so the numbers and the shape cannot
 // disagree.
 //
-// Every window counts the stored business date (`order_date`), the same date
-// the table and its filters use. Nothing here reads `created_at`: the chips
-// answer "how many orders belong to this period", not "when were they typed".
+// Every window counts a stored business date (`order_date` on the order list,
+// `walk_date` on the line-walk list), the date the table and its filters use.
+// Nothing here reads `created_at`.
 //
 // Every function here is pure: the data layer supplies the counts, and the UI
 // supplies the anchor day.
 
 import type { TrendGrain, TrendPoint } from '@/lib/db/types'
 
-import { formatThaiMonthYear, formatThaiYear, thaiMonthName } from './date'
-import { formatThaiDate } from './format'
+import { formatThaiMonthYear, formatThaiYear, thaiMonthName } from './order-images/date'
+import { formatThaiDate } from './order-images/format'
 
 export const TREND_GRAINS = ['day', 'month', 'year'] as const
 

@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 
 import { getDb } from './index'
+import { escapeLike } from './sql'
 import type {
   ImageRecord,
   ItemDetail,
@@ -30,7 +31,7 @@ import {
   fillTrend,
   TREND_GRAINS,
   trendWindow,
-} from '../order-images/trend'
+} from '@/lib/trend'
 import {
   buildKey,
   ensureDirForFile,
@@ -293,12 +294,6 @@ export function getOrderOverview(today: string): OrderOverview {
   }
 
   return overview
-}
-
-// LIKE treats % and _ as wildcards; a user typing them means the literal
-// character, so escape them before wrapping the value in %...%.
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
 
 export function listOrders(filters: OrderListFilters): OrderListResult {

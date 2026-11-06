@@ -12,7 +12,7 @@ import type { TrendGrain, TrendPoint } from '@/lib/db/types'
 import {
   formatTrendLabel,
   formatTrendTick,
-} from '@/lib/order-images/trend'
+} from '@/lib/trend'
 
 // One series, so the config carries a single entry. `--chart-2` is the mid
 // grey in the luma palette; `--chart-1` is too light to read as a line on the

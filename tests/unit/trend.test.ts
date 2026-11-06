@@ -6,7 +6,7 @@ import {
   formatTrendPeriod,
   formatTrendTick,
   trendWindow,
-} from '@/lib/order-images/trend'
+} from '@/lib/trend'
 
 // The windows are anchored on today: day is the last seven days, month is
 // every day of this month, and year is every month of this year. Buckets that

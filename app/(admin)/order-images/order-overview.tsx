@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { OrderOverview, TrendGrain } from '@/lib/db/types'
-import { formatTrendPeriod } from '@/lib/order-images/trend'
+import { formatTrendPeriod } from '@/lib/trend'
 import { cn } from '@/lib/utils'
 
 import { OrderTrend } from './order-trend'
