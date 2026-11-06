@@ -18,7 +18,8 @@ This supersedes only the "without an ORM" part of [ADR 0002](0002-sqlite-local-u
 ## Consequences
 
 - `drizzle/` is read at runtime by `migrate()`, so it must ship with the app. It is committed and resolved from `process.cwd()` under `next start`; a future standalone build would have to trace it into the output.
-- Changing the schema means editing `lib/db/schema.ts` and running `bunx drizzle-kit generate`. The generated SQL is committed. Hand-editing a database is no longer a supported step.
+- Changing the schema means editing `lib/db/schema.ts` and running `bun run db:generate`. The generated SQL is committed. Hand-editing a database is no longer a supported step.
+- The build runs the generator before Next.js starts. `scripts/check-migrations.ts` fingerprints every file under `drizzle/` by content, runs `drizzle-kit generate`, fingerprints the folder again and compares, so an edit to `lib/db/schema.ts` without a committed migration stops the build instead of reaching `migrate()` at runtime. The generated migration is left in the working tree for review and commit. The build therefore needs `drizzle-kit`, a dev dependency: a build that installs only production dependencies fails on a missing binary.
 - A database file created before this change has no `__drizzle_migrations` table, so `migrate()` would try to create the existing tables and fail. The local file was copied aside outside the repo and then deleted, so the first migration ran on an empty file.
 - Branches older than this change can no longer open the new database file.
 - A failed migration closes the handle before the error is rethrown, because a half-open handle keeps the file locked on Windows and makes the next test file fail with EPERM instead of the real error.

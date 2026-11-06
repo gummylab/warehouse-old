@@ -16,7 +16,9 @@ All run with bun (do not use npm/yarn/pnpm, `packageManager: bun@1.4.2`):
 - `bun run verify` → lint + typecheck + unit tests + production build. Run this before claiming a change works. The build step is part of it because cacheComponents only surfaces its validation errors there, not in dev.
 - `bun run dev:tunnel` → dev server + Cloudflare Tunnel side by side (`concurrently`).
 - `bun run tunnel` → tunnel only. Requires `CLOUDFLARE_TUNNEL_TOKEN` in `.env`, exits if missing.
-- `bun run build` / `bun run start` → production. `start` runs Next + tunnel; `start:next` runs Next alone.
+- `bun run build` / `bun run start` → production. `start` runs Next + tunnel; `start:next` runs Next alone. `build` runs `db:check` first, so it stops when `lib/db/schema.ts` and `drizzle/` disagree (see Schema and database).
+- `bun run db:generate` → `drizzle-kit generate`, the normal way to turn a schema edit into SQL under `drizzle/`.
+- `bun run db:check` → runs the generator and fails if that changed `drizzle/`, which means the migration was never committed. `build` calls it; run it alone to check without a full build.
 
 ## Tests
 
@@ -39,8 +41,9 @@ Data isolation is the part to understand before adding a test:
 
 ## Schema and database
 
-- `lib/db/schema.ts` is the single source of truth for the six tables, their indexes, unique indexes and CHECK constraints. The SQL under `drizzle/` is generated from it by `bunx drizzle-kit generate` (`drizzle.config.ts` holds the dialect and paths), and the generated files are committed.
+- `lib/db/schema.ts` is the single source of truth for the six tables, their indexes, unique indexes and CHECK constraints. The SQL under `drizzle/` is generated from it by `bun run db:generate` (`drizzle.config.ts` holds the dialect and paths), and the generated files are committed.
 - Changing a column or an index means editing `lib/db/schema.ts` and regenerating. Hand-editing the database or the SQL under `drizzle/` is not the workflow (ADR 0013). Constrained text columns carry a type-level `enum`, but the CHECK constraint in the SQL is what the file enforces.
+- `bun run build` runs `bun run db:check` before Next.js starts (`scripts/check-migrations.ts`): it fingerprints `drizzle/` by content, runs the generator, and fails when that changed the folder, because the migration was never generated. The generated file is left in the working tree. Content, not filename, is compared, since each migration gets a random suffix. stdin is closed and the child times out, so a rename prompt fails the build instead of hanging it; run `bun run db:generate` directly to answer that prompt.
 - `lib/db/index.ts` opens the file, sets the pragmas (WAL, `busy_timeout 5000`, `foreign_keys ON`), runs `migrate()` over `drizzle/`, then seeds the line catalog. `migrate()` takes the ORM instance, not the raw driver, because it runs through the dialect. If the migration throws, the handle is closed before the error is rethrown: a half-open handle locks the file on Windows and the next test file fails with EPERM.
 - `drizzle/` is read at runtime, so it must ship with the app. It resolves from `process.cwd()` under `next start`; a future standalone build would have to trace it into the output.
 - A database file created before ADR 0013 has no `__drizzle_migrations` table, so `migrate()` tries to create tables that already exist and fails. Copy the file aside and start from an empty one rather than patching it.

@@ -20,14 +20,16 @@
 ```bash
 bun run dev          # dev server ที่ 127.0.0.1:8080
 bun run dev:tunnel   # dev server + Cloudflare Tunnel
-bun run build        # production build
+bun run build        # production build (ตรวจ migration ก่อน)
+bun run db:generate  # สร้าง migration จาก `lib/db/schema.ts`
+bun run db:check     # ตรวจว่า `drizzle/` ตรงกับ schema (สร้าง migration ที่ขาดให้)
 bun run start        # production server + tunnel
 bun run verify       # lint + typecheck + unit test + build
 bun run test         # unit test (Vitest)
 bun run test:e2e     # e2e test (Playwright) ต้อง `bunx playwright install chromium` ครั้งแรก
 ```
 
-การแก้ schema: แก้ที่ `lib/db/schema.ts` แล้วรัน `bunx drizzle-kit generate` ไฟล์ SQL ที่สร้างใน `drizzle/` ต้อง commit ไปด้วย
+การแก้ schema: แก้ที่ `lib/db/schema.ts` แล้วรัน `bun run db:generate` ไฟล์ SQL ที่สร้างใน `drizzle/` ต้อง commit ไปด้วย ถ้ายังมี migration ที่ค้างอยู่ `bun run build` จะหยุดเอง
 
 ดูรายละเอียดเพิ่มเติมใน `AGENTS.md`
 
