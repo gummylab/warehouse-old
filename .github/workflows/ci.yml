@@ -3,18 +3,43 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - "app/**"
+      - "lib/**"
+      - "components/**"
+      - "tests/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "app/**"
+      - "lib/**"
+      - "components/**"
+      - "tests/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/ci.yml"
+
+# Cancel superseded runs for the same branch/PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: read-only by default.
+permissions:
+  contents: read
 
 jobs:
   verify:
     # The whole check is `bun run verify` (lint + typecheck + unit tests +
-    # production build), because cacheComponents only surfaces its
-    # validation errors during the build, not in dev.
+    # production build), because cacheComponents only surfaces its validation
+    # errors during the build, not in dev.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
 
@@ -28,9 +53,9 @@ jobs:
     # The e2e suite needs a browser, so it is a job of its own.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
 
