@@ -1,5 +1,5 @@
 // Data layer for the order-image form: lines catalog, orders, items and
-// images. Raw SQL + better-sqlite3 like lib/db/users.ts (ADR 0002).
+// images (ADR 0013: Drizzle on top of better-sqlite3).
 // Image row and file on disk are treated as one unit of storage here: the
 // save/delete functions own both, because SQLite transactions in
 // better-sqlite3 are synchronous and can therefore wrap sync file IO
@@ -9,7 +9,10 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 
-import { getDb } from './index'
+import { and, between, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
+
+import { getOrm } from './index'
+import { images, items, lines, orders, users } from './schema'
 import { escapeLike } from './sql'
 import type {
   ImageRecord,
@@ -27,11 +30,8 @@ import type {
   TrendPoint,
 } from './types'
 import { nextSingleNumber, nextVarietyNumber } from '../order-images/item-number'
-import {
-  fillTrend,
-  TREND_GRAINS,
-  trendWindow,
-} from '@/lib/trend'
+import type { PackageName } from '../order-images/packages'
+import { fillTrend, TREND_GRAINS, trendWindow } from '@/lib/trend'
 import {
   buildKey,
   ensureDirForFile,
@@ -67,87 +67,60 @@ export type AddItemResult =
   | { ok: true; item: ItemRecord }
   | { ok: false; error: 'parent-missing' | 'variety-of-variety' | 'pack-full' }
 
-type OrderRow = {
-  id: string
-  order_number: string
-  order_date: string
-  line: string
-  created_by: string
-  created_at: string
-}
+type OrderRows = typeof orders.$inferSelect
+type ItemRows = typeof items.$inferSelect
+type ImageRows = typeof images.$inferSelect
 
-type ItemRow = {
-  id: string
-  order_id: string
-  parent_item_id: string | null
-  item_number: number
-  created_by: string
-  created_at: string
-}
-
-type OrderListRowSql = OrderRow & {
-  item_count: number
-  creator_name: string | null
-}
-
-type ImageRow = {
-  id: string
-  item_id: string
-  order_id: string
-  seq: number
-  package: string | null
-  file_name: string | null
-  mime_type: string | null
-  file_size: number | null
-  storage_key: string
-  created_by: string
-  created_at: string
-}
-
-function toOrder(row: OrderRow): OrderRecord {
+function toOrder(row: OrderRows): OrderRecord {
   return {
     id: row.id,
-    orderNumber: row.order_number,
-    orderDate: row.order_date,
+    orderNumber: row.orderNumber,
+    orderDate: row.orderDate,
     line: row.line,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
   }
 }
 
-function toOrderListRow(row: OrderListRowSql): OrderListRow {
+// The admin row: the order plus its item count and the creator's name. A row
+// saved on this machine has no users entry, so it falls back to the local
+// label instead of showing the raw 'local-device' string.
+function toOrderListRow(
+  row: OrderRows,
+  itemCount: number,
+  creatorName: string | null,
+): OrderListRow {
   return {
     ...toOrder(row),
-    itemCount: row.item_count,
+    itemCount,
     creatorName:
-      row.creator_name ??
-      (row.created_by === 'local-device' ? 'เครื่องนี้' : null),
+      creatorName ?? (row.createdBy === 'local-device' ? 'เครื่องนี้' : null),
   }
 }
 
-function toItem(row: ItemRow): ItemRecord {
+function toItem(row: ItemRows): ItemRecord {
   return {
     id: row.id,
-    orderId: row.order_id,
-    parentItemId: row.parent_item_id,
-    itemNumber: row.item_number,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
+    orderId: row.orderId,
+    parentItemId: row.parentItemId,
+    itemNumber: row.itemNumber,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
   }
 }
 
-function toImage(row: ImageRow): ImageRecord {
+function toImage(row: ImageRows): ImageRecord {
   return {
     id: row.id,
-    itemId: row.item_id,
-    orderId: row.order_id,
+    itemId: row.itemId,
+    orderId: row.orderId,
     seq: row.seq,
     package: row.package,
-    fileName: row.file_name,
-    mimeType: row.mime_type,
-    fileSize: row.file_size,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    fileSize: row.fileSize,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
   }
 }
 
@@ -159,23 +132,32 @@ function toImage(row: ImageRow): ImageRecord {
 // order filter. A plain read: the catalog is seeded when the database is
 // opened (see lib/db/index.ts) and only an admin edit changes it.
 //
+// Ordered by rowid so the list keeps the seeding order; that is the order the
+// operator is used to in the dropdown.
+//
 // Not cached with 'use cache'. The read would run during the build and
 // bake whatever the build machine's database holds into the static shell,
 // and an admin edit to a line name would then need an explicit invalidation
 // to show up. The pages that read it are 'instant = false' anyway (the
 // LIFF gate withholds their children), so a cached shell would buy nothing.
 export function listLines(): string[] {
-  const rows = getDb().prepare('SELECT name FROM lines ORDER BY rowid').all() as {
-    name: string
-  }[]
-  return rows.map((row) => row.name)
+  return getOrm()
+    .select({ name: lines.name })
+    .from(lines)
+    .orderBy(sql`rowid`)
+    .all()
+    .map((row) => row.name)
 }
 
 // Sync variant for request validation in route handlers (which are dynamic
 // anyway and must not pull in the cacheComponents io()).
 export function lineExists(name: string): boolean {
   return (
-    getDb().prepare('SELECT 1 FROM lines WHERE name = ?').get(name) !== undefined
+    getOrm()
+      .select({ name: lines.name })
+      .from(lines)
+      .where(eq(lines.name, name))
+      .get() !== undefined
   )
 }
 
@@ -186,74 +168,60 @@ export function lineExists(name: string): boolean {
 // Shared WHERE for the admin list: the table narrows by period, line and
 // order-number search. The KPI strip does not use it; it follows its own
 // day/month/year window (getOrderOverview).
-function buildOrderWhere(filters: OrderListFilters): {
-  whereSql: string
-  params: (string | number)[]
-} {
-  const where: string[] = []
-  const params: (string | number)[] = []
+function buildOrderWhere(filters: OrderListFilters): SQL | undefined {
+  const conditions: SQL[] = []
 
   if (filters.from) {
-    where.push('o.order_date >= ?')
-    params.push(filters.from)
+    conditions.push(sql`${orders.orderDate} >= ${filters.from}`)
   }
   if (filters.to) {
-    where.push('o.order_date <= ?')
-    params.push(filters.to)
+    conditions.push(sql`${orders.orderDate} <= ${filters.to}`)
   }
   if (filters.line) {
-    where.push('o.line = ?')
-    params.push(filters.line)
+    conditions.push(eq(orders.line, filters.line))
   }
   if (filters.query) {
     // The escape character is a single backslash, written as a JS escape.
-    where.push("o.order_number LIKE ? ESCAPE '\\'")
-    params.push(`%${escapeLike(filters.query)}%`)
+    const like = `%${escapeLike(filters.query)}%`
+    conditions.push(sql`${orders.orderNumber} LIKE ${like} ESCAPE '\\'`)
   }
 
-  return {
-    whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
-    params,
-  }
+  return conditions.length ? and(...conditions) : undefined
 }
 
 // The KPI strip and the trend chart share one window, so the summary takes
 // that range and nothing else. A line or a search term belongs to the table
 // below, not to the overview.
+//
+// Three small counts instead of one statement with three scalar subqueries:
+// the queries are readable on their own, and SQLite answers them from the
+// same indexes in the same process.
 export function getOrderSummary(range: {
   from: string
   to: string
 }): OrderSummary {
-  const row = getDb()
-    .prepare(
-      `SELECT
-         (SELECT COUNT(*) FROM orders o
-            WHERE o.order_date BETWEEN ? AND ?) AS orders,
-         (SELECT COUNT(*) FROM items i
-            JOIN orders o ON o.id = i.order_id
-            WHERE o.order_date BETWEEN ? AND ?) AS items,
-         (SELECT COUNT(*) FROM images img
-            JOIN orders o ON o.id = img.order_id
-            WHERE o.order_date BETWEEN ? AND ?) AS images`,
-    )
-    .get(
-      range.from,
-      range.to,
-      range.from,
-      range.to,
-      range.from,
-      range.to,
-    ) as {
-    orders: number
-    items: number
-    images: number
-  }
+  const orm = getOrm()
+  const window = between(orders.orderDate, range.from, range.to)
 
-  return {
-    orders: row.orders,
-    items: row.items,
-    images: row.images,
-  }
+  const orderCount =
+    orm.select({ count: sql<number>`count(*)` }).from(orders).where(window).get()
+      ?.count ?? 0
+  const itemCount =
+    orm
+      .select({ count: sql<number>`count(*)` })
+      .from(items)
+      .innerJoin(orders, eq(orders.id, items.orderId))
+      .where(window)
+      .get()?.count ?? 0
+  const imageCount =
+    orm
+      .select({ count: sql<number>`count(*)` })
+      .from(images)
+      .innerJoin(orders, eq(orders.id, images.orderId))
+      .where(window)
+      .get()?.count ?? 0
+
+  return { orders: orderCount, items: itemCount, images: imageCount }
 }
 
 // The daily windows group by the stored date; the year window groups by its
@@ -263,18 +231,18 @@ function getTrendPoints(
   from: string,
   to: string,
 ): TrendPoint[] {
-  const bucketSql =
-    grain === 'year' ? 'substr(o.order_date, 1, 7)' : 'o.order_date'
+  const bucket =
+    grain === 'year'
+      ? sql<string>`substr(${orders.orderDate}, 1, 7)`
+      : sql<string>`${orders.orderDate}`
 
-  return getDb()
-    .prepare(
-      `SELECT ${bucketSql} AS bucket, COUNT(*) AS count
-       FROM orders o
-       WHERE o.order_date BETWEEN ? AND ?
-       GROUP BY bucket
-       ORDER BY bucket`,
-    )
-    .all(from, to) as TrendPoint[]
+  return getOrm()
+    .select({ bucket, count: sql<number>`count(*)` })
+    .from(orders)
+    .where(between(orders.orderDate, from, to))
+    .groupBy(bucket)
+    .orderBy(bucket)
+    .all()
 }
 
 // Everything the overview needs for all three grains in one call, so the page
@@ -297,33 +265,46 @@ export function getOrderOverview(today: string): OrderOverview {
 }
 
 export function listOrders(filters: OrderListFilters): OrderListResult {
-  const db = getDb()
+  const orm = getOrm()
   const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize)))
-  const { whereSql, params } = buildOrderWhere(filters)
-  const total = (
-    db.prepare(`SELECT COUNT(*) AS total FROM orders o ${whereSql}`).get(...params) as {
-      total: number
-    }
-  ).total
+  const where = buildOrderWhere(filters)
+
+  const total = orm
+    .select({ total: sql<number>`count(*)` })
+    .from(orders)
+    .where(where)
+    .get()?.total ?? 0
 
   const pageCount = total > 0 ? Math.ceil(total / pageSize) : 0
-  const page = Math.min(Math.max(1, Math.floor(filters.page)), Math.max(1, pageCount))
+  const page = Math.min(
+    Math.max(1, Math.floor(filters.page)),
+    Math.max(1, pageCount),
+  )
 
-  const rows = db
-    .prepare(
-      `SELECT
-         o.id, o.order_number, o.order_date, o.line, o.created_by, o.created_at,
-         (SELECT COUNT(*) FROM items i WHERE i.order_id = o.id) AS item_count,
-         u.display_name AS creator_name
-       FROM orders o
-       LEFT JOIN users u ON u.line_user_id = o.created_by
-       ${whereSql}
-       ORDER BY o.order_date DESC, o.created_at DESC
-       LIMIT ? OFFSET ?`,
-    )
-    .all(...params, pageSize, (page - 1) * pageSize) as OrderListRowSql[]
+  const rows = orm
+    .select({
+      order: orders,
+      // Counting in the same statement avoids one query per row on a page
+      // that shows 25 of them.
+      itemCount: sql<number>`(SELECT count(*) FROM ${items} WHERE ${items.orderId} = ${orders.id})`,
+      creatorName: users.displayName,
+    })
+    .from(orders)
+    .leftJoin(users, eq(users.lineUserId, orders.createdBy))
+    .where(where)
+    .orderBy(sql`${orders.orderDate} DESC`, sql`${orders.createdAt} DESC`)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .all()
 
-  return { rows: rows.map(toOrderListRow), total, page, pageCount }
+  return {
+    rows: rows.map((row) =>
+      toOrderListRow(row.order, row.itemCount, row.creatorName),
+    ),
+    total,
+    page,
+    pageCount,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -335,11 +316,17 @@ function findOrder(
   orderDate: string,
   line: string,
 ): OrderRecord | undefined {
-  const row = getDb()
-    .prepare(
-      'SELECT * FROM orders WHERE order_number = ? AND order_date = ? AND line = ?',
+  const row = getOrm()
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.orderNumber, orderNumber),
+        eq(orders.orderDate, orderDate),
+        eq(orders.line, line),
+      ),
     )
-    .get(orderNumber, orderDate, line) as OrderRow | undefined
+    .get()
   return row ? toOrder(row) : undefined
 }
 
@@ -357,16 +344,22 @@ function createOrder(input: {
     createdBy: input.createdBy,
     createdAt: new Date().toISOString(),
   }
-  getDb()
-    .prepare(
-      'INSERT INTO orders (id, order_number, order_date, line, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    )
-    .run(order.id, order.orderNumber, order.orderDate, order.line, order.createdBy, order.createdAt)
+  getOrm()
+    .insert(orders)
+    .values({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      orderDate: order.orderDate,
+      line: order.line,
+      createdBy: order.createdBy,
+      createdAt: order.createdAt,
+    })
+    .run()
   return order
 }
 
 function getItem(id: string): ItemRecord | undefined {
-  const row = getDb().prepare('SELECT * FROM items WHERE id = ?').get(id) as ItemRow | undefined
+  const row = getOrm().select().from(items).where(eq(items.id, id)).get()
   return row ? toItem(row) : undefined
 }
 
@@ -384,12 +377,36 @@ function insertItem(input: {
     createdBy: input.createdBy,
     createdAt: new Date().toISOString(),
   }
-  getDb()
-    .prepare(
-      'INSERT INTO items (id, order_id, parent_item_id, item_number, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    )
-    .run(item.id, item.orderId, item.parentItemId, item.itemNumber, item.createdBy, item.createdAt)
+  getOrm()
+    .insert(items)
+    .values({
+      id: item.id,
+      orderId: item.orderId,
+      parentItemId: item.parentItemId,
+      itemNumber: item.itemNumber,
+      createdBy: item.createdBy,
+      createdAt: item.createdAt,
+    })
+    .run()
   return item
+}
+
+// True when the error, or anything it wraps, is a rejected UNIQUE insert.
+// Drizzle wraps some failures in a DrizzleQueryError; better-sqlite3 puts the
+// SQLite code on the error it throws, so both shapes are checked.
+function isUniqueViolation(error: unknown): boolean {
+  let current = error
+  for (let depth = 0; depth < 5 && current; depth++) {
+    const code = (current as { code?: string }).code
+    if (
+      code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      code === 'SQLITE_CONSTRAINT_PRIMARYKEY'
+    ) {
+      return true
+    }
+    current = (current as { cause?: unknown }).cause
+  }
+  return false
 }
 
 // Cross-process insert race (dev + prod server open on the same file): the
@@ -404,10 +421,7 @@ function withRetry<T>(fn: () => T): T {
     try {
       return fn()
     } catch (error) {
-      const code = (error as { code?: string } | null)?.code
-      if (code !== 'SQLITE_CONSTRAINT_UNIQUE' && code !== 'SQLITE_CONSTRAINT_PRIMARYKEY') {
-        throw error
-      }
+      if (!isUniqueViolation(error)) throw error
       lastError = error
     }
   }
@@ -425,12 +439,15 @@ export function findOrCreateOrder(input: {
   line: string
   createdBy: string
 }): OrderRecord {
-  const run = getDb().transaction(
-    () =>
-      findOrder(input.orderNumber, input.orderDate, input.line) ??
-      createOrder(input),
+  // The callback stays synchronous on purpose: better-sqlite3's transaction
+  // commits only after it returns. The helpers inside it call getOrm() rather
+  // than taking the transaction handle, which is still correct: every handle
+  // shares the one connection, so their statements join this transaction.
+  return withRetry(() =>
+    getOrm().transaction(
+      () => findOrder(input.orderNumber, input.orderDate, input.line) ?? createOrder(input),
+    ),
   )
-  return withRetry(run)
 }
 
 // Step 2 "add item" buttons: auto-numbered next single (+100) or next
@@ -442,74 +459,95 @@ export function addItem(
   parentItemId: string | null,
   createdBy: string,
 ): AddItemResult {
-  const db = getDb()
-  const run = db.transaction((): AddItemResult => {
-    if (parentItemId === null) {
-      const tops = db
-        .prepare('SELECT item_number FROM items WHERE order_id = ? AND parent_item_id IS NULL')
-        .all(orderId) as { item_number: number }[]
+  const orm = getOrm()
+  // withRetry re-runs the whole transaction, so the callback is built fresh
+  // for every attempt instead of capturing variables from a previous run.
+  return withRetry(() =>
+    orm.transaction((): AddItemResult => {
+      if (parentItemId === null) {
+        const tops = orm
+          .select({ itemNumber: items.itemNumber })
+          .from(items)
+          .where(and(eq(items.orderId, orderId), sql`${items.parentItemId} IS NULL`))
+          .all()
+        return {
+          ok: true,
+          item: insertItem({
+            orderId,
+            itemNumber: nextSingleNumber(tops.map((row) => row.itemNumber)),
+            parentItemId: null,
+            createdBy,
+          }),
+        }
+      }
+
+      const parent = getItem(parentItemId)
+      if (!parent || parent.orderId !== orderId) {
+        return { ok: false, error: 'parent-missing' }
+      }
+      if (parent.parentItemId !== null) {
+        return { ok: false, error: 'variety-of-variety' }
+      }
+      const children = orm
+        .select({ itemNumber: items.itemNumber })
+        .from(items)
+        .where(eq(items.parentItemId, parentItemId))
+        .all()
+      const next = nextVarietyNumber(
+        parent.itemNumber,
+        children.map((row) => row.itemNumber),
+      )
+      if (next === null) return { ok: false, error: 'pack-full' }
       return {
         ok: true,
-        item: insertItem({
-          orderId,
-          itemNumber: nextSingleNumber(tops.map((row) => row.item_number)),
-          parentItemId: null,
-          createdBy,
-        }),
+        item: insertItem({ orderId, itemNumber: next, parentItemId, createdBy }),
       }
-    }
-
-    const parent = getItem(parentItemId)
-    if (!parent || parent.orderId !== orderId) return { ok: false, error: 'parent-missing' }
-    if (parent.parentItemId !== null) return { ok: false, error: 'variety-of-variety' }
-    const children = db
-      .prepare('SELECT item_number FROM items WHERE parent_item_id = ?')
-      .all(parentItemId) as { item_number: number }[]
-    const next = nextVarietyNumber(
-      parent.itemNumber,
-      children.map((row) => row.item_number),
-    )
-    if (next === null) return { ok: false, error: 'pack-full' }
-    return {
-      ok: true,
-      item: insertItem({ orderId, itemNumber: next, parentItemId, createdBy }),
-    }
-  })
-  return withRetry(run)
+    }),
+  )
 }
 
 export function orderExists(id: string): boolean {
-  return getDb().prepare('SELECT 1 FROM orders WHERE id = ?').get(id) !== undefined
+  return (
+    getOrm().select({ id: orders.id }).from(orders).where(eq(orders.id, id)).get() !==
+    undefined
+  )
 }
 
 export function getOrderDetail(orderId: string): OrderDetail | undefined {
-  const db = getDb()
-  const orderRow = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as
-    | OrderRow
-    | undefined
+  const orm = getOrm()
+  const orderRow = orm.select().from(orders).where(eq(orders.id, orderId)).get()
   if (!orderRow) return undefined
 
-  const itemRows = db
-    .prepare('SELECT * FROM items WHERE order_id = ? ORDER BY item_number')
-    .all(orderId) as ItemRow[]
-  const imageRows = db
-    .prepare('SELECT * FROM images WHERE order_id = ? ORDER BY seq')
-    .all(orderId) as ImageRow[]
+  const itemRows = orm
+    .select()
+    .from(items)
+    .where(eq(items.orderId, orderId))
+    .orderBy(items.itemNumber)
+    .all()
+  const imageRows = orm
+    .select()
+    .from(images)
+    .where(eq(images.orderId, orderId))
+    .orderBy(images.seq)
+    .all()
 
   const nodes = new Map(
-    itemRows.map((row) => [row.id, { ...toItem(row), images: [], children: [] } as OrderItemNode]),
+    itemRows.map((row) => [
+      row.id,
+      { ...toItem(row), images: [], children: [] } as OrderItemNode,
+    ]),
   )
   const tops: OrderItemNode[] = []
   for (const row of itemRows) {
     const node = nodes.get(row.id)
     if (!node) continue
-    const parent = row.parent_item_id ? nodes.get(row.parent_item_id) : undefined
+    const parent = row.parentItemId ? nodes.get(row.parentItemId) : undefined
     // An unknown parent id should be impossible (same order + cascade);
     // show the item at top level rather than lose it.
     if (parent) parent.children.push(node)
     else tops.push(node)
   }
-  for (const row of imageRows) nodes.get(row.item_id)?.images.push(toImage(row))
+  for (const row of imageRows) nodes.get(row.itemId)?.images.push(toImage(row))
 
   return { order: toOrder(orderRow), items: tops }
 }
@@ -518,16 +556,17 @@ export function getOrderDetail(orderId: string): OrderDetail | undefined {
 // back link), the item itself and its photos in seq order. The client
 // refetches this after every mutation on that page.
 export function getItemDetail(itemId: string): ItemDetail | undefined {
-  const db = getDb()
-  const itemRow = db.prepare('SELECT * FROM items WHERE id = ?').get(itemId) as ItemRow | undefined
+  const orm = getOrm()
+  const itemRow = orm.select().from(items).where(eq(items.id, itemId)).get()
   if (!itemRow) return undefined
-  const orderRow = db.prepare('SELECT * FROM orders WHERE id = ?').get(itemRow.order_id) as
-    | OrderRow
-    | undefined
+  const orderRow = orm.select().from(orders).where(eq(orders.id, itemRow.orderId)).get()
   if (!orderRow) return undefined
-  const imageRows = db
-    .prepare('SELECT * FROM images WHERE item_id = ? ORDER BY seq')
-    .all(itemId) as ImageRow[]
+  const imageRows = orm
+    .select()
+    .from(images)
+    .where(eq(images.itemId, itemId))
+    .orderBy(images.seq)
+    .all()
   return {
     order: toOrder(orderRow),
     item: toItem(itemRow),
@@ -536,7 +575,10 @@ export function getItemDetail(itemId: string): ItemDetail | undefined {
 }
 
 export function itemExists(id: string): boolean {
-  return getDb().prepare('SELECT 1 FROM items WHERE id = ?').get(id) !== undefined
+  return (
+    getOrm().select({ id: items.id }).from(items).where(eq(items.id, id)).get() !==
+    undefined
+  )
 }
 
 // Deletes the item row; children and image rows follow via ON DELETE
@@ -544,15 +586,19 @@ export function itemExists(id: string): boolean {
 // creates one variety level (a variety cannot parent another), so item +
 // direct children cover every descendant image.
 export function deleteItemCascade(itemId: string): boolean {
-  const db = getDb()
-  const keys = db
-    .prepare(
-      "SELECT storage_key FROM images WHERE item_id = ? OR item_id IN (SELECT id FROM items WHERE parent_item_id = ?)",
-    )
-    .all(itemId, itemId) as { storage_key: string }[]
-  const info = db.prepare('DELETE FROM items WHERE id = ?').run(itemId)
-  if (info.changes === 0) return false
-  for (const row of keys) removeStoredFile(toAbsolute(row.storage_key))
+  const orm = getOrm()
+  const children = orm
+    .select({ id: items.id })
+    .from(items)
+    .where(eq(items.parentItemId, itemId))
+  const keys = orm
+    .select({ storageKey: images.storageKey })
+    .from(images)
+    .where(or(eq(images.itemId, itemId), inArray(images.itemId, children)))
+    .all()
+  const result = orm.delete(items).where(eq(items.id, itemId)).run()
+  if (result.changes === 0) return false
+  for (const row of keys) removeStoredFile(toAbsolute(row.storageKey))
   return true
 }
 
@@ -560,18 +606,19 @@ export function deleteItemCascade(itemId: string): boolean {
 // storage keys are read inside the transaction, then the files are unlinked
 // after the commit (best effort, same rule as deleteItemCascade).
 export function deleteOrderCascade(orderId: string): boolean {
-  const db = getDb()
-  const run = db.transaction((): { storage_key: string }[] | null => {
-    const keys = db
-      .prepare('SELECT storage_key FROM images WHERE order_id = ?')
-      .all(orderId) as { storage_key: string }[]
-    const info = db.prepare('DELETE FROM orders WHERE id = ?').run(orderId)
-    return info.changes > 0 ? keys : null
+  const orm = getOrm()
+  const keys = orm.transaction((): string[] | null => {
+    const rows = orm
+      .select({ storageKey: images.storageKey })
+      .from(images)
+      .where(eq(images.orderId, orderId))
+      .all()
+    const result = orm.delete(orders).where(eq(orders.id, orderId)).run()
+    return result.changes > 0 ? rows.map((row) => row.storageKey) : null
   })
 
-  const keys = run()
   if (!keys) return false
-  for (const row of keys) removeStoredFile(toAbsolute(row.storage_key))
+  for (const key of keys) removeStoredFile(toAbsolute(key))
   return true
 }
 
@@ -592,86 +639,78 @@ export function saveImage(input: {
   createdBy: string
   buffer: Buffer
 }): ImageRecord {
-  const db = getDb()
-  const run = db.transaction((): ImageRecord => {
-    const target = db
-      .prepare(
-        `SELECT i.item_number, o.id AS order_id, o.order_number, o.order_date, o.line
-           FROM items i JOIN orders o ON o.id = i.order_id
-          WHERE i.id = ?`,
+  const orm = getOrm()
+  // Rebuilt per attempt: withRetry re-runs the transaction after a lost
+  // cross-process race, and a retry must re-read the seq it lost.
+  return withRetry(() =>
+    orm.transaction((): ImageRecord => {
+      const target = orm
+        .select({
+          itemNumber: items.itemNumber,
+          orderId: orders.id,
+          orderNumber: orders.orderNumber,
+          orderDate: orders.orderDate,
+          line: orders.line,
+        })
+        .from(items)
+        .innerJoin(orders, eq(orders.id, items.orderId))
+        .where(eq(items.id, input.itemId))
+        .get()
+      if (!target) throw new Error('saveImage: item not found')
+
+      const seq =
+        orm
+          .select({ next: sql<number>`coalesce(max(${images.seq}), 0) + 1` })
+          .from(images)
+          .where(eq(images.itemId, input.itemId))
+          .get()?.next ?? 1
+      // The three formats the form accepts; anything else is rejected by the
+      // route before reaching here, so the fallback is jpeg (old chat flow).
+      const ext =
+        input.mimeType === 'image/png'
+          ? 'png'
+          : input.mimeType === 'image/webp'
+            ? 'webp'
+            : 'jpg'
+      const key = buildKey(
+        target.orderDate,
+        target.orderNumber,
+        target.line,
+        target.itemNumber,
+        seq,
+        input.package,
+        ext,
       )
-      .get(input.itemId) as
-      | {
-          item_number: number
-          order_id: string
-          order_number: string
-          order_date: string
-          line: string
-        }
-      | undefined
-    if (!target) throw new Error('saveImage: item not found')
+      const absolute = toAbsolute(key)
+      // The write path needs the same guard as the read path: a key that
+      // resolves outside the storage root would drop a file anywhere on the
+      // disk. buildKey() already makes every segment a plain name, so this is
+      // the second line of defence rather than the only one.
+      if (!isInsideRoot(absolute)) {
+        throw new Error('saveImage: storage key escapes the storage root')
+      }
+      ensureDirForFile(absolute)
+      writeFileSync(absolute, input.buffer)
 
-    const seq = (
-      db.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM images WHERE item_id = ?').get(
-        input.itemId,
-      ) as { next: number }
-    ).next
-    // The three formats the form accepts; anything else is rejected by the
-    // route before reaching here, so the fallback is jpeg (old chat flow).
-    const ext =
-      input.mimeType === 'image/png' ? 'png' : input.mimeType === 'image/webp' ? 'webp' : 'jpg'
-    const key = buildKey(
-      target.order_date,
-      target.order_number,
-      target.line,
-      target.item_number,
-      seq,
-      input.package,
-      ext,
-    )
-    const absolute = toAbsolute(key)
-    // The write path needs the same guard as the read path: a key that
-    // resolves outside the storage root would drop a file anywhere on the
-    // disk. buildKey() already makes every segment a plain name, so this is
-    // the second line of defence rather than the only one.
-    if (!isInsideRoot(absolute)) {
-      throw new Error('saveImage: storage key escapes the storage root')
-    }
-    ensureDirForFile(absolute)
-    writeFileSync(absolute, input.buffer)
-
-    const row: ImageRow = {
-      id: randomUUID(),
-      item_id: input.itemId,
-      order_id: target.order_id,
-      seq,
-      package: input.package,
-      file_name: input.fileName,
-      mime_type: input.mimeType,
-      file_size: input.fileSize,
-      storage_key: key,
-      created_by: input.createdBy,
-      created_at: new Date().toISOString(),
-    }
-    db.prepare(
-      `INSERT INTO images (id, item_id, order_id, seq, package, file_name, mime_type, file_size, storage_key, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      row.id,
-      row.item_id,
-      row.order_id,
-      row.seq,
-      row.package,
-      row.file_name,
-      row.mime_type,
-      row.file_size,
-      row.storage_key,
-      row.created_by,
-      row.created_at,
-    )
-    return toImage(row)
-  })
-  return withRetry(run)
+      const row = {
+        id: randomUUID(),
+        itemId: input.itemId,
+        orderId: target.orderId,
+        seq,
+        // The route validated the package against PACKAGE_OPTIONS; the cast is
+        // only here because the column type is the narrower enum.
+        package: input.package as PackageName | null,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        storageKey: key,
+        createdBy: input.createdBy,
+        createdAt: new Date().toISOString(),
+      }
+      orm.insert(images).values(row).run()
+      return toImage(row)
+    }),
+  )
 }
 
 // Minimal shape for the file-serving route. storage_key deliberately stays
@@ -679,31 +718,42 @@ export function saveImage(input: {
 export function getImageFile(
   id: string,
 ): { storageKey: string; mimeType: string | null } | undefined {
-  const row = getDb()
-    .prepare('SELECT storage_key, mime_type FROM images WHERE id = ?')
-    .get(id) as { storage_key: string; mime_type: string | null } | undefined
-  return row ? { storageKey: row.storage_key, mimeType: row.mime_type } : undefined
+  const row = getOrm()
+    .select({ storageKey: images.storageKey, mimeType: images.mimeType })
+    .from(images)
+    .where(eq(images.id, id))
+    .get()
+  return row ?? undefined
 }
 
 export function getImage(id: string): ImageRecord | undefined {
-  const row = getDb().prepare('SELECT * FROM images WHERE id = ?').get(id) as ImageRow | undefined
+  const row = getOrm().select().from(images).where(eq(images.id, id)).get()
   return row ? toImage(row) : undefined
 }
 
 // Row first, file second: the database stays the source of truth and a
 // failed unlink only leaves a harmless orphan on disk.
 export function deleteImage(id: string): boolean {
-  const row = getDb()
-    .prepare('SELECT storage_key FROM images WHERE id = ?')
-    .get(id) as { storage_key: string } | undefined
+  const orm = getOrm()
+  const row = orm
+    .select({ storageKey: images.storageKey })
+    .from(images)
+    .where(eq(images.id, id))
+    .get()
   if (!row) return false
-  const info = getDb().prepare('DELETE FROM images WHERE id = ?').run(id)
-  if (info.changes === 0) return false
-  removeStoredFile(toAbsolute(row.storage_key))
+  const result = orm.delete(images).where(eq(images.id, id)).run()
+  if (result.changes === 0) return false
+  removeStoredFile(toAbsolute(row.storageKey))
   return true
 }
 
 export function setImagePackage(id: string, pkg: string | null): boolean {
-  const info = getDb().prepare('UPDATE images SET package = ? WHERE id = ?').run(pkg, id)
-  return info.changes > 0
+  // Same cast as saveImage: the caller (a route handler) validated the value
+  // against PACKAGE_OPTIONS before it got here.
+  const result = getOrm()
+    .update(images)
+    .set({ package: pkg as PackageName | null })
+    .where(eq(images.id, id))
+    .run()
+  return result.changes > 0
 }
