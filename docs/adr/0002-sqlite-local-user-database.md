@@ -1,5 +1,7 @@
 # User data lives in a local SQLite file, read and written without an ORM
 
+> Superseded in part by [ADR 0013](0013-drizzle-orm-over-better-sqlite3.md): user data still lives in a local SQLite file, but the schema is now written in Drizzle and applied by generated migrations instead of the `CREATE TABLE IF NOT EXISTS` bootstrap described below.
+
 Registration data (the users shown on the register screen) is stored in a single better-sqlite3 file at `database/wh.db`, opened from server code with plain SQL. The schema bootstraps on first open via `CREATE TABLE IF NOT EXISTS` in `lib/db/index.ts`; there is no migration tool, so changing columns later means a manual `ALTER TABLE`. One table with no joins or reporting queries did not justify drizzle, and a local file keeps the dashboard self-contained with no database server to run.
 
 Access is server-only: the register page reads through `lib/db/users.ts` and approve/reject are server actions, so there is no REST layer yet. When the LIFF side needs this data, its endpoints live under `/api/liff/*` — a path the owner adds to the WAF allowlist at Cloudflare (ADR 0001), keeping the LIFF pages under `/liff` and the API under its own prefix.

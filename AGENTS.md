@@ -28,7 +28,7 @@ Two layers, split by what they can prove.
 Data isolation is the part to understand before adding a test:
 
 - `tests/unit/setup/db.ts` exports `isolateTestData()`. Call it at the top of any test file that touches the database or the upload folder: it points `WH_DB_PATH` and `STORAGE_PATH` at a temp dir and wipes both before every test, so counting rows is trustworthy and nothing reaches `database/wh.db`.
-- Those two variables are read lazily (`lib/db/index.ts` on open, `lib/order-images/storage.ts` per call), which is what makes the swap possible. An open connection is cached on `globalThis.__whDb`, so the helper calls `closeDb()` around every test.
+- Those two variables are read lazily (`lib/db/index.ts` on open, `lib/order-images/storage.ts` per call), which is what makes the swap possible. The connection and the ORM built on it are cached together on `globalThis` (`__whDb`, `__whOrm`), and `closeDb()` drops both, so the helper calls it around every test.
 - The e2e harness owns its own server, port, database, upload folder and Next build output (`tests/e2e/support/env.ts`, `playwright.config.ts`; `WH_DIST_DIR` in `next.config.ts`). It never touches port 8080, the real database or the developer's `.next`.
 - The e2e runner and the server it starts must agree on the run id (`WH_E2E_RUN_ID`), or they work on different database files and the specs see neither the seeded rows nor the deletions. `tests/e2e/support/env.ts` sets it on the runner's process and `playwright.config.ts` passes it on in `webServer.env`.
 - The e2e specs import the data layer, which carries the `server-only` marker. That package throws on import unless the `react-server` export condition is set, which Next sets for the server bundle but Playwright does not: the `test:e2e` scripts pass `--conditions=react-server` for that reason.
@@ -36,6 +36,15 @@ Data isolation is the part to understand before adding a test:
 - A LINE-verified identity cannot be produced from a browser, so the register and cookie cases seed rows through the real data layer (`tests/e2e/support/data.ts`) and mint cookies with the harness secret. Each spec uses a unique name or id because the specs share one database.
 - A component library reports a misused component in the browser console, and a locator assertion never sees it. `tests/e2e/support/console.ts` collects those console errors, and the specs that walk a screen check them at the end. A spec that clicks through a screen without that check passes while the console fills up with errors.
 - Bun loads `.env` into the test process, so a test that depends on an env var must set it explicitly rather than rely on it being absent.
+
+## Schema and database
+
+- `lib/db/schema.ts` is the single source of truth for the six tables, their indexes, unique indexes and CHECK constraints. The SQL under `drizzle/` is generated from it by `bunx drizzle-kit generate` (`drizzle.config.ts` holds the dialect and paths), and the generated files are committed.
+- Changing a column or an index means editing `lib/db/schema.ts` and regenerating. Hand-editing the database or the SQL under `drizzle/` is not the workflow (ADR 0013). Constrained text columns carry a type-level `enum`, but the CHECK constraint in the SQL is what the file enforces.
+- `lib/db/index.ts` opens the file, sets the pragmas (WAL, `busy_timeout 5000`, `foreign_keys ON`), runs `migrate()` over `drizzle/`, then seeds the line catalog. `migrate()` takes the ORM instance, not the raw driver, because it runs through the dialect. If the migration throws, the handle is closed before the error is rethrown: a half-open handle locks the file on Windows and the next test file fails with EPERM.
+- `drizzle/` is read at runtime, so it must ship with the app. It resolves from `process.cwd()` under `next start`; a future standalone build would have to trace it into the output.
+- A database file created before ADR 0013 has no `__drizzle_migrations` table, so `migrate()` tries to create tables that already exist and fails. Copy the file aside and start from an empty one rather than patching it.
+- Data-layer modules query through `getOrm()`; `getDb()` stays for row counts and the rare direct query. Raw `sql` fragments remain where the builder falls short: `ESCAPE '\'` on LIKE, `substr(walk_date, 1, 7)` buckets, `count(*)`, correlated item counts and `ORDER BY rowid` in `listLines`.
 
 ## Layout architecture
 

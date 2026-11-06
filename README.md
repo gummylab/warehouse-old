@@ -7,7 +7,7 @@
 - `app/(admin)/` หน้าแอดมิน (จัดการผู้ใช้, จัดการรูปภาพออเดอร์) เข้าถึงจากเครื่องผู้ดูแลระบบเท่านั้น
 - `app/liff/` หน้าจอสำหรับผู้ใช้ LINE เปิดจากในแอป LINE เท่านั้น
 - `app/api/liff/` API ที่หน้า LIFF เรียกใช้
-- `lib/db/` ชั้นข้อมูล (SQLite ผ่าน better-sqlite3, ไม่มี ORM)
+- `lib/db/` ชั้นข้อมูล (SQLite ผ่าน better-sqlite3 + Drizzle ORM, schema ที่ `lib/db/schema.ts`)
 - `lib/liff/` การยืนยันตัวตนกับ LINE, คุกกี้เซสชัน, rate limit
 - `lib/order-images/` กติกาธุรกิจของฟอร์มรูปภาพ (หมายเลขไอเท็ม, key ของไฟล์, แพ็กเกจ)
 - `docs/adr/` บันทึกการตัดสินใจเชิงสถาปัตยกรรม
@@ -26,6 +26,8 @@ bun run verify       # lint + typecheck + unit test + build
 bun run test         # unit test (Vitest)
 bun run test:e2e     # e2e test (Playwright) ต้อง `bunx playwright install chromium` ครั้งแรก
 ```
+
+การแก้ schema: แก้ที่ `lib/db/schema.ts` แล้วรัน `bunx drizzle-kit generate` ไฟล์ SQL ที่สร้างใน `drizzle/` ต้อง commit ไปด้วย
 
 ดูรายละเอียดเพิ่มเติมใน `AGENTS.md`
 

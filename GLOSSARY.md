@@ -78,6 +78,20 @@ _Avoid_: file path, filename
 The pages and server actions under `app/(admin)/`, reachable only from the machine running the server. The rule that keeps them local is the one ADR 0004 uses for the LIFF surface: no `CF-Connecting-IP` header and a loopback `Host` (ADR 0007).
 _Avoid_: dashboard (the dashboard is one page of the admin surface), private pages
 
+## Database
+
+**Drizzle schema**:
+The TypeScript definition of every table, index and constraint in `lib/db/schema.ts`, the single source of truth for the shape of the database file. `drizzle-kit generate` turns it into the SQL under `drizzle/`, so the two move together (ADR 0013).
+_Avoid_: table definitions, entity model, schema file
+
+**Migration**:
+One generated SQL file under `drizzle/` that brings an existing database file in line with the Drizzle schema; `migrate()` applies the files the database has not recorded yet when the connection opens, and the generated file is committed. Changing a column or an index normally means editing `lib/db/schema.ts` and regenerating; editing the generated SQL by hand is a last resort, and the schema file must then describe the same shape (ADR 0013).
+_Avoid_: schema script, bootstrap SQL, ALTER script
+
+**ORM handle**:
+The Drizzle object built on one connection (`getOrm()`); the data layer queries through it, and `getDb()` keeps the raw driver for row counts and the rare direct query. The handle is cached with its connection and dropped together by `closeDb()` (ADR 0013).
+_Avoid_: db object, connection pool, client
+
 ## Testing
 
 **Test database**:
