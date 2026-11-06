@@ -95,7 +95,7 @@ function openDatabase(): Handles {
 
     // The line catalog is seeded here, once per open, rather than on every
     // read: a write inside a read path would make the catalog uncacheable.
-    seedLines(db)
+    seedLines(orm)
     return { db, orm }
   } catch (error) {
     // A half-open handle keeps the file locked on Windows, so a failed

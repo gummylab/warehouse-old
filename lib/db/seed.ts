@@ -8,7 +8,10 @@
 // inside a read would make the catalog uncacheable, and every form page
 // load would run a pointless COUNT.
 
-import type Database from 'better-sqlite3'
+import { sql } from 'drizzle-orm'
+
+import type { Orm } from './index'
+import { lines } from './schema'
 
 export const SEED_LINES = [
   'ดอกแค',
@@ -40,11 +43,21 @@ export const SEED_LINES = [
   'กล้วยไม้ 2',
 ]
 
+// The ORM is passed in rather than read from getOrm(): this runs from
+// openDatabase(), before the connection is cached, so calling getOrm() here
+// would open the file a second time.
+//
 // Seed only when the catalog is empty: a future admin edit (renamed or
 // removed line) must survive restarts, so this never re-inserts over rows.
-export function seedLines(db: Database.Database): void {
-  const count = (db.prepare('SELECT COUNT(*) AS c FROM lines').get() as { c: number }).c
+// onConflictDoNothing is the belt to that braces, in case two processes seed
+// at the same moment.
+export function seedLines(orm: Orm): void {
+  const count =
+    orm.select({ count: sql<number>`count(*)` }).from(lines).get()?.count ?? 0
   if (count > 0) return
-  const insert = db.prepare('INSERT OR IGNORE INTO lines (name) VALUES (?)')
-  for (const name of SEED_LINES) insert.run(name)
+  orm
+    .insert(lines)
+    .values(SEED_LINES.map((name) => ({ name })))
+    .onConflictDoNothing()
+    .run()
 }
