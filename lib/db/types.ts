@@ -136,6 +136,50 @@ export type LineWalkRecord = LineWalkInput & {
   updatedAt: string
 }
 
+// The admin list filters and results. The list keeps the form's record shape
+// and adds the resolved creator name for the table.
+export type LineWalkListFilters = {
+  period: OrderPeriod
+  date: string
+  from: string
+  to: string
+  line: string | null
+  shift: LineWalkShift | null
+  query: string | null
+  page: number
+  pageSize: number
+}
+
+export type LineWalkListRow = LineWalkRecord & {
+  creatorName: string
+}
+
+export type LineWalkListResult = {
+  rows: LineWalkListRow[]
+  total: number
+  page: number
+  pageCount: number
+}
+
+export type LineWalkSummary = {
+  records: number
+  people: number
+  amount: number
+}
+
+export type LineWalkPoint = {
+  bucket: string
+  people: number
+  amount: number
+}
+
+export type LineWalkOverviewRange = {
+  points: LineWalkPoint[]
+  summary: LineWalkSummary
+}
+
+export type LineWalkOverview = Record<TrendGrain, LineWalkOverviewRange>
+
 // One item with the order it belongs to: everything the item-images page
 // needs, scoped to a single item instead of the whole order tree.
 export type ItemDetail = {

@@ -2,6 +2,7 @@
 export const PAGE_TITLES: Record<string, string> = {
   '/': 'แดชบอร์ด',
   '/order-images': 'จัดการรูปภาพออเดอร์',
+  '/line-walks': 'รายการเดินไลน์',
   '/register': 'จัดการผู้ใช้',
   '/liff/authorization': 'ตรวจสอบสิทธิ์การใช้งาน',
   '/liff/forms': 'แบบฟอร์ม',

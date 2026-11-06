@@ -2,6 +2,7 @@
 // imports the type and the href builder, while the page sends the parsed
 // object to the data layer.
 import type { OrderListFilters, OrderPeriod } from '@/lib/db/types'
+import { periodRange } from '@/lib/date-range'
 
 import { isValidCalendarDate, todayBangkok } from './validation'
 
@@ -13,30 +14,6 @@ type SearchParams = Record<string, string | string[] | undefined>
 
 function first(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value)?.trim() ?? ''
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0')
-}
-
-// The anchor date is always a real calendar date. The selected period turns
-// it into the inclusive range the SQL query filters on.
-export function periodRange(
-  period: OrderPeriod,
-  date: string,
-): { from: string; to: string } {
-  if (period === 'day') return { from: date, to: date }
-
-  const [year, month] = date.split('-').map(Number)
-  if (period === 'month') {
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
-    return {
-      from: `${year}-${pad2(month)}-01`,
-      to: `${year}-${pad2(month)}-${pad2(lastDay)}`,
-    }
-  }
-
-  return { from: `${year}-01-01`, to: `${year}-12-31` }
 }
 
 function parsePeriod(value: string): OrderPeriod {
