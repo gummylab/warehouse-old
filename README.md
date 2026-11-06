@@ -7,7 +7,7 @@
 - `app/(admin)/` หน้าแอดมิน (จัดการผู้ใช้, จัดการรูปภาพออเดอร์) เข้าถึงจากเครื่องผู้ดูแลระบบเท่านั้น
 - `app/liff/` หน้าจอสำหรับผู้ใช้ LINE เปิดจากในแอป LINE เท่านั้น
 - `app/api/liff/` API ที่หน้า LIFF เรียกใช้
-- `lib/db/` ชั้นข้อมูล (SQLite ผ่าน better-sqlite3, ไม่มี ORM)
+- `lib/db/` ชั้นข้อมูล (SQLite ผ่าน better-sqlite3 + Drizzle ORM, schema ที่ `lib/db/schema.ts`)
 - `lib/liff/` การยืนยันตัวตนกับ LINE, คุกกี้เซสชัน, rate limit
 - `lib/order-images/` กติกาธุรกิจของฟอร์มรูปภาพ (หมายเลขไอเท็ม, key ของไฟล์, แพ็กเกจ)
 - `docs/adr/` บันทึกการตัดสินใจเชิงสถาปัตยกรรม
@@ -20,12 +20,16 @@
 ```bash
 bun run dev          # dev server ที่ 127.0.0.1:8080
 bun run dev:tunnel   # dev server + Cloudflare Tunnel
-bun run build        # production build
+bun run build        # production build (ตรวจ migration ก่อน)
+bun run db:generate  # สร้าง migration จาก `lib/db/schema.ts`
+bun run db:check     # ตรวจว่า `drizzle/` ตรงกับ schema (สร้าง migration ที่ขาดให้)
 bun run start        # production server + tunnel
 bun run verify       # lint + typecheck + unit test + build
 bun run test         # unit test (Vitest)
 bun run test:e2e     # e2e test (Playwright) ต้อง `bunx playwright install chromium` ครั้งแรก
 ```
+
+การแก้ schema: แก้ที่ `lib/db/schema.ts` แล้วรัน `bun run db:generate` ไฟล์ SQL ที่สร้างใน `drizzle/` ต้อง commit ไปด้วย ถ้ายังมี migration ที่ค้างอยู่ `bun run build` จะหยุดเอง
 
 ดูรายละเอียดเพิ่มเติมใน `AGENTS.md`
 
