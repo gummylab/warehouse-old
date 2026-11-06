@@ -21,7 +21,7 @@ test('edits the two locations and applies the storage root at once', async ({
   const storage = page.getByLabel('ที่จัดเก็บ', { exact: true })
 
   await expect(database).toHaveValue(/.+\.db$/)
-  await expect(storage).toHaveValue(/wh-order-images-storage$/)
+  await expect(storage).toHaveValue(/order-images$/)
 
   const moved = join(E2E_STORAGE_DIR, 'moved')
   await storage.fill(moved)
@@ -29,7 +29,7 @@ test('edits the two locations and applies the storage root at once', async ({
   await expect(page.getByText('บันทึกตำแหน่งที่ตั้งแล้ว')).toBeVisible()
   // The rule appends the app's folder name, and the field shows what the app
   // will actually use rather than what was typed.
-  await expect(storage).toHaveValue(join(moved, 'wh-order-images-storage'))
+  await expect(storage).toHaveValue(join(moved, 'order-images'))
 
   // A database file that does not exist yet must be confirmed before the app
   // switches to a brand-new empty database.
@@ -46,7 +46,7 @@ test('edits the two locations and applies the storage root at once', async ({
   await storage.fill(E2E_STORAGE_DIR)
   await page.getByRole('button', { name: 'บันทึกที่จัดเก็บ' }).click()
   await expect(storage).toHaveValue(
-    join(E2E_STORAGE_DIR, 'wh-order-images-storage'),
+    join(E2E_STORAGE_DIR, 'order-images'),
   )
 
   expect(errors).toEqual([])

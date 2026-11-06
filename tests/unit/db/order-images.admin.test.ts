@@ -13,7 +13,7 @@ import {
   listOrders,
   saveImage,
 } from '@/lib/db/order-images'
-import { toAbsolute } from '@/lib/order-images/storage'
+import { originalPath } from '@/lib/order-images/storage'
 
 import { isolateTestData } from '../setup/db'
 
@@ -54,6 +54,8 @@ function upload(itemId: string, size = 4, createdBy = CREATED_BY) {
     fileSize: bytes.length,
     createdBy,
     buffer: bytes,
+    web: Buffer.from('web'),
+    thumb: Buffer.from('thumb'),
   })
 }
 
@@ -256,7 +258,7 @@ describe('deleteOrderCascade', () => {
     const varietyImage = upload(variety.id)
 
     const files = [packImage, varietyImage].map((image) =>
-      toAbsolute(getImageFile(image.id)?.storageKey ?? ''),
+      originalPath(getImageFile(image.id)?.storageKey ?? ''),
     )
     for (const file of files) expect(existsSync(file)).toBe(true)
 

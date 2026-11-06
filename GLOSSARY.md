@@ -71,8 +71,16 @@ The httpOnly, 12-hour cookie `wh_order_image_session`, which the form exchanges 
 _Avoid_: LIFF session, auth token (the token is exchanged away, never kept)
 
 **Storage key**:
-The relative path a stored image occupies under `wh-order-images-storage` (`date/order/line/item/seq-package.ext`). It exists only server-side and is never part of an API response.
+The relative path a stored image occupies inside the app's storage folder, one level below the kind folder (`date/order/line/item/seq-package.ext`). It exists only server-side and is never part of an API response.
 _Avoid_: file path, filename
+
+**Original**:
+The uploaded file exactly as it arrived, kept so the archive holds what the camera produced and the display copies can be rebuilt from it (ADR 0015).
+_Avoid_: master file, source file, full-size copy
+
+**Derivative**:
+A smaller WebP copy generated from an original for display: `web` at 1600px for previews, or `thumb` at 480px for grids. Disposable, because it can be regenerated (ADR 0015).
+_Avoid_: resized copy, cache file, preview file
 
 **Admin surface**:
 The pages and server actions under `app/(admin)/`, reachable only from the machine running the server. The rule that keeps them local is the one ADR 0004 uses for the LIFF surface: no `CF-Connecting-IP` header and a loopback `Host` (ADR 0007).
@@ -99,7 +107,7 @@ The JSON file at `config/settings.json` that holds the paths saved on `/settings
 _Avoid_: config file, .env, preferences
 
 **Effective path**:
-The path the app actually uses after the rules have run: the resolved database file, or the storage base with `wh-order-images-storage` appended unless it already ends with that folder. The card shows the effective path, which is why a saved storage base reads back with the folder on the end.
+The path the app actually uses after the rules have run: the resolved database file, or the storage base with `order-images` appended unless the base is already a folder of that name. The card shows the effective path, which is why a saved storage base reads back with the folder on the end.
 _Avoid_: saved path, raw path, configured path
 
 **Database switch**:

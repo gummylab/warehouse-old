@@ -22,6 +22,7 @@ import type {
   LineWalkShift,
 } from '../../../lib/db/types'
 import { approvePendingUser, createPendingUser } from '../../../lib/db/users'
+import { buildImageVariants } from '../../../lib/order-images/optimize'
 
 export type SeededUser = {
   id: string
@@ -64,7 +65,7 @@ export function seedUser({
 }
 
 const PNG_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=',
   'base64',
 )
 
@@ -82,7 +83,7 @@ export type SeededOrder = {
 // An order as the LIFF form would leave it: one pack, one variety and a
 // photo on each, written through the same data layer the server uses. The
 // run's database and upload folder are already isolated by the harness.
-export function seedOrder({
+export async function seedOrder({
   orderNumber = uniqueOrderNumber(),
   orderDate = '2026-10-19',
   line = 'ดอกแค',
@@ -94,13 +95,18 @@ export function seedOrder({
   line?: string
   createdBy?: string
   imageCount?: number
-} = {}): SeededOrder {
+} = {}): Promise<SeededOrder> {
   const order = findOrCreateOrder({
     orderNumber,
     orderDate,
     line,
     createdBy,
   })
+
+  // The seed writes rows the way the upload route does, so it builds the two
+  // display sizes the same way. Byte-for-byte fixtures would be served as
+  // image/webp and fail to render.
+  const variants = await buildImageVariants(PNG_BYTES)
 
   const pack = addItem(order.id, null, createdBy)
   if (!pack.ok) throw new Error(`seedOrder: pack failed (${pack.error})`)
@@ -120,6 +126,8 @@ export function seedOrder({
         fileSize: PNG_BYTES.length,
         createdBy,
         buffer: PNG_BYTES,
+        web: variants.web,
+        thumb: variants.thumb,
       }),
     )
   }

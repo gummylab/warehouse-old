@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 
 import { itemExists, saveImage } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import {
+  buildImageVariants,
+  UnsupportedImageError,
+} from '@/lib/order-images/optimize'
 import { isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
 
 // One file per request; the form loops over a multi-file selection so a
@@ -38,6 +42,20 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // The declared MIME type is only a claim; decoding is what proves the bytes
+  // are one of the three formats. This happens before saveImage on purpose:
+  // sharp is async, and the save must stay inside one synchronous transaction.
+  let variants
+  try {
+    variants = await buildImageVariants(buffer)
+  } catch (error) {
+    if (error instanceof UnsupportedImageError) {
+      return NextResponse.json({ error: 'unsupported-type' }, { status: 400 })
+    }
+    throw error
+  }
+
   const image = saveImage({
     itemId,
     // The package is labelled after upload (same flow the old manage view
@@ -48,6 +66,8 @@ export async function POST(
     fileSize: file.size,
     createdBy: auth.createdBy,
     buffer,
+    web: variants.web,
+    thumb: variants.thumb,
   })
   return NextResponse.json({ image }, { status: 201 })
 }

@@ -1,37 +1,61 @@
 // Filesystem layout for order-image uploads, ported from eu-shipment's
-// lib/storage.ts (read-only reference). STORAGE_PATH from .env is the base
-// dir (e.g. D:\ or ./); the storage folder name is appended here so wh and
-// eu-shipment never share files even when pointed at the same base.
+// lib/storage.ts (read-only reference). STORAGE_PATH from .env (or the path
+// saved on /settings) is the base dir (e.g. D:\ or ./); the app folder name is
+// appended here so this app never shares files with another one pointed at the
+// same base.
+//
+// Inside the app folder every photo exists in three forms:
+//
+//   order-images/originals/<date>/<order>/<line>/<item>/<seq>-<package>.<ext>
+//   order-images/web/<date>/<order>/<line>/<item>/<seq>-<package>.webp
+//   order-images/thumb/<date>/<order>/<line>/<item>/<seq>-<package>.webp
+//
+// The database stores the key without any of those prefixes; the kind folder
+// is a storage detail. That keeps a backup to `originals/` enough to restore
+// every photo, with the derivatives rebuildable from it.
 import { mkdirSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 
 import { storageBase } from '../settings/paths'
 
-// The effective upload root: the configured base with the app's own folder
-// name appended, so wh and eu-shipment never share files even when pointed at
-// the same base. A value that already ends with the folder name is used as-is,
-// which keeps a path saved from /settings looking like the one the operator
-// typed.
-//
+const APP_FOLDER = 'order-images'
+
+// The two derivative sizes. `original` is not in this list: it is the file the
+// upload arrived as, not something this module generates.
+export type ImageSize = 'web' | 'thumb'
+export const DERIVATIVE_SIZES: readonly ImageSize[] = ['web', 'thumb']
+
 // Resolved per call rather than once at module load: the test harness points
 // STORAGE_PATH at a throwaway directory before the first write
 // (tests/unit/setup/db.ts), and a value saved on /settings has to apply to the
 // next write without a restart.
 export function storageRoot(): string {
   const base = storageBase()
-  return base.endsWith('wh-order-images-storage')
+  // Compare the folder itself, not a string suffix: a base such as
+  // "backup-order-images" must not be mistaken for the root already.
+  return path.basename(base) === APP_FOLDER
     ? base
-    : path.join(base, 'wh-order-images-storage')
+    : path.join(base, APP_FOLDER)
 }
 
-// Convert a relative storage key ('2026-10-19/1234/ดอกแค/100/1-Primary.jpg')
-// to an absolute file path.
-export function toAbsolute(key: string): string {
-  return path.join(storageRoot(), path.normalize(key))
+// The uploaded file. `key` is the relative storage key from the database
+// (date/order/line/item/file), never a path under the root.
+export function originalPath(key: string): string {
+  return path.join(storageRoot(), 'originals', path.normalize(key))
 }
 
-// Called before writing a new file; mkdir recursive also creates the root,
-// so no separate boot-time hook is needed.
+// A derivative keeps the key's folders and file name, changes the extension to
+// webp, and moves under its size folder.
+export function derivativeKey(key: string, size: ImageSize): string {
+  return `${size}/${key.replace(/\.[^./\\]+$/, '.webp')}`
+}
+
+export function derivativePath(key: string, size: ImageSize): string {
+  return path.join(storageRoot(), path.normalize(derivativeKey(key, size)))
+}
+
+// Called before writing a new file; mkdir recursive also creates the root and
+// the kind folders, so no separate boot-time hook is needed.
 export function ensureDirForFile(absoluteFilePath: string): void {
   mkdirSync(path.dirname(absoluteFilePath), { recursive: true })
 }
@@ -43,6 +67,15 @@ export function removeStoredFile(absoluteFilePath: string): void {
     unlinkSync(absoluteFilePath)
   } catch {
     // Best effort — a missing file must not fail the database delete.
+  }
+}
+
+// Removes the original and every derivative. Callers delete the row first, so
+// a missed derivative would outlive the row that names it.
+export function removeStoredFiles(key: string): void {
+  removeStoredFile(originalPath(key))
+  for (const size of DERIVATIVE_SIZES) {
+    removeStoredFile(derivativePath(key, size))
   }
 }
 

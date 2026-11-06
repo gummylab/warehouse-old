@@ -47,8 +47,8 @@ next-env.d.ts
 /config/settings.json
 
 # order-image uploads (only when STORAGE_PATH is unset and the default
-# ./wh-order-images-storage lands in the repo root)
-/wh-order-images-storage/
+# ./order-images lands in the repo root)
+/order-images/
 
 # test runs: the e2e server keeps its throwaway database, uploads and build
 # output under tests/.tmp/<run id>, plus Playwright's own artifacts

@@ -83,18 +83,18 @@ describe('storageRoot', () => {
   it('appends the app folder name to a base', () => {
     process.env.STORAGE_PATH = envStorage
 
-    expect(storageRoot()).toBe(join(envStorage, 'wh-order-images-storage'))
+    expect(storageRoot()).toBe(join(envStorage, 'order-images'))
   })
 
   it('keeps a path that already names the folder', () => {
-    process.env.STORAGE_PATH = join(envStorage, 'wh-order-images-storage')
+    process.env.STORAGE_PATH = join(envStorage, 'order-images')
 
-    expect(storageRoot()).toBe(join(envStorage, 'wh-order-images-storage'))
+    expect(storageRoot()).toBe(join(envStorage, 'order-images'))
   })
 
   it('applies a saved base to the next call', () => {
     updateSettings({ storagePath: savedStorage })
 
-    expect(storageRoot()).toBe(join(savedStorage, 'wh-order-images-storage'))
+    expect(storageRoot()).toBe(join(savedStorage, 'order-images'))
   })
 })

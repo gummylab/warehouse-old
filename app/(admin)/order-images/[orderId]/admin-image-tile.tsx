@@ -43,7 +43,7 @@ export function AdminImageTile({
             cookie, so the auth-gated route is loaded directly. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src */}
         <img
-          src={`/api/liff/order-images/images/${image.id}/file`}
+          src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
           alt={`รูปที่ ${image.seq}`}
           loading="lazy"
           decoding="async"

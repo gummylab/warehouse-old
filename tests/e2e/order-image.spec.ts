@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 
 import { expect, test } from '@playwright/test'
 
-import { buildKey, toAbsolute } from '../../lib/order-images/storage'
+import { buildKey, derivativePath, originalPath } from '../../lib/order-images/storage'
 
 import { collectConsoleErrors } from './support/console'
 import { uniqueOrderNumber } from './support/data'
@@ -11,10 +11,10 @@ import { uniqueOrderNumber } from './support/data'
 // database and upload folder. Every value it creates is unique, because the
 // specs share one database.
 
-// A one-pixel PNG. The server never decodes an upload (it stores and serves
-// the bytes), so this only has to be recognisable on the way back out.
+// A one-pixel PNG. It has to be a real image: the upload route decodes it to
+// build the web and thumb copies, so a header-only fixture would be rejected.
 const PNG_BYTES = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=',
   'base64',
 )
 
@@ -81,9 +81,18 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
 
   // ---- the bytes round-trip through the auth-gated file endpoint -------
   const src = await page.locator('img[alt="รูปที่ 1"]').getAttribute('src')
-  expect(src).toMatch(/^\/api\/liff\/order-images\/images\/[0-9a-f-]+\/file$/)
+  expect(src).toMatch(
+    /^\/api\/liff\/order-images\/images\/[0-9a-f-]+\/file\?size=thumb$/,
+  )
 
-  const download = await request.get(src ?? '')
+  // The grid asks for the thumbnail, which is a WebP the route generated.
+  const thumbResponse = await request.get(src ?? '')
+  expect(thumbResponse.status()).toBe(200)
+  expect(thumbResponse.headers()['content-type']).toBe('image/webp')
+
+  // The original is still there, unchanged, behind ?size=original.
+  const originalSrc = (src ?? '').replace('?size=thumb', '?size=original')
+  const download = await request.get(originalSrc)
   expect(download.status()).toBe(200)
   expect(download.headers()['content-type']).toBe('image/png')
   expect((await download.body()).length).toBe(PNG_BYTES.length)
@@ -93,8 +102,10 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // layout (date/order/line/item/seq-package.ext) rather than a copy of it.
   const key = buildKey(orderDate, orderNumber, line, 100, 1, null, 'png')
   expect(key.endsWith('/100/1-Primary.png')).toBe(true)
-  const storedFile = toAbsolute(key)
+  const storedFile = originalPath(key)
   expect(existsSync(storedFile)).toBe(true)
+  expect(existsSync(derivativePath(key, 'web'))).toBe(true)
+  expect(existsSync(derivativePath(key, 'thumb'))).toBe(true)
 
   // ---- label the photo -------------------------------------------------
   // The package lives in the card's menu: open the menu, open the
@@ -155,6 +166,8 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // The card leaves the grid on the click; the unlink happens on the server
   // response, so poll the disk instead of reading it in the same tick.
   await expect.poll(() => existsSync(storedFile)).toBe(false)
+  expect(existsSync(derivativePath(key, 'web'))).toBe(false)
+  expect(existsSync(derivativePath(key, 'thumb'))).toBe(false)
 
   // ---- delete the item, taking its variety with it ---------------------
   await page.getByRole('link', { name: 'กลับออเดอร์' }).click()

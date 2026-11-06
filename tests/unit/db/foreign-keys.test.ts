@@ -54,6 +54,8 @@ describe('order delete cascade', () => {
       fileSize: 8,
       createdBy: CREATED_BY,
       buffer: Buffer.from('89504e47', 'hex'),
+      web: Buffer.from('web'),
+      thumb: Buffer.from('thumb'),
     })
 
     expect(countWhere('items', 'order_id', order.id)).toBe(1)
