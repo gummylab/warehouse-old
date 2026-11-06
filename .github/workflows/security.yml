@@ -1,3 +1,11 @@
+# NOTE: CodeQL and dependency-review on PRIVATE repos require GitHub Advanced
+# Security (paid). On the free plan these jobs are skipped (neutral) unless
+# you set the repo variable ENABLE_SECURITY_SCAN=true after enabling GHAS.
+# See: https://docs.github.com/en/get-started/learning-about-github/about-github-advanced-security
+#
+# Secret scanning + push protection likewise require GHAS on private repos
+# (could not be enabled via API on the free plan).
+
 name: Security
 
 on:
@@ -14,9 +22,9 @@ permissions:
 
 jobs:
   codeql:
-    # NOTE: CodeQL on private repos requires GitHub Advanced Security (paid).
-    # On the free plan this job will not run on private repos; it works on public ones.
+    # CodeQL requires GHAS on private repos; skipped (neutral) when disabled.
     name: CodeQL
+    if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -38,9 +46,9 @@ jobs:
       - uses: github/codeql-action/analyze@b7b84b636b4f90c9b31da1bc5f72bfadd5b31410 # v3
 
   dependency-review:
-    # NOTE: dependency review on private repos requires GitHub Advanced Security.
-    if: github.event_name == 'pull_request'
+    # Dependency review requires GHAS on private repos; skipped when disabled.
     name: Dependency Review
+    if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
