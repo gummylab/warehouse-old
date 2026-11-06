@@ -12,6 +12,9 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.WH_DB_PATH ?? 'database/wh.db',
   },
+  // `strict` keeps the generator conservative about destructive changes.
+  // `verbose` stays off: `bun run build` runs the generator on every build
+  // (scripts/check-migrations.ts), and the statement-by-statement dump buries
+  // the rest of the build log.
   strict: true,
-  verbose: true,
 })
