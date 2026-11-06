@@ -2,143 +2,69 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 import Database from 'better-sqlite3'
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 
+import * as schema from './schema'
 import { seedLines } from './seed'
 
-// Schema bootstrap. No migration tool by choice (ADR 0002): the first open
-// creates everything, later opens are no-ops thanks to IF NOT EXISTS. Adding
-// or changing a column after this point needs a manual ALTER TABLE.
-// 'rejected' is not a stored status: rejecting deletes the row (ADR 0003).
-const SCHEMA = `
-  CREATE TABLE IF NOT EXISTS users (
-    id           TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    avatar_url   TEXT,
-    status       TEXT NOT NULL DEFAULT 'pending'
-                   CHECK (status IN ('pending', 'approved')),
-    requested_at TEXT NOT NULL,
-    decided_at   TEXT,
-    line_user_id TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
-  -- One request per LINE user; multiple NULLs stay allowed for rows that
-  -- predate LIFF identity.
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_users_line_user_id
-    ON users (line_user_id);
+// The generated SQL lives in the repo, not in this file: `drizzle-kit
+// generate` writes to `drizzle/` from ./schema.ts and `migrate()` below applies
+// whatever has not run yet (docs/adr/0013). Changing a column means changing
+// ./schema.ts and regenerating; hand-editing the database is no longer part of
+// the workflow.
+const MIGRATIONS_FOLDER = join(process.cwd(), 'drizzle')
 
-  -- Order-image form (feature /liff/forms/order-image): catalog of production
-  -- lines the form dropdown offers. Only seeded when empty, so a future
-  -- admin edit survives restarts.
-  CREATE TABLE IF NOT EXISTS lines (
-    name TEXT PRIMARY KEY
-  );
+export type Orm = BetterSQLite3Database<typeof schema>
 
-  -- order_date is the Bangkok calendar date as plain 'YYYY-MM-DD' text: no
-  -- timezone math anywhere downstream (storage key, unique constraint, Thai
-  -- display all reuse the string). created_by stores the LINE user id or
-  -- 'local-device' (ADR 0004) and deliberately has no FK to users: revoking
-  -- deletes the users row (ADR 0003) and order history must survive it.
-  CREATE TABLE IF NOT EXISTS orders (
-    id           TEXT PRIMARY KEY,
-    order_number TEXT NOT NULL,
-    order_date   TEXT NOT NULL,
-    line         TEXT NOT NULL,
-    created_by   TEXT NOT NULL,
-    created_at   TEXT NOT NULL
-  );
-  -- Order identity = number + date + line: the same printed number can appear
-  -- on more than one production line on the same day.
-  --
-  -- DROP first: older databases carry the two-column index under its old
-  -- name, and CREATE INDEX IF NOT EXISTS would leave it in place.
-  DROP INDEX IF EXISTS idx_orders_number_date;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_number_date_line
-    ON orders (order_number, order_date, line);
-  CREATE INDEX IF NOT EXISTS idx_orders_order_number
-    ON orders (order_number);
-  CREATE INDEX IF NOT EXISTS idx_orders_line ON orders (line);
-  -- The admin list filters by order_date range and sorts by it.
-  CREATE INDEX IF NOT EXISTS idx_orders_order_date ON orders (order_date);
+// One connection and one ORM on top of it, cached together so a raw query and
+// an ORM query in the same request see the same state.
+type Handles = { db: Database.Database; orm: Orm }
 
-  -- Items self-reference for varieties (110-190 under parent 100); the
-  -- database allows any depth but the form only ever creates depth 2.
-  CREATE TABLE IF NOT EXISTS items (
-    id             TEXT PRIMARY KEY,
-    order_id       TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    parent_item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
-    item_number    INTEGER NOT NULL,
-    created_by     TEXT NOT NULL,
-    created_at     TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_items_order_number
-    ON items (order_id, item_number);
-  CREATE INDEX IF NOT EXISTS idx_items_parent ON items (parent_item_id);
-
-  -- package stays NULL until someone labels the photo; filenames fall back
-  -- to 'Primary' like the old chat flow did. seq restarts per item.
-  CREATE TABLE IF NOT EXISTS images (
-    id          TEXT PRIMARY KEY,
-    item_id     TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    order_id    TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    seq         INTEGER NOT NULL,
-    package     TEXT
-                CHECK (package IS NULL
-                       OR package IN ('Primary', 'Inner Box', 'Sleeve Box',
-                                      'Tray', 'Carton')),
-    file_name   TEXT,
-    mime_type   TEXT,
-    file_size   INTEGER,
-    storage_key TEXT NOT NULL,
-    created_by  TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_images_item_seq
-    ON images (item_id, seq);
-  CREATE INDEX IF NOT EXISTS idx_images_order ON images (order_id);
-
-  -- Line-walk log. The composite key is the record's identity: re-saving the
-  -- same date, shift, line, brand and pack style updates its counts instead of
-  -- creating a second row.
-  CREATE TABLE IF NOT EXISTS line_walks (
-    id          TEXT PRIMARY KEY,
-    walk_date   TEXT NOT NULL,
-    shift       TEXT NOT NULL CHECK (shift IN ('day', 'night')),
-    line        TEXT NOT NULL,
-    brand       TEXT NOT NULL,
-    pack_style  TEXT NOT NULL,
-    people      INTEGER NOT NULL CHECK (people >= 0),
-    amount      INTEGER NOT NULL CHECK (amount >= 0),
-    created_by  TEXT NOT NULL,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_line_walks_key
-    ON line_walks (walk_date, shift, line, brand, pack_style);
-  CREATE INDEX IF NOT EXISTS idx_line_walks_date ON line_walks (walk_date);
-`
-
-type GlobalWithDb = typeof globalThis & { __whDb?: Database.Database }
+type GlobalWithDb = typeof globalThis & {
+  __whDb?: Database.Database
+  __whOrm?: Orm
+}
 
 // The dev server hot-reloads modules without exiting the process, so a
 // module-scoped connection would open a new file handle on every edit and
 // leak the old one. Cache the connection on globalThis instead.
 export function getDb(): Database.Database {
-  const scope = globalThis as GlobalWithDb
-  scope.__whDb ??= openDatabase()
-  return scope.__whDb
+  return openOnce().db
 }
 
-// Drops the cached connection and its file handle. The app never calls this:
-// the test harness does, between test files, because each file points
-// WH_DB_PATH at its own throwaway file and must not inherit the handle of the
-// file before it (tests/unit/setup/db.ts).
+// The ORM wrapper. getDb() stays public because the test harness counts rows
+// and the rare raw query needs the driver directly.
+export function getOrm(): Orm {
+  return openOnce().orm
+}
+
+// Drops the cached connection, its file handle and the ORM built on top of it.
+// The app never calls this: the test harness does, between test files, because
+// each file points WH_DB_PATH at its own throwaway file and must not inherit
+// the handle of the file before it (tests/unit/setup/db.ts).
 export function closeDb(): void {
   const scope = globalThis as GlobalWithDb
   scope.__whDb?.close()
   delete scope.__whDb
+  delete scope.__whOrm
 }
 
-function openDatabase(): Database.Database {
+function openOnce(): Handles {
+  const scope = globalThis as GlobalWithDb
+  let db = scope.__whDb
+  let orm = scope.__whOrm
+  if (!db || !orm) {
+    const opened = openDatabase()
+    db = opened.db
+    orm = opened.orm
+    scope.__whDb = db
+    scope.__whOrm = orm
+  }
+  return { db, orm }
+}
+
+function openDatabase(): Handles {
   // process.cwd() is the repo root because every command in this repo runs
   // from there (see AGENTS.md); running from elsewhere would silently
   // create the database in the wrong directory.
@@ -151,16 +77,31 @@ function openDatabase(): Database.Database {
   mkdirSync(dirname(file), { recursive: true })
 
   const db = new Database(file)
-  // WAL lets admin reads run while an action writes; busy_timeout absorbs
-  // the brief writer window instead of throwing SQLITE_BUSY. Foreign keys
-  // are OFF by default in SQLite, so ON DELETE CASCADE on the order-image
-  // tables would silently do nothing without this pragma.
-  db.pragma('journal_mode = WAL')
-  db.pragma('busy_timeout = 5000')
-  db.pragma('foreign_keys = ON')
-  db.exec(SCHEMA)
-  // The line catalog is seeded here, once per open, rather than on every
-  // read: a write inside a read path would make the catalog uncacheable.
-  seedLines(db)
-  return db
+  try {
+    // WAL lets admin reads run while an action writes; busy_timeout absorbs
+    // the brief writer window instead of throwing SQLITE_BUSY. Foreign keys
+    // are OFF by default in SQLite, so ON DELETE CASCADE on the order-image
+    // tables would silently do nothing without this pragma.
+    db.pragma('journal_mode = WAL')
+    db.pragma('busy_timeout = 5000')
+    db.pragma('foreign_keys = ON')
+
+    // Synchronous by design (better-sqlite3): a brand-new file ends up with
+    // every table before the first query, and an up-to-date file is a no-op
+    // read of the migrations table. migrate() takes the ORM, not the raw
+    // driver, because it runs through the dialect.
+    const orm = drizzle(db, { schema })
+    migrate(orm, { migrationsFolder: MIGRATIONS_FOLDER })
+
+    // The line catalog is seeded here, once per open, rather than on every
+    // read: a write inside a read path would make the catalog uncacheable.
+    seedLines(db)
+    return { db, orm }
+  } catch (error) {
+    // A half-open handle keeps the file locked on Windows, so a failed
+    // migration would break the next test file with EPERM instead of showing
+    // the real error. Close it and let the original error through.
+    db.close()
+    throw error
+  }
 }
