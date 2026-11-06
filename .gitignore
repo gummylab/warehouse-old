@@ -43,6 +43,9 @@ next-env.d.ts
 # database (WAL sidecars match *.db-wal / *.db-shm)
 /database/*.db*
 
+# runtime settings written from /settings (absolute paths, machine specific)
+/config/settings.json
+
 # order-image uploads (only when STORAGE_PATH is unset and the default
 # ./wh-order-images-storage lands in the repo root)
 /wh-order-images-storage/

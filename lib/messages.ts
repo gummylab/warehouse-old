@@ -24,6 +24,8 @@ export const toastMessages = {
   imageDeleted: 'ลบรูปแล้ว',
   imageDeleteFailed: 'ลบรูปไม่สำเร็จ',
 
+  settingsSaved: 'บันทึกตำแหน่งที่ตั้งแล้ว',
+
   uploadDone: (count: number) => `อัปโหลด ${count} รูปแล้ว`,
 
   sessionUnavailable: 'เซสชันใช้งานไม่ได้',

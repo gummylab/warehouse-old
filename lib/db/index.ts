@@ -7,6 +7,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 
 import * as schema from './schema'
 import { seedLines } from './seed'
+import { databaseFile } from '../settings/paths'
+import { updateSettings } from '../settings/store'
 
 // The generated SQL lives in the repo, not in this file: `drizzle-kit
 // generate` writes to `drizzle/` from ./schema.ts and `migrate()` below applies
@@ -64,16 +66,10 @@ function openOnce(): Handles {
   return { db, orm }
 }
 
-function openDatabase(): Handles {
-  // process.cwd() is the repo root because every command in this repo runs
-  // from there (see AGENTS.md); running from elsewhere would silently
-  // create the database in the wrong directory.
-  //
-  // WH_DB_PATH overrides the file so tests never open the real database
-  // (tests/unit/setup/db.ts, playwright.config.ts). It is read here, at call
-  // time, so a test can set it before the first getDb().
-  const override = process.env.WH_DB_PATH
-  const file = override ? resolve(override) : join(process.cwd(), 'database', 'wh.db')
+// Opens one file and gets it ready to serve: pragmas, migrations, seed. Split
+// out from openDatabase() so a new path can be proved before the live
+// connection is closed (see applyDatabasePath).
+function openAt(file: string): Handles {
   mkdirSync(dirname(file), { recursive: true })
 
   const db = new Database(file)
@@ -104,4 +100,41 @@ function openDatabase(): Handles {
     db.close()
     throw error
   }
+}
+
+function openDatabase(): Handles {
+  // databaseFile() reads the path saved on /settings first, then WH_DB_PATH
+  // (the test harness override), then database/wh.db at the repo root. It is
+  // read at call time, so both a test and a save can change it before the
+  // first getDb(). process.cwd() is the repo root because every command in
+  // this repo runs from there (see AGENTS.md).
+  return openAt(databaseFile())
+}
+
+// Switches the whole app to another SQLite file without a restart.
+//
+// The target is opened and migrated first, in a throwaway handle, and the live
+// connection is only dropped after that succeeds: a typo in the path must not
+// be able to leave the dashboard without a database. When the reopen somehow
+// fails anyway, the previous path is written back and the app returns to the
+// file it was serving before.
+export function applyDatabasePath(requested: string): string {
+  const target = resolve(requested)
+  const previous = databaseFile()
+  if (target === previous) return target
+
+  const probe = openAt(target)
+  probe.db.close()
+
+  updateSettings({ databasePath: target })
+  closeDb()
+  try {
+    getDb()
+  } catch (error) {
+    updateSettings({ databasePath: previous })
+    closeDb()
+    getDb()
+    throw error
+  }
+  return target
 }

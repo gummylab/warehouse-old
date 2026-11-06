@@ -1,15 +1,27 @@
 import type { Metadata } from 'next'
+import { io } from 'next/cache'
 
+import { storageRoot } from '@/lib/order-images/storage'
 import { PAGE_TITLES } from '@/lib/page-titles'
+import { databaseFile } from '@/lib/settings/paths'
+
+import { LocationsCard } from './locations-card'
+
+// Both values are read from disk, so the page has to run per request: a
+// prerendered page would bake the build machine's paths into the HTML.
+export const instant = false
 
 export const metadata: Metadata = {
   title: PAGE_TITLES['/settings'],
 }
 
-// Placeholder on purpose: the route exists so the sidebar entry has a real
-// destination. The page holds nothing until the first setting is designed;
-// the admin layout already supplies the header, the shell and the local-only
-// gate, so there is nothing to repeat here.
-export default function SettingsPage() {
-  return null
+export default async function SettingsPage() {
+  await io()
+
+  return (
+    <LocationsCard
+      databasePath={databaseFile()}
+      storagePath={storageRoot()}
+    />
+  )
 }

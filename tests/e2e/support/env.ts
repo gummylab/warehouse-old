@@ -32,6 +32,11 @@ export const E2E_BASE_URL = `http://127.0.0.1:${serverPort}`
 
 export const E2E_DB_PATH = path.join(runDir, 'wh.db')
 export const E2E_STORAGE_DIR = path.join(runDir, 'storage')
+// The settings file outranks both paths above, so the run keeps it inside the
+// throwaway tree as well. Without it a spec that saves a path would change
+// what the next run reads.
+export const E2E_SETTINGS_PATH = path.join(runDir, 'settings.json')
+process.env.WH_SETTINGS_PATH = E2E_SETTINGS_PATH
 
 // Next resolves distDir against the project root, so this stays relative and
 // uses forward slashes.
