@@ -1,6 +1,6 @@
 'use client'
 
-import { ImageIcon, LayoutDashboardIcon, UsersIcon } from 'lucide-react'
+import { FootprintsIcon, ImageIcon, LayoutDashboardIcon, UsersIcon } from 'lucide-react'
 import Link from 'next/link'
 import * as React from 'react'
 
@@ -38,6 +38,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton tooltip="จัดการรูปภาพออเดอร์" render={<Link href="/order-images" />}>
               <ImageIcon />
               <span>จัดการรูปภาพออเดอร์</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="รายการเดินไลน์" render={<Link href="/line-walks" />}>
+              <FootprintsIcon />
+              <span>รายการเดินไลน์</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
