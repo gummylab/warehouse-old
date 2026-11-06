@@ -49,13 +49,22 @@ Data isolation is the part to understand before adding a test:
 - A database file created before ADR 0013 has no `__drizzle_migrations` table, so `migrate()` tries to create tables that already exist and fails. Copy the file aside and start from an empty one rather than patching it.
 - Data-layer modules query through `getOrm()`; `getDb()` stays for row counts and the rare direct query. Raw `sql` fragments remain where the builder falls short: `ESCAPE '\'` on LIKE, `substr(walk_date, 1, 7)` buckets, `count(*)`, correlated item counts and `ORDER BY rowid` in `listLines`.
 
+## Uploads and storage
+
+- One upload becomes three files under `<storage root>/order-images/`: `originals/<key>`, `web/<key>.webp` (long edge 1600) and `thumb/<key>.webp` (long edge 480). `storage_key` in the database stays `<date>/<order>/<line>/<item>/<file>`; the kind folder is resolved by `originalPath` and `derivativePath` in `lib/order-images/storage.ts` (ADR 0015).
+- `scripts` that copy or back up the uploads should copy `originals/` only. `web/` and `thumb/` are derived and can be rebuilt from the originals at any time.
+- The variants are built in the upload route, before `saveImage`, because sharp is async and `saveImage` must stay inside one synchronous transaction. Keep that split: awaiting sharp inside the transaction would commit before the files land.
+- Decoding is the format check (`lib/order-images/optimize.ts`): jpeg, png and webp only, EXIF orientation applied, metadata dropped from the copies. A corrupt image is a 400 `unsupported-type`, not a 500.
+- Deleting a photo, an item or an order unlinks all three files through `removeStoredFiles`. A test that only counts rows will not notice a leaked derivative.
+- `GET /api/liff/order-images/images/[id]/file?size=web|thumb|original` defaults to `web`, answers `image/webp` for the copies, and falls back to the original when a copy is missing. Grids use `thumb`, previews use `web`.
+
 ## Settings
 
 - `/settings` is the only place the operator changes where the app keeps its data. The values live in `config/settings.json` (gitignored, absolute paths); a key there outranks the matching env variable, and the repo default applies when neither is set (ADR 0014).
 - Reads are uncached: `lib/settings/store.ts` reads the file on every call because `storageRoot()` runs on every upload and every file lookup. Writes go through a temporary file and a rename, so a crash cannot leave a truncated file.
 - `WH_SETTINGS_PATH` moves the settings file and exists for the test harnesses. A saved path outranks `WH_DB_PATH` and `STORAGE_PATH`, so a test that forgets to isolate it opens the operator's real database.
 - The database field goes through `applyDatabasePath` (`lib/db/index.ts`): the target is opened and migrated in a throwaway handle first, then the live connection is swapped, and a failed reopen restores the previous path. A missing or zero-byte target needs `confirm: true` from the client, so an empty database is never created by a typo.
-- The storage field saves the base; `storageRoot()` appends `wh-order-images-storage` unless the path already ends with it. Existing files are not moved, so old photos stop resolving until the operator copies the folder.
+- The storage field saves the base; `storageRoot()` appends `order-images` unless the base is already a folder of that name. Existing files are not moved, so old photos stop resolving until the operator copies the folder.
 - Both server actions start with `requireLocalAdminRequest()` (ADR 0007), like every other admin write.
 
 ## Layout architecture
