@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
-import { Database, FolderOpen, type LucideIcon } from 'lucide-react'
+import { MapPin, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -74,7 +74,8 @@ export function LocationsCard({
       aria-labelledby="locations-title"
       className="flex flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground">
       <div className="flex flex-col gap-1">
-        <h2 id="locations-title" className="text-sm font-semibold">
+        <h2 id="locations-title" className="flex items-center gap-2 text-sm font-semibold">
+          <MapPin className="size-4" />
           ตำแหน่งที่ตั้ง
         </h2>
 
@@ -83,7 +84,7 @@ export function LocationsCard({
       <PathField
         id="settings-database-path"
         label="โฟลเดอร์ฐานข้อมูล"
-         icon={Database}
+
         value={database}
         error={databaseError}
         saving={savingDatabase}
@@ -95,7 +96,7 @@ export function LocationsCard({
       <PathField
         id="settings-storage-path"
         label="โฟลเดอร์ที่จัดเก็บไฟล์"
-         icon={FolderOpen}
+
         value={storage}
         error={storageError}
         saving={savingStorage}
