@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { findLineWalk, saveLineWalks } from '@/lib/db/line-walks'
 import { lineExists } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
@@ -106,5 +107,6 @@ export async function POST(request: Request) {
   }
 
   const saved = saveLineWalks(entries, auth.createdBy)
+  safeRevalidateTag('line-walks')
   return NextResponse.json({ entries: saved })
 }

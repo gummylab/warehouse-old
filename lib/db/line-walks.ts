@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 import { randomUUID } from 'node:crypto'
 
@@ -291,3 +292,10 @@ export const findLineWalk = cache(_findLineWalk)
 export const getLineWalkSummary = cache(_getLineWalkSummary)
 export const listLineWalks = cache(_listLineWalks)
 export const getLineWalkOverview = cache(_getLineWalkOverview)
+
+// Cross-request cache for the line-walk overview (60s revalidation).
+export const getCachedLineWalkOverview = unstable_cache(
+  async (today: string) => _getLineWalkOverview(today),
+  ['line-walk-overview'],
+  { revalidate: 60, tags: ['line-walks'] },
+)

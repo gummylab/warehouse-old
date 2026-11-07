@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { deleteItemCascade, getItemDetail } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
 
@@ -41,5 +42,6 @@ export async function DELETE(
   if (!deleteItemCascade(id)) {
     return NextResponse.json({ error: 'item-not-found' }, { status: 404 })
   }
+  safeRevalidateTag('orders')
   return NextResponse.json({ ok: true })
 }

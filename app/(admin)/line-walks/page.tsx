@@ -7,7 +7,7 @@ import { FootprintsIcon, InboxIcon } from 'lucide-react'
 import { EmptyState } from '@/components/layout/empty-state'
 import { StateScreen } from '@/components/layout/state-screen'
 import { ButtonLink } from '@/components/ui/button'
-import { getLineWalkOverview, listLineWalks } from '@/lib/db/line-walks'
+import { getLineWalkOverview, listLineWalks, getCachedLineWalkOverview } from '@/lib/db/line-walks'
 import { listLines } from '@/lib/db/order-images'
 import {
   hasLineWalkFilters,
@@ -57,7 +57,7 @@ async function LineWalksData({
   const lines = listLines()
   const today = todayBangkok()
   // The KPI and the chart share one window and ignore the table filters.
-  const overview = getLineWalkOverview(today)
+  const overview = await getCachedLineWalkOverview(today)
   const result = listLineWalks(filters)
   const filtered = hasLineWalkFilters(filters)
   const defaultToday = filters.period === 'day' && filters.date === today
