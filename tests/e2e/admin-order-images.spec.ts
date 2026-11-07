@@ -34,8 +34,8 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   await expect(page.getByRole('combobox', { name: 'ไลน์ผลิต' })).toContainText(
     'ทั้งหมด',
   )
-  // The period is a single-select toggle group now, and the search box
-  // leads the row while the period group closes it.
+  // The period is a single-select toggle group, and it sits directly after
+  // the date it controls.
   const periodGroup = page.getByRole('group', { name: 'ช่วงเวลา' })
   await expect(
     periodGroup.getByRole('button', { name: 'รายวัน' }),
@@ -46,7 +46,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
         .locator('form[aria-label="ตัวกรองออเดอร์"] > *')
         .allInnerTexts()
     ).map((text) => text.split('\n')[0]),
-  ).toEqual(['ค้นหาเลขออเดอร์', 'วันที่', 'ไลน์ผลิต', 'ช่วงเวลา', 'ค้นหา'])
+  ).toEqual(['วันที่', 'ช่วงเวลา', 'ค้นหาเลขออเดอร์', 'ไลน์ผลิต', 'ค้นหา'])
 
   const orderLink = page.getByRole('link', { name: orderNumber })
   await expect(orderLink).toBeVisible()
