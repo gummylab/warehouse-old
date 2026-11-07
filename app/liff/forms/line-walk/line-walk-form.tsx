@@ -343,7 +343,7 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
         ) : null}
 
         <Button type="button" disabled={!canSave || saving} onClick={handleSave}>
-          {saving ? 'กำลังบันทึก...' : 'บันทึกทั้งหมด'}
+          {saving ? 'กำลังบันทึก…' : 'บันทึกทั้งหมด'}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           {canSave
@@ -455,7 +455,7 @@ function LineWalkSectionCard({
     status === 'duplicate'
       ? `รายการซ้ำกับรายการที่ ${duplicateOf + 1}`
       : status === 'loading'
-        ? 'กำลังตรวจข้อมูลเดิม...'
+        ? 'กำลังตรวจข้อมูลเดิม…'
         : status === 'found'
           ? 'มีข้อมูลเดิม'
           : status === 'new'

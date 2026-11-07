@@ -226,7 +226,7 @@ export function OrderFilters({
           disabled={pending}
           className={cn(mobile && 'flex-1')}>
           <SearchIcon />
-          {pending ? 'กำลังค้นหา...' : 'ค้นหา'}
+          {pending ? 'กำลังค้นหา…' : 'ค้นหา'}
         </Button>
         {!isDefaultView ? (
           <ButtonLink

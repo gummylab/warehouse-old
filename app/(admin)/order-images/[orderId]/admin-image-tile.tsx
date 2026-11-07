@@ -45,6 +45,8 @@ export function AdminImageTile({
         <img
           src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
           alt={`รูปที่ ${image.seq}`}
+          width={400}
+          height={400}
           loading="lazy"
           decoding="async"
           className="aspect-square w-full bg-muted object-cover"

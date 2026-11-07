@@ -23,7 +23,7 @@ export default async function OrderDetailPage(
   const { orderId } = await props.params
 
   return (
-    <Suspense fallback={<StateScreen loading title="กำลังโหลด..." />}>
+    <Suspense fallback={<StateScreen loading title="กำลังโหลด…" />}>
       <OrderDetailData orderId={orderId} />
     </Suspense>
   )

@@ -51,15 +51,15 @@ export default async function LineWalkManagementPage(props: PageProps<'/line-wal
         </ButtonLink>
       </div>
 
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดภาพรวม..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดภาพรวม…" />}>
         <LineWalkOverviewSection today={today} />
       </Suspense>
 
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดตัวกรอง..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตัวกรอง…" />}>
         <LineWalkFiltersSection filters={filters} />
       </Suspense>
 
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดตาราง..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตาราง…" />}>
         <LineWalkTableSection filters={filters} filtered={filtered} defaultToday={defaultToday} today={today} />
       </Suspense>
     </div>

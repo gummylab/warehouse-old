@@ -33,7 +33,7 @@ async function RegisterUsers() {
 function RegisterFallback() {
   return (
     <div className="flex flex-1 items-center justify-center text-muted-foreground">
-      กำลังโหลด...
+      กำลังโหลด…
     </div>
   )
 }

@@ -90,7 +90,7 @@ export function StepOneFields({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Button type="submit" disabled={submitting}>
-        {submitting ? 'กำลังค้นหา...' : 'ถัดไป'}
+        {submitting ? 'กำลังค้นหา…' : 'ถัดไป'}
       </Button>
     </form>
   )
