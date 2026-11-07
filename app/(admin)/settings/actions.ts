@@ -5,7 +5,7 @@ import { basename, dirname, resolve } from 'node:path'
 
 import { requireLocalAdminRequest } from '@/lib/admin/authorize'
 import { applyDatabasePath } from '@/lib/db'
-import { storageRoot } from '@/lib/order-images/storage'
+import { storageBase } from '@/lib/settings/paths'
 import { updateSettings } from '@/lib/settings/store'
 
 // The outcome of one save. 'confirm' only comes back from the database field,
@@ -70,7 +70,7 @@ export async function saveStoragePath(input: {
     // is the effective root the operator will see.
     mkdirSync(base, { recursive: true })
     updateSettings({ storagePath: base })
-    return { status: 'saved', path: storageRoot() }
+    return { status: 'saved', path: storageBase() }
   } catch (error) {
     return { status: 'error', message: `ใช้ที่อยู่นี้ไม่ได้: ${reason(error)}` }
   }

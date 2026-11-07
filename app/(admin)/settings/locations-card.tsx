@@ -83,7 +83,7 @@ export function LocationsCard({
 
       <PathField
         id="settings-database-path"
-        label="ฐานข้อมูล (โฟลเดอร์)"
+        label="โฟลเดอร์ฐานข้อมูล"
         value={database}
         error={databaseError}
         saving={savingDatabase}
@@ -94,7 +94,7 @@ export function LocationsCard({
 
       <PathField
         id="settings-storage-path"
-        label="ที่จัดเก็บ"
+        label="โฟลเดอร์ที่จัดเก็บไฟล์"
         value={storage}
         error={storageError}
         saving={savingStorage}
