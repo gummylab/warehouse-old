@@ -443,14 +443,22 @@ export function findOrCreateOrder(input: {
   line: string
   createdBy: string
 }): OrderRecord {
-  // The callback stays synchronous on purpose: better-sqlite3's transaction
-  // commits only after it returns. The helpers inside it call getOrm() rather
-  // than taking the transaction handle, which is still correct: every handle
-  // shares the one connection, so their statements join this transaction.
+  // Fast path: read-only lookup outside a transaction. Most calls find an
+  // existing order, so we avoid opening a write transaction (and acquiring
+  // the SQLite write lock) on every request. This is the single biggest
+  // reduction in write contention under concurrent load.
+  const existing = findOrder(input.orderNumber, input.orderDate, input.line)
+  if (existing) return existing
+
+  // Slow path: create, guarded by withRetry for cross-process races.
+  // Re-check inside the transaction in case another process created it
+  // between our read and the write.
   return withRetry(() =>
-    getOrm().transaction(
-      () => findOrder(input.orderNumber, input.orderDate, input.line) ?? createOrder(input),
-    ),
+    getOrm().transaction(() => {
+      const found = findOrder(input.orderNumber, input.orderDate, input.line)
+      if (found) return found
+      return createOrder(input)
+    }),
   )
 }
 
