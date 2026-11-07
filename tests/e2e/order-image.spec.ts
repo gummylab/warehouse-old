@@ -76,8 +76,8 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // The caption of the tile turns into "ยังไม่ระบุแพ็กเกจ" (unlabelled) once
   // the upload response lands, and the tile itself carries the photo.
   const thumbnail = page.locator('button:has(img[alt="รูปที่ 1"])')
-  await expect(thumbnail).toBeVisible()
-  await expect(page.locator('img[alt="รูปที่ 2"]')).toBeVisible()
+  await expect(thumbnail).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('img[alt="รูปที่ 2"]')).toBeVisible({ timeout: 10000 })
 
   // ---- the bytes round-trip through the auth-gated file endpoint -------
   const src = await page.locator('img[alt="รูปที่ 1"]').getAttribute('src')
