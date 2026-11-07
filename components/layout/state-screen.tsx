@@ -37,6 +37,8 @@ export function StateScreen({
   return (
     <div
       data-slot="state-screen"
+      role={tone === 'error' ? 'alert' : undefined}
+      aria-live={tone === 'error' ? 'assertive' : 'polite'}
       className={cn(
         'flex flex-1 flex-col items-center justify-center gap-4 p-4 text-center',
         className,

@@ -560,6 +560,7 @@ function LineWalkSectionCard({
         </label>
         <Input
           id={`walk-brand-${section.id}`}
+          type="text"
           value={section.brand}
           onChange={(event) =>
             onUpdate(section.id, { brand: event.target.value })
@@ -574,6 +575,7 @@ function LineWalkSectionCard({
         </label>
         <Input
           id={`walk-pack-${section.id}`}
+          type="text"
           value={section.packStyle}
           onChange={(event) =>
             onUpdate(section.id, { packStyle: event.target.value })

@@ -166,6 +166,7 @@ function PathField({
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
           id={id}
+          type="text"
           dir="ltr"
           className="font-mono text-xs"
           value={value}
