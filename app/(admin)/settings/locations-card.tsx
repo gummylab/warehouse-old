@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
+import { Database, FolderOpen, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -76,31 +77,31 @@ export function LocationsCard({
         <h2 id="locations-title" className="text-sm font-semibold">
           ตำแหน่งที่ตั้ง
         </h2>
-        <p className="text-xs text-muted-foreground">
-          แก้ที่อยู่แล้วบันทึก มีผลทันทีโดยไม่ต้องรีสตาร์ท
-        </p>
+
       </div>
 
       <PathField
         id="settings-database-path"
         label="โฟลเดอร์ฐานข้อมูล"
+         icon={Database}
         value={database}
         error={databaseError}
         saving={savingDatabase}
         onChange={setDatabase}
         onSave={() => submitDatabase(false)}
-        hint="ระบบจะใช้ไฟล์ wh.db ภายในโฟลเดอร์นี้"
+
       />
 
       <PathField
         id="settings-storage-path"
         label="โฟลเดอร์ที่จัดเก็บไฟล์"
+         icon={FolderOpen}
         value={storage}
         error={storageError}
         saving={savingStorage}
         onChange={setStorage}
         onSave={submitStorage}
-        hint="ระบบจะสร้างโฟลเดอร์ order-images ภายใน • รูปเดิมยังอยู่ที่โฟลเดอร์เดิม ไม่ถูกย้ายตาม"
+
       />
 
       <Dialog
@@ -143,6 +144,7 @@ export function LocationsCard({
 function PathField({
   id,
   label,
+  icon: Icon,
   value,
   error,
   hint,
@@ -152,6 +154,7 @@ function PathField({
 }: {
   id: string
   label: string
+  icon?: LucideIcon
   value: string
   error: string | null
   hint?: string
@@ -161,7 +164,8 @@ function PathField({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="flex items-center gap-2 text-sm font-medium">
+        {Icon ? <Icon className="size-4" /> : null}
         {label}
       </label>
       <div className="flex flex-col gap-2 sm:flex-row">
