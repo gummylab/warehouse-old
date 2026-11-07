@@ -326,6 +326,8 @@ export function OrderDetail({
               <img
                 src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
                 alt={`รูปที่ ${previewImage.seq}`}
+                width={1200}
+                height={900}
                 className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
               />
 

@@ -21,6 +21,7 @@ export const metadata: Metadata = {
     template: '%s | Warehouse Dashboard',
   },
   description: 'ระบบจัดการรูปภาพออเดอร์สำหรับโรงงาน',
+  themeColor: '#ffffff',
 }
 
 export default function RootLayout({

@@ -140,6 +140,13 @@
   }
   html {
     @apply font-sans;
+    color-scheme: light;
+  }
+
+  @media (pointer: fine) {
+    html {
+      overscroll-behavior: none;
+    }
   }
 }
 

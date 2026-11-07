@@ -226,7 +226,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
           {uploading && (
             <span aria-hidden="true" className="flex flex-col gap-1 rounded-xl border border-dashed p-1">
               <span className="block aspect-square w-full animate-pulse rounded-lg bg-muted" />
-              <span className="text-xs text-muted-foreground">กำลังอัปโหลด...</span>
+              <span className="text-xs text-muted-foreground">กำลังอัปโหลด…</span>
             </span>
           )}
 
@@ -293,6 +293,8 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
               <img
                 src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
                 alt={`รูปที่ ${previewImage.seq}`}
+                width={1200}
+                height={900}
                 className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
               />
 
@@ -401,6 +403,8 @@ function PhotoTile({
         <img
           src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
           alt={`รูปที่ ${image.seq}`}
+          width={400}
+          height={400}
           loading="lazy"
           className="aspect-square w-full bg-muted object-cover"
         />

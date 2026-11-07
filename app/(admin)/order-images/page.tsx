@@ -36,15 +36,15 @@ export default async function OrderImageManagementPage(props: PageProps<'/order-
 
   return (
     <div className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-hidden">
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดภาพรวม..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดภาพรวม…" />}>
         <OrderOverviewSection today={today} />
       </Suspense>
 
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดตัวกรอง..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตัวกรอง…" />}>
         <OrderFiltersSection filters={filters} />
       </Suspense>
 
-      <Suspense fallback={<StateScreen loading title="กำลังโหลดตาราง..." />}>
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตาราง…" />}>
         <OrderTableSection filters={filters} filtered={filtered} defaultToday={defaultToday} today={today} />
       </Suspense>
     </div>

@@ -106,7 +106,7 @@ export function DeleteOrderDialog({
             variant="destructive"
             onClick={() => onConfirm(confirmation)}
             disabled={!matches || pending}>
-            {pending ? 'กำลังลบ...' : 'ลบออเดอร์'}
+            {pending ? 'กำลังลบ…' : 'ลบออเดอร์'}
           </Button>
         </DialogFooter>
       </DialogContent>

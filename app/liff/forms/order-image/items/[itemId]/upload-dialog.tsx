@@ -170,7 +170,7 @@ export function UploadDialog({
   const readyCount = entries.filter((entry) => entry.status === 'ready').length
   const failedCount = entries.filter((entry) => entry.status === 'error').length
   const primaryLabel = uploading
-    ? 'กำลังอัปโหลด...'
+    ? 'กำลังอัปโหลด…'
     : readyCount > 0
       ? 'อัปโหลด'
       : failedCount > 0

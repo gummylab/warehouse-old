@@ -18,7 +18,7 @@ export function LiffNotice({
 }) {
   switch (status) {
     case 'loading':
-      return <StateScreen loading title="กำลังโหลด..." />
+      return <StateScreen loading title="กำลังโหลด…" />
     case 'unconfigured':
       return <StateScreen tone="error" title="ยังไม่ได้ตั้งค่า LIFF ID" />
     case 'outside-line':
