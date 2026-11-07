@@ -50,23 +50,23 @@ export function StepOneFields({
   return (
     <form onSubmit={handleSubmit} className="mx-auto flex w-full flex-col gap-4">
       <div className="flex flex-col gap-1.5 text-sm">
-        <label htmlFor="order-number">เลขออเดอร์</label>
-        <OrderNumberInput
-          id="order-number"
-          label="เลขออเดอร์"
-          value={orderNumber}
-          onChange={setOrderNumber}
-          disabled={submitting}
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5 text-sm">
         <label htmlFor="order-date">วันที่ออเดอร์</label>
         <DatePicker
           id="order-date"
           label="วันที่ออเดอร์"
           value={orderDate}
           onChange={setOrderDate}
+          disabled={submitting}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label htmlFor="order-number">เลขออเดอร์</label>
+        <OrderNumberInput
+          id="order-number"
+          label="เลขออเดอร์"
+          value={orderNumber}
+          onChange={setOrderNumber}
           disabled={submitting}
         />
       </div>
