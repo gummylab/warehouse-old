@@ -131,19 +131,6 @@ export function OrderFilters({
       aria-label="ตัวกรองออเดอร์"
       onSubmit={handleSubmit}
       className="flex shrink-0 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:items-end">
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ค้นหาเลขออเดอร์
-        <Input
-          type="search"
-          name="q"
-          defaultValue={filters.query ?? ''}
-          placeholder="เช่น 123456789"
-          inputMode="numeric"
-          autoComplete="off"
-          disabled={pending}
-        />
-      </label>
-
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
         <span>
           {period === 'day' ? 'วันที่' : period === 'month' ? 'เดือน' : 'ปี'}
@@ -172,26 +159,6 @@ export function OrderFilters({
         )}
       </div>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ไลน์ผลิต
-        <Select
-          items={lineItems}
-          value={line}
-          onValueChange={(value: string | null) => setLine(value ?? 'all')}
-          disabled={pending}>
-          <SelectTrigger className="w-full" aria-label="ไลน์ผลิต">
-            <SelectValue placeholder="ทั้งหมด" />
-          </SelectTrigger>
-          <SelectContent>
-            {lineItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </label>
-
       <div className="flex shrink-0 flex-col gap-1.5 text-sm">
         <span>ช่วงเวลา</span>
         <ToggleGroup
@@ -219,6 +186,39 @@ export function OrderFilters({
           })}
         </ToggleGroup>
       </div>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        ค้นหาเลขออเดอร์
+        <Input
+          type="search"
+          name="q"
+          defaultValue={filters.query ?? ''}
+          placeholder="เช่น 123456789"
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={pending}
+        />
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        ไลน์ผลิต
+        <Select
+          items={lineItems}
+          value={line}
+          onValueChange={(value: string | null) => setLine(value ?? 'all')}
+          disabled={pending}>
+          <SelectTrigger className="w-full" aria-label="ไลน์ผลิต">
+            <SelectValue placeholder="ทั้งหมด" />
+          </SelectTrigger>
+          <SelectContent>
+            {lineItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
 
       <div className={cn('flex items-center gap-2', mobile ? 'w-full' : 'shrink-0')}>
         <Button

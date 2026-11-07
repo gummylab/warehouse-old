@@ -138,30 +138,6 @@ export function LineWalkFilters({
       aria-label="ตัวกรองบันทึกการเดินไลน์"
       onSubmit={handleSubmit}
       className="flex shrink-0 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:flex-wrap md:items-end">
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        แบรนด์
-        <Input
-          type="search"
-          name="brand"
-          defaultValue={filters.brand ?? ''}
-          placeholder="เช่น แบรนด์"
-          autoComplete="off"
-          disabled={pending}
-        />
-      </label>
-
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        Pack style
-        <Input
-          type="search"
-          name="packStyle"
-          defaultValue={filters.packStyle ?? ''}
-          placeholder="เช่น pack style"
-          autoComplete="off"
-          disabled={pending}
-        />
-      </label>
-
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
         <span>
           {period === 'day' ? 'วันที่' : period === 'month' ? 'เดือน' : 'ปี'}
@@ -190,46 +166,6 @@ export function LineWalkFilters({
         )}
       </div>
 
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ไลน์ผลิต
-        <Select
-          items={lineItems}
-          value={line}
-          onValueChange={(value: string | null) => setLine(value ?? 'all')}
-          disabled={pending}>
-          <SelectTrigger className="w-full" aria-label="ไลน์ผลิต">
-            <SelectValue placeholder="ทั้งหมด" />
-          </SelectTrigger>
-          <SelectContent>
-            {lineItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </label>
-
-      <label className="flex min-w-0 flex-col gap-1.5 text-sm md:w-36">
-        กะ
-        <Select
-          items={SHIFT_ITEMS}
-          value={shift}
-          onValueChange={(value: string | null) => setShift(value ?? 'all')}
-          disabled={pending}>
-          <SelectTrigger className="w-full" aria-label="กะ">
-            <SelectValue placeholder="ทั้งหมด" />
-          </SelectTrigger>
-          <SelectContent>
-            {SHIFT_ITEMS.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </label>
-
       <div className="flex shrink-0 flex-col gap-1.5 text-sm">
         <span>ช่วงเวลา</span>
         <ToggleGroup
@@ -256,6 +192,70 @@ export function LineWalkFilters({
           })}
         </ToggleGroup>
       </div>
+
+      <label className="flex min-w-0 flex-col gap-1.5 text-sm md:w-36">
+        กะ
+        <Select
+          items={SHIFT_ITEMS}
+          value={shift}
+          onValueChange={(value: string | null) => setShift(value ?? 'all')}
+          disabled={pending}>
+          <SelectTrigger className="w-full" aria-label="กะ">
+            <SelectValue placeholder="ทั้งหมด" />
+          </SelectTrigger>
+          <SelectContent>
+            {SHIFT_ITEMS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        ไลน์ผลิต
+        <Select
+          items={lineItems}
+          value={line}
+          onValueChange={(value: string | null) => setLine(value ?? 'all')}
+          disabled={pending}>
+          <SelectTrigger className="w-full" aria-label="ไลน์ผลิต">
+            <SelectValue placeholder="ทั้งหมด" />
+          </SelectTrigger>
+          <SelectContent>
+            {lineItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        แบรนด์
+        <Input
+          type="search"
+          name="brand"
+          defaultValue={filters.brand ?? ''}
+          placeholder="เช่น แบรนด์"
+          autoComplete="off"
+          disabled={pending}
+        />
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        Pack style
+        <Input
+          type="search"
+          name="packStyle"
+          defaultValue={filters.packStyle ?? ''}
+          placeholder="เช่น pack style"
+          autoComplete="off"
+          disabled={pending}
+        />
+      </label>
 
       <div
         className={cn(
