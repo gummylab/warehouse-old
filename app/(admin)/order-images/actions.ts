@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { redirect } from 'next/navigation'
 
 import { requireLocalAdminRequest } from '@/lib/admin/authorize'
@@ -23,6 +25,7 @@ export type OrderActionState = { error: string } | null
 function revalidateOrder(orderId: string): void {
   revalidatePath('/order-images')
   revalidatePath(`/order-images/${orderId}`)
+  safeRevalidateTag('orders')
 }
 
 export async function deleteImageAction(
@@ -103,5 +106,6 @@ export async function deleteOrderAction(
   }
 
   revalidatePath('/order-images')
+  safeRevalidateTag('orders')
   redirect('/order-images')
 }

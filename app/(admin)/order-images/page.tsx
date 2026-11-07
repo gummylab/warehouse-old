@@ -7,7 +7,7 @@ import { InboxIcon } from 'lucide-react'
 import { EmptyState } from '@/components/layout/empty-state'
 import { StateScreen } from '@/components/layout/state-screen'
 import { ButtonLink } from '@/components/ui/button'
-import { getOrderOverview, listLines, listOrders } from '@/lib/db/order-images'
+import { getOrderOverview, listLines, listOrders, getCachedOrderOverview } from '@/lib/db/order-images'
 import { hasOrderFilters, orderListHref, parseOrderListParams } from '@/lib/order-images/filters'
 import { todayBangkok } from '@/lib/order-images/validation'
 import { PAGE_TITLES } from '@/lib/page-titles'
@@ -48,7 +48,7 @@ async function OrderImagesData({ params }: { params: Record<string, string | str
   const today = todayBangkok()
   // The KPI strip and the chart share this window; the table keeps its own
   // filters below.
-  const overview = getOrderOverview(today)
+  const overview = await getCachedOrderOverview(today)
   const result = listOrders(filters)
   const filtered = hasOrderFilters(filters)
   const defaultToday = filters.period === 'day' && filters.date === today

@@ -7,6 +7,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
@@ -729,6 +730,99 @@ export function saveImage(input: {
   )
 }
 
+// saveImageOriginal: saves only the original file + creates the DB record.
+// Variants (web/thumb) are written later via writeImageVariants (deferred via
+// `after()`), so the upload response is not blocked by sharp.
+// Returns the image record and the storage key so the caller can schedule
+// variant generation after the response.
+export function saveImageOriginal(input: {
+  itemId: string
+  package: string | null
+  fileName: string | null
+  mimeType: string | null
+  fileSize: number | null
+  createdBy: string
+  buffer: Buffer
+}): { image: ImageRecord; key: string } {
+  const orm = getOrm()
+  return withRetry(() => {
+    const result = orm.transaction((): { image: ImageRecord; key: string } => {
+      const target = orm
+        .select({
+          itemNumber: items.itemNumber,
+          orderId: orders.id,
+          orderNumber: orders.orderNumber,
+          orderDate: orders.orderDate,
+          line: orders.line,
+        })
+        .from(items)
+        .innerJoin(orders, eq(orders.id, items.orderId))
+        .where(eq(items.id, input.itemId))
+        .get()
+      if (!target) throw new Error('saveImageOriginal: item not found')
+
+      const seq =
+        orm
+          .select({ next: sql<number>`coalesce(max(${images.seq}), 0) + 1` })
+          .from(images)
+          .where(eq(images.itemId, input.itemId))
+          .get()?.next ?? 1
+      const ext =
+        input.mimeType === 'image/png'
+          ? 'png'
+          : input.mimeType === 'image/webp'
+            ? 'webp'
+            : 'jpg'
+      const key = buildKey(
+        target.orderDate,
+        target.orderNumber,
+        target.line,
+        target.itemNumber,
+        seq,
+        input.package,
+        ext,
+      )
+      const original = originalPath(key)
+      if (!isInsideRoot(original)) {
+        throw new Error('saveImageOriginal: storage key escapes the storage root')
+      }
+      ensureDirForFile(original)
+      writeFileSync(original, input.buffer)
+
+      const row = {
+        id: randomUUID(),
+        itemId: input.itemId,
+        orderId: target.orderId,
+        seq,
+        package: input.package as PackageName | null,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        storageKey: key,
+        createdBy: input.createdBy,
+        createdAt: new Date().toISOString(),
+      }
+      orm.insert(images).values(row).run()
+      return { image: toImage(row), key }
+    })
+    return result
+  })
+}
+
+// Write the web/thumb derivative files for a previously saved image.
+// Called from `after()` so the upload response is not blocked by sharp.
+export function writeImageVariants(key: string, web: Buffer, thumb: Buffer): void {
+  const webPath = derivativePath(key, 'web')
+  const thumbPath = derivativePath(key, 'thumb')
+  if (!isInsideRoot(webPath) || !isInsideRoot(thumbPath)) {
+    throw new Error('writeImageVariants: storage key escapes the storage root')
+  }
+  ensureDirForFile(webPath)
+  ensureDirForFile(thumbPath)
+  writeFileSync(webPath, web)
+  writeFileSync(thumbPath, thumb)
+}
+
 // Minimal shape for the file-serving route. storage_key deliberately stays
 // out of ImageRecord so API responses never leak filesystem layout.
 function _getImageFile(
@@ -778,6 +872,14 @@ export function setImagePackage(id: string, pkg: string | null): boolean {
 export const listLines = cache(_listLines)
 export const getOrderSummary = cache(_getOrderSummary)
 export const getOrderOverview = cache(_getOrderOverview)
+
+// Cross-request cache for the dashboard overview (60s revalidation).
+// Invalidated via revalidateTag('orders') on order/item/image mutations.
+export const getCachedOrderOverview = unstable_cache(
+  async (today: string) => _getOrderOverview(today),
+  ['order-overview'],
+  { revalidate: 60, tags: ['orders'] },
+)
 export const listOrders = cache(_listOrders)
 export const getOrderDetail = cache(_getOrderDetail)
 export const getItemDetail = cache(_getItemDetail)

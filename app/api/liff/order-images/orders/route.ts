@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { findOrCreateOrder, lineExists } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
 import { orderLookupSchema, parseJsonBody } from '@/lib/liff/schemas'
@@ -44,5 +45,6 @@ export async function POST(request: Request) {
     line: body.data.line,
     createdBy: auth.createdBy,
   })
+  safeRevalidateTag('orders')
   return NextResponse.json({ orderId: order.id })
 }
