@@ -17,6 +17,11 @@ k6 version
 
 ## Run the server under test
 
+> ⚠️ **Always use the production build for load/soak/stress tests.**
+> `bun run dev` (Next.js dev mode) leaks native memory (~76 MB/30s) and crashes
+> under sustained load (see issue #33). Dev mode is for development only.
+> Use `bun run build && bun run start:next` for any load test beyond smoke.
+
 Use an isolated database + storage (never the production one):
 
 ```bash
@@ -27,10 +32,9 @@ rm -f "$WH_DB_PATH" "$WH_SETTINGS_PATH"
 rm -rf "$STORAGE_PATH"
 mkdir -p "$STORAGE_PATH"
 
-# Start server (dev or production)
-bun run dev            # http://127.0.0.1:8080
-# or
-bun run build && bun run start:next   # http://127.0.0.1:8080
+# Build and start production server
+bun run build
+bun run start:next   # http://127.0.0.1:8080
 ```
 
 Default base URL is `http://127.0.0.1:8080`. Override with `BASE_URL`.
@@ -88,6 +92,15 @@ SQLite-specific watch items:
 - `busy_timeout` hits (5s) → write contention
 - WAL checkpoint lag
 - Memory growth over soak runs
+
+### ⚠️ Dev vs Production mode
+
+| Mode | RSS growth (10m) | p95 latency | Throughput | Crash? |
+|---|---|---|---|---|
+| Dev (`bun run dev`) | +1531 MB ❌ | 1.62s | 17 req/s | ❌ yes (30m) |
+| Production (`bun run start:next`) | +24 MB ✅ | 380ms | 56 req/s | ✅ no (5m) |
+
+**Always test in production mode.** Dev mode leaks native memory (Turbopack/HMR) and crashes under sustained load. See issue #33.
 
 ## Thresholds
 
