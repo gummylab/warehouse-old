@@ -31,7 +31,8 @@ function filters(
     to: '2026-11-05',
     line: null,
     shift: null,
-    query: null,
+    brand: null,
+    packStyle: null,
     page: 1,
     pageSize: 25,
     ...overrides,
@@ -112,14 +113,27 @@ describe('listLineWalks', () => {
     expect(result.rows[0].creatorName).toBe('U-1')
   })
 
-  it('filters by line, shift and the brand or pack-style search', () => {
+  it('filters by line, shift, brand and pack style', () => {
     seedRows()
 
     expect(listLineWalks(filters({ line: 'line-a' })).total).toBe(1)
     expect(listLineWalks(filters({ shift: 'night' })).total).toBe(1)
-    expect(listLineWalks(filters({ query: 'alph' })).total).toBe(1)
-    expect(listLineWalks(filters({ query: 'bag' })).total).toBe(1)
-    expect(listLineWalks(filters({ query: 'zzz' })).total).toBe(0)
+    expect(listLineWalks(filters({ brand: 'alph' })).total).toBe(1)
+    expect(listLineWalks(filters({ packStyle: 'bag' })).total).toBe(1)
+    expect(listLineWalks(filters({ brand: 'zzz' })).total).toBe(0)
+  })
+
+  it('requires a row to match both searches', () => {
+    seedRows()
+
+    // Alpha is box only, so pairing the brand with the other pack style finds
+    // nothing. The two fields are ANDed, not ORed like the old single search.
+    expect(
+      listLineWalks(filters({ brand: 'Alpha', packStyle: 'bag' })).total,
+    ).toBe(0)
+    expect(
+      listLineWalks(filters({ brand: 'Alpha', packStyle: 'box' })).total,
+    ).toBe(1)
   })
 
   it('narrows by the date range and pages the result', () => {

@@ -6,6 +6,7 @@ import { unstable_cache, revalidateTag } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 
 import { and, between, eq, sql, type SQL } from 'drizzle-orm'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 import { fillLineWalkTrend } from '../line-walks/trend'
 import { TREND_GRAINS, trendWindow } from '../trend'
@@ -149,9 +150,18 @@ function toListRow(
   }
 }
 
-// The table narrows by the day/month/year range, line, shift and the brand or
-// pack-style search. An empty list means "no filter", which Drizzle reads as
-// an undefined WHERE.
+// A substring match on one text column. LIKE treats % and _ as wildcards;
+// escapeLike made them literal, and the ESCAPE clause is what makes the
+// backslash count as the escape character.
+function likeSearch(column: AnySQLiteColumn, value: string): SQL {
+  const like = `%${escapeLike(value)}%`
+  return sql`${column} LIKE ${like} ESCAPE '\\'`
+}
+
+// The table narrows by the day/month/year range, line, shift and the two
+// searches. Brand and pack style are independent conditions, so a row has to
+// match both when both fields carry a value. An empty list means "no filter",
+// which Drizzle reads as an undefined WHERE.
 function buildLineWalkWhere(
   filters: LineWalkListFilters,
 ): SQL | undefined {
@@ -169,13 +179,11 @@ function buildLineWalkWhere(
   if (filters.shift) {
     conditions.push(eq(lineWalks.shift, filters.shift))
   }
-  if (filters.query) {
-    // LIKE treats % and _ as wildcards; escapeLike made them literal, and the
-    // ESCAPE clause is what makes the backslash count as the escape character.
-    const like = `%${escapeLike(filters.query)}%`
-    conditions.push(
-      sql`(${lineWalks.brand} LIKE ${like} ESCAPE '\\' OR ${lineWalks.packStyle} LIKE ${like} ESCAPE '\\')`,
-    )
+  if (filters.brand) {
+    conditions.push(likeSearch(lineWalks.brand, filters.brand))
+  }
+  if (filters.packStyle) {
+    conditions.push(likeSearch(lineWalks.packStyle, filters.packStyle))
   }
 
   return conditions.length ? and(...conditions) : undefined

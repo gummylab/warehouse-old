@@ -87,12 +87,14 @@ export function LineWalkFilters({
     filters.date === todayBangkok() &&
     filters.line === null &&
     filters.shift === null &&
-    filters.query === null
+    filters.brand === null &&
+    filters.packStyle === null
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
-    const query = text(form.get('q'))
+    const brand = text(form.get('brand'))
+    const packStyle = text(form.get('packStyle'))
 
     const anchor =
       period === 'day'
@@ -108,7 +110,8 @@ export function LineWalkFilters({
       page: 1,
       line: line === 'all' ? null : line,
       shift: shift === 'day' || shift === 'night' ? shift : null,
-      query: query || null,
+      brand: brand || null,
+      packStyle: packStyle || null,
     }
     startTransition(() => router.push(lineWalkListHref(next, 1)))
   }
@@ -136,12 +139,24 @@ export function LineWalkFilters({
       onSubmit={handleSubmit}
       className="flex shrink-0 flex-col gap-3 rounded-xl border bg-card p-4 text-card-foreground md:flex-row md:flex-wrap md:items-end">
       <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ค้นหาแบรนด์หรือ pack style
+        แบรนด์
         <Input
           type="search"
-          name="q"
-          defaultValue={filters.query ?? ''}
+          name="brand"
+          defaultValue={filters.brand ?? ''}
           placeholder="เช่น แบรนด์"
+          autoComplete="off"
+          disabled={pending}
+        />
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        Pack style
+        <Input
+          type="search"
+          name="packStyle"
+          defaultValue={filters.packStyle ?? ''}
+          placeholder="เช่น pack style"
           autoComplete="off"
           disabled={pending}
         />

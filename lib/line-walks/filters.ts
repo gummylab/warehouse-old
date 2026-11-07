@@ -37,7 +37,10 @@ export function parseLineWalkListParams(
   const date = isValidCalendarDate(dateValue) ? dateValue : todayBangkok()
   const { from, to } = periodRange(period, date)
 
-  const query = first(params.q).slice(0, 100)
+  // Each search has its own URL parameter, so a link can narrow the brand and
+  // the pack style independently.
+  const brand = first(params.brand).slice(0, 100)
+  const packStyle = first(params.packStyle).slice(0, 100)
   const pageValue = Number.parseInt(first(params.page), 10)
   const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1
 
@@ -48,16 +51,20 @@ export function parseLineWalkListParams(
     to,
     line: first(params.line) || null,
     shift: parseShift(first(params.shift)),
-    query: query || null,
+    brand: brand || null,
+    packStyle: packStyle || null,
     page,
     pageSize: LINE_WALK_PAGE_SIZE,
   }
 }
 
 // The period and date select the view, not a filter the user typed. Only the
-// line, shift and search decide whether the empty state says "no matches".
+// line, shift and the two searches decide whether the empty state says
+// "no matches".
 export function hasLineWalkFilters(filters: LineWalkListFilters): boolean {
-  return Boolean(filters.line || filters.shift || filters.query)
+  return Boolean(
+    filters.line || filters.shift || filters.brand || filters.packStyle,
+  )
 }
 
 // Page 1 and the default today/day view keep the clean /line-walks URL.
@@ -72,7 +79,8 @@ export function lineWalkListHref(
   }
   if (filters.line) params.set('line', filters.line)
   if (filters.shift) params.set('shift', filters.shift)
-  if (filters.query) params.set('q', filters.query)
+  if (filters.brand) params.set('brand', filters.brand)
+  if (filters.packStyle) params.set('packStyle', filters.packStyle)
   if (page > 1) params.set('page', String(page))
 
   const query = params.toString()
