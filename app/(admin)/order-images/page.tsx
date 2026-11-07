@@ -80,6 +80,7 @@ async function OrderTableSection({
     return (
       <EmptyState
         variant="page"
+        bordered
         className="md:min-h-0 md:overflow-y-auto"
         icon={<InboxIcon />}
         title={
