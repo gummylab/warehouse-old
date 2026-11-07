@@ -25,7 +25,7 @@ test('edits the two locations and applies the storage root at once', async ({
 
   const moved = join(E2E_STORAGE_DIR, 'moved')
   await storage.fill(moved)
-  await page.getByRole('button', { name: 'บันทึกที่จัดเก็บ' }).click()
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ที่จัดเก็บไฟล์' }).click()
   await expect(page.getByText('บันทึกตำแหน่งที่ตั้งแล้ว')).toBeVisible()
   // The field shows the folder the operator typed (the app appends the
   // fixed file/folder name internally).
@@ -35,7 +35,7 @@ test('edits the two locations and applies the storage root at once', async ({
   // switches to a brand-new empty database.
   const missing = join(E2E_STORAGE_DIR, 'missing.db')
   await database.fill(missing)
-  await page.getByRole('button', { name: 'บันทึกฐานข้อมูล' }).click()
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ฐานข้อมูล' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('button', { name: 'ยกเลิก' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
@@ -44,7 +44,7 @@ test('edits the two locations and applies the storage root at once', async ({
   // Put the run's own root back, so a later spec and the next run see the
   // same folder.
   await storage.fill(E2E_STORAGE_DIR)
-  await page.getByRole('button', { name: 'บันทึกที่จัดเก็บ' }).click()
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ที่จัดเก็บไฟล์' }).click()
   await expect(storage).toHaveValue(E2E_STORAGE_DIR)
 
   expect(errors).toEqual([])
