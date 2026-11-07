@@ -60,13 +60,24 @@ test('lists line walks with the overview and table filters', async ({
   await expect(page.getByText(dayBrand, { exact: true })).toHaveCount(0)
   expect(await kpi.allTextContents()).toEqual(before)
 
-  // Clear and search by brand.
+  // Clear and search by brand. The brand and the pack style have their own
+  // fields now, so the label is just "แบรนด์" (it no longer says ค้นหา).
   await page.getByRole('link', { name: 'ล้างตัวกรอง' }).click()
   await expect(page).toHaveURL(/\/line-walks$/)
-  await page.getByLabel(/ค้นหาแบรนด์/).fill(dayBrand)
+  await page.getByLabel('แบรนด์', { exact: true }).fill(dayBrand)
   await page.getByRole('button', { name: 'ค้นหา' }).click()
   await expect(page.getByText(dayBrand, { exact: true })).toBeVisible()
   await expect(page.getByText(nightBrand, { exact: true })).toHaveCount(0)
+
+  // The pack style is a separate field now: matching it keeps the row whose
+  // pack style matches, and the brand box no longer matches it.
+  await page.getByRole('link', { name: 'ล้างตัวกรอง' }).click()
+  await expect(page).toHaveURL(/\/line-walks$/)
+  await page.getByLabel('Pack style', { exact: true }).fill('bag')
+  await page.getByRole('button', { name: 'ค้นหา' }).click()
+  await expect(page).toHaveURL(/packStyle=bag/)
+  await expect(page.getByText(nightBrand, { exact: true })).toBeVisible()
+  await expect(page.getByText(dayBrand, { exact: true })).toHaveCount(0)
 
   // The chart opens with both series and switches grain.
   await page.getByRole('link', { name: 'ล้างตัวกรอง' }).click()
