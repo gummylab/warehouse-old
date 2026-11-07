@@ -262,7 +262,9 @@ export function UploadDialog({
                   <CheckIcon className="size-4 shrink-0 text-success" aria-label="อัปโหลดแล้ว" />
                 )}
                 {(entry.status === 'error' || entry.status === 'rejected') && (
-                  <span className="max-w-40 shrink-0 truncate text-xs text-destructive">
+                  <span
+                    aria-live="polite"
+                    className="max-w-40 shrink-0 truncate text-xs text-destructive">
                     {entry.error}
                   </span>
                 )}

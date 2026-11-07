@@ -77,6 +77,7 @@ export function DeleteOrderDialog({
           ) : (
             <Input
               id="delete-order-confirmation"
+              type="text"
               aria-label="พิมพ์เลขออเดอร์เพื่อยืนยัน"
               aria-invalid={Boolean(error) || undefined}
               value={confirmation}

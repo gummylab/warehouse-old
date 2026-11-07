@@ -193,6 +193,7 @@ export function OrderItemsStep({
             // pad. The browser's own clear button is hidden: the button below
             // sits in the same corner.
             inputMode="numeric"
+            autoComplete="off"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="ค้นหาเลขไอเท็ม"
