@@ -146,7 +146,10 @@ export type LineWalkListFilters = {
   to: string
   line: string | null
   shift: LineWalkShift | null
-  query: string | null
+  // Two independent searches: each one narrows its own column, and a row must
+  // match both when both are set.
+  brand: string | null
+  packStyle: string | null
   page: number
   pageSize: number
 }

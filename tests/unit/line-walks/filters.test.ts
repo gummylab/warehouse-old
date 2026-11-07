@@ -19,7 +19,8 @@ describe('parseLineWalkListParams', () => {
       to: today,
       line: null,
       shift: null,
-      query: null,
+      brand: null,
+      packStyle: null,
       page: 1,
       pageSize: LINE_WALK_PAGE_SIZE,
     })
@@ -37,21 +38,37 @@ describe('parseLineWalkListParams', () => {
     ).toMatchObject({ from: '2028-02-01', to: '2028-02-29' })
   })
 
-  it('reads a shift, line and trimmed query', () => {
+  it('reads a shift, line and the two trimmed searches', () => {
     expect(
       parseLineWalkListParams({
         shift: 'night',
         line: 'line-a',
-        q: '  ab  ',
+        brand: '  Alpha  ',
+        packStyle: '  box  ',
       }),
-    ).toMatchObject({ shift: 'night', line: 'line-a', query: 'ab' })
+    ).toMatchObject({
+      shift: 'night',
+      line: 'line-a',
+      brand: 'Alpha',
+      packStyle: 'box',
+    })
   })
 
-  it('drops an unknown shift and caps a long query', () => {
+  it('drops an unknown shift and caps each long search', () => {
     expect(parseLineWalkListParams({ shift: 'midnight' }).shift).toBeNull()
-    expect(
-      parseLineWalkListParams({ q: 'x'.repeat(150) }).query,
-    ).toHaveLength(100)
+    const filters = parseLineWalkListParams({
+      brand: 'x'.repeat(150),
+      packStyle: 'y'.repeat(150),
+    })
+    expect(filters.brand).toHaveLength(100)
+    expect(filters.packStyle).toHaveLength(100)
+  })
+
+  it('treats a blank search as no filter', () => {
+    const filters = parseLineWalkListParams({ brand: '   ', packStyle: '' })
+
+    expect(filters.brand).toBeNull()
+    expect(filters.packStyle).toBeNull()
   })
 })
 
@@ -64,16 +81,19 @@ describe('hasLineWalkFilters', () => {
     ).toBe(false)
   })
 
-  it('is true when the line, shift or query is set', () => {
+  it('is true when the line, shift or either search is set', () => {
     expect(
       hasLineWalkFilters(parseLineWalkListParams({ line: 'line-a' })),
     ).toBe(true)
     expect(
       hasLineWalkFilters(parseLineWalkListParams({ shift: 'day' })),
     ).toBe(true)
-    expect(hasLineWalkFilters(parseLineWalkListParams({ q: '12' }))).toBe(
-      true,
-    )
+    expect(
+      hasLineWalkFilters(parseLineWalkListParams({ brand: 'Al' })),
+    ).toBe(true)
+    expect(
+      hasLineWalkFilters(parseLineWalkListParams({ packStyle: 'box' })),
+    ).toBe(true)
   })
 })
 
@@ -93,15 +113,16 @@ describe('lineWalkListHref', () => {
     ).toBe('/line-walks?period=day&date=2026-11-05')
   })
 
-  it('preserves line, shift, query and page', () => {
+  it('preserves line, shift, both searches and page', () => {
     const filters = parseLineWalkListParams({
       line: 'line-a',
       shift: 'night',
-      q: 'ab',
+      brand: 'Alpha',
+      packStyle: 'box',
     })
 
     expect(lineWalkListHref(filters, 2)).toBe(
-      '/line-walks?line=line-a&shift=night&q=ab&page=2',
+      '/line-walks?line=line-a&shift=night&brand=Alpha&packStyle=box&page=2',
     )
   })
 })
