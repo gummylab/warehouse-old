@@ -17,25 +17,25 @@ test('edits the two locations and applies the storage root at once', async ({
   const errors = collectConsoleErrors(page)
   await page.goto('/settings')
 
-  const database = page.getByLabel('ฐานข้อมูล', { exact: true })
-  const storage = page.getByLabel('ที่จัดเก็บ', { exact: true })
+  const database = page.getByLabel('โฟลเดอร์ฐานข้อมูล', { exact: true })
+  const storage = page.getByLabel('โฟลเดอร์ที่จัดเก็บไฟล์', { exact: true })
 
-  await expect(database).toHaveValue(/.+\.db$/)
-  await expect(storage).toHaveValue(/order-images$/)
+  await expect(database).toHaveValue(/.+/)
+  await expect(storage).toHaveValue(/.+/)
 
   const moved = join(E2E_STORAGE_DIR, 'moved')
   await storage.fill(moved)
-  await page.getByRole('button', { name: 'บันทึกที่จัดเก็บ' }).click()
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ที่จัดเก็บไฟล์' }).click()
   await expect(page.getByText('บันทึกตำแหน่งที่ตั้งแล้ว')).toBeVisible()
-  // The rule appends the app's folder name, and the field shows what the app
-  // will actually use rather than what was typed.
-  await expect(storage).toHaveValue(join(moved, 'order-images'))
+  // The field shows the folder the operator typed (the app appends the
+  // fixed file/folder name internally).
+  await expect(storage).toHaveValue(moved)
 
-  // A database file that does not exist yet must be confirmed before the app
+  // A database folder that does not exist yet must be confirmed before the app
   // switches to a brand-new empty database.
   const missing = join(E2E_STORAGE_DIR, 'missing.db')
   await database.fill(missing)
-  await page.getByRole('button', { name: 'บันทึกฐานข้อมูล' }).click()
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ฐานข้อมูล' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.getByRole('button', { name: 'ยกเลิก' }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
@@ -44,10 +44,8 @@ test('edits the two locations and applies the storage root at once', async ({
   // Put the run's own root back, so a later spec and the next run see the
   // same folder.
   await storage.fill(E2E_STORAGE_DIR)
-  await page.getByRole('button', { name: 'บันทึกที่จัดเก็บ' }).click()
-  await expect(storage).toHaveValue(
-    join(E2E_STORAGE_DIR, 'order-images'),
-  )
+  await page.getByRole('button', { name: 'บันทึกโฟลเดอร์ที่จัดเก็บไฟล์' }).click()
+  await expect(storage).toHaveValue(E2E_STORAGE_DIR)
 
   expect(errors).toEqual([])
 })

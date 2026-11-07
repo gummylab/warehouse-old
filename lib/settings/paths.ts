@@ -2,18 +2,26 @@
 // time: the value saved on /settings, else the environment override, else the
 // default inside the repo. Both functions read on every call so a save applies
 // to the next operation without a restart (ADR 0014).
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 import { readSettings } from './store'
 
-// The SQLite file. WH_DB_PATH stays the test harness's override; a value saved
-// on /settings wins over it because that is the operator's latest choice.
+// The SQLite file. A value saved on /settings is a FOLDER now (the operator only
+// types the folder); the fixed file name 'wh.db' is appended here. A saved value
+// that still ends in 'wh.db' (older builds) is treated as its parent folder so
+// the switch is transparent. WH_DB_PATH keeps its old meaning (full file path)
+// because the test harness and .env pass a file there.
+const DB_FILE_NAME = 'wh.db'
+
 export function databaseFile(): string {
   const saved = readSettings().databasePath
-  if (saved) return resolve(saved)
+  if (saved) {
+    const base = basename(saved) === DB_FILE_NAME ? dirname(saved) : saved
+    return resolve(base, DB_FILE_NAME)
+  }
 
   const override = process.env.WH_DB_PATH
-  return override ? resolve(override) : join(process.cwd(), 'database', 'wh.db')
+  return override ? resolve(override) : join(process.cwd(), 'database', DB_FILE_NAME)
 }
 
 // The base directory uploads live under. The folder name itself is appended by

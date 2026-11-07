@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 
+import { MapPin, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -73,33 +74,35 @@ export function LocationsCard({
       aria-labelledby="locations-title"
       className="flex flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground">
       <div className="flex flex-col gap-1">
-        <h2 id="locations-title" className="text-sm font-semibold">
+        <h2 id="locations-title" className="flex items-center gap-2 text-sm font-semibold">
+          <MapPin className="size-4" />
           ตำแหน่งที่ตั้ง
         </h2>
-        <p className="text-xs text-muted-foreground">
-          แก้ที่อยู่แล้วบันทึก มีผลทันทีโดยไม่ต้องรีสตาร์ท
-        </p>
+
       </div>
 
       <PathField
         id="settings-database-path"
-        label="ฐานข้อมูล"
+        label="โฟลเดอร์ฐานข้อมูล"
+
         value={database}
         error={databaseError}
         saving={savingDatabase}
         onChange={setDatabase}
         onSave={() => submitDatabase(false)}
+
       />
 
       <PathField
         id="settings-storage-path"
-        label="ที่จัดเก็บ"
+        label="โฟลเดอร์ที่จัดเก็บไฟล์"
+
         value={storage}
         error={storageError}
         saving={savingStorage}
         onChange={setStorage}
         onSave={submitStorage}
-        hint="รูปเดิมยังอยู่ที่โฟลเดอร์เดิม ไม่ถูกย้ายตาม"
+
       />
 
       <Dialog
@@ -111,8 +114,8 @@ export function LocationsCard({
           <DialogHeader>
             <DialogTitle>สร้างฐานข้อมูลใหม่</DialogTitle>
             <DialogDescription>
-              ไฟล์นี้ยังไม่มี ระบบจะสร้างฐานข้อมูลว่างที่ {pending}{' '}
-              ข้อมูลเดิมยังอยู่ที่ไฟล์เดิม และกลับมาใช้ได้โดยแก้ที่อยู่กลับ
+              โฟลเดอร์นี้ยังไม่มีไฟล์ wh.db ระบบจะสร้างฐานข้อมูลว่างที่{' '}
+              {pending}/wh.db ข้อมูลเดิมยังอยู่ที่ไฟล์เดิม และกลับมาใช้ได้โดยแก้ที่อยู่กลับ
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -142,6 +145,7 @@ export function LocationsCard({
 function PathField({
   id,
   label,
+  icon: Icon,
   value,
   error,
   hint,
@@ -151,6 +155,7 @@ function PathField({
 }: {
   id: string
   label: string
+  icon?: LucideIcon
   value: string
   error: string | null
   hint?: string
@@ -160,7 +165,8 @@ function PathField({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="flex items-center gap-2 text-sm font-medium">
+        {Icon ? <Icon className="size-4" /> : null}
         {label}
       </label>
       <div className="flex flex-col gap-2 sm:flex-row">

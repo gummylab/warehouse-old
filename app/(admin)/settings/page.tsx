@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
+import { dirname } from 'node:path'
 import { io } from 'next/cache'
 
-import { storageRoot } from '@/lib/order-images/storage'
 import { PAGE_TITLES } from '@/lib/page-titles'
-import { databaseFile } from '@/lib/settings/paths'
+import { databaseFile, storageBase } from '@/lib/settings/paths'
 
 import { LocationsCard } from './locations-card'
 
@@ -20,8 +20,8 @@ export default async function SettingsPage() {
 
   return (
     <LocationsCard
-      databasePath={databaseFile()}
-      storagePath={storageRoot()}
+      databasePath={dirname(databaseFile())}
+      storagePath={storageBase()}
     />
   )
 }

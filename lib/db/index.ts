@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 import Database from 'better-sqlite3'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -125,22 +125,30 @@ function openDatabase(): Handles {
 // fails anyway, the previous path is written back and the app returns to the
 // file it was serving before.
 export function applyDatabasePath(requested: string): string {
-  const target = resolve(requested)
+  // The operator types a folder; the fixed file name lives inside it. A value
+  // that already ends in 'wh.db' (older builds) is treated as its parent folder.
+  const dir = resolve(requested)
+  const base = basename(dir) === 'wh.db' ? dirname(dir) : dir
+  const target = resolve(base, 'wh.db')
+
   const previous = databaseFile()
-  if (target === previous) return target
+  if (target === previous) {
+    updateSettings({ databasePath: base })
+    return base
+  }
 
   const probe = openAt(target)
   probe.db.close()
 
-  updateSettings({ databasePath: target })
+  updateSettings({ databasePath: base })
   closeDb()
   try {
     getDb()
   } catch (error) {
-    updateSettings({ databasePath: previous })
+    updateSettings({ databasePath: dirname(previous) })
     closeDb()
     getDb()
     throw error
   }
-  return target
+  return base
 }
