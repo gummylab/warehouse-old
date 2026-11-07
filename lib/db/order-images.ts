@@ -241,8 +241,13 @@ function getTrendPoints(
       : sql<string>`${orders.orderDate}`
 
   return getOrm()
-    .select({ bucket, count: sql<number>`count(*)` })
+    .select({
+      bucket,
+      count: sql<number>`count(distinct ${orders.id})`,
+      itemCount: sql<number>`count(${items.id})`,
+    })
     .from(orders)
+    .leftJoin(items, eq(items.orderId, orders.id))
     .where(between(orders.orderDate, from, to))
     .groupBy(bucket)
     .orderBy(bucket)

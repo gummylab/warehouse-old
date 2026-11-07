@@ -80,20 +80,20 @@ describe('fillTrend', () => {
   it('keeps the window order and fills missing buckets with zero', () => {
     expect(
       fillTrend(['2026-11-03', '2026-11-04', '2026-11-05'], [
-        { bucket: '2026-11-05', count: 2 },
-        { bucket: '2026-11-03', count: 1 },
+        { bucket: '2026-11-05', count: 2, itemCount: 5 },
+        { bucket: '2026-11-03', count: 1, itemCount: 1 },
       ]),
     ).toEqual([
-      { bucket: '2026-11-03', count: 1 },
-      { bucket: '2026-11-04', count: 0 },
-      { bucket: '2026-11-05', count: 2 },
+      { bucket: '2026-11-03', count: 1, itemCount: 1 },
+      { bucket: '2026-11-04', count: 0, itemCount: 0 },
+      { bucket: '2026-11-05', count: 2, itemCount: 5 },
     ])
   })
 
   it('drops a row that falls outside the window', () => {
     expect(
-      fillTrend(['2026-11-05'], [{ bucket: '2026-11-04', count: 9 }]),
-    ).toEqual([{ bucket: '2026-11-05', count: 0 }])
+      fillTrend(['2026-11-05'], [{ bucket: '2026-11-04', count: 9, itemCount: 3 }]),
+    ).toEqual([{ bucket: '2026-11-05', count: 0, itemCount: 0 }])
   })
 })
 
