@@ -67,7 +67,7 @@ export function LineWalkTrend({
         className="h-[180px] w-full"
         role="img"
         aria-label={`กราฟจำนวนคนและยอดสินค้า${GRAIN_LABEL[grain]} ${period}`}>
-        <AreaChart data={points} margin={{ left: 0, right: 0, top: 8 }}>
+        <AreaChart data={points} margin={{ left: 0, right: 8, top: 8 }}>
           <defs>
             <linearGradient
               id="fill-line-walk-amount"
@@ -114,19 +114,7 @@ export function LineWalkTrend({
             tickFormatter={(value) => formatTrendTick(grain, String(value))}
           />
           <YAxis
-            yAxisId="amount"
-            orientation="left"
             width={36}
-            tickLine={false}
-            axisLine={false}
-            tickMargin={4}
-            allowDecimals={false}
-            domain={[0, 'auto']}
-          />
-          <YAxis
-            yAxisId="people"
-            orientation="right"
-            width={28}
             tickLine={false}
             axisLine={false}
             tickMargin={4}
@@ -144,7 +132,6 @@ export function LineWalkTrend({
             }
           />
           <Area
-            yAxisId="amount"
             dataKey="amount"
             type="monotone"
             fill="url(#fill-line-walk-amount)"
@@ -152,7 +139,6 @@ export function LineWalkTrend({
             strokeWidth={2}
           />
           <Area
-            yAxisId="people"
             dataKey="people"
             type="monotone"
             fill="url(#fill-line-walk-people)"
