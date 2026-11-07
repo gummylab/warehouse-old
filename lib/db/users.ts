@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { randomUUID } from 'node:crypto'
 
 import { and, eq } from 'drizzle-orm'
@@ -50,7 +52,7 @@ export async function listUsers(): Promise<RegisterUser[]> {
 
 // Used by the LIFF status endpoint. Sync and unaugmented: the caller has
 // already verified the LINE identity, only the lookup happens here.
-export function getUserByLineId(lineUserId: string): RegisterUser | undefined {
+function _getUserByLineId(lineUserId: string): RegisterUser | undefined {
   const row = getOrm()
     .select(USER_COLUMNS)
     .from(users)
@@ -134,3 +136,6 @@ function toRegisterUser(row: UserRow): RegisterUser {
     requestedAt: row.requestedAt,
   }
 }
+
+// React cache() wrappers (within-request dedup).
+export const getUserByLineId = cache(_getUserByLineId)
