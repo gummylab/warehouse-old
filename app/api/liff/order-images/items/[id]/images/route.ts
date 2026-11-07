@@ -1,10 +1,9 @@
 import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 
-import { Worker } from 'worker_threads'
-
-import { itemExists, saveImageOriginal, writeImageVariants } from '@/lib/db/order-images'
+import { itemExists, saveImageOriginal } from '@/lib/db/order-images'
 import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { buildImageVariants } from '@/lib/order-images/optimize'
 import { isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
 import sharp from 'sharp'
 
@@ -70,25 +69,20 @@ export async function POST(
     buffer,
   })
 
-  // Defer heavy variant generation to a worker thread (after the response).
+  // Defer heavy variant generation to after the response.
   after(async () => {
     try {
-      const worker = new Worker(new URL('../../../../../../../lib/order-images/variant-worker.ts', import.meta.url))
-      const variants = await new Promise<{ web: Buffer; thumb: Buffer }>((resolve, reject) => {
-        worker.on('message', (msg: { ok: boolean; web?: ArrayBuffer; thumb?: ArrayBuffer; error?: string }) => {
-          worker.terminate()
-          if (msg.ok && msg.web && msg.thumb) {
-            resolve({ web: Buffer.from(msg.web), thumb: Buffer.from(msg.thumb) })
-          } else {
-            reject(new Error(msg.error || 'variant generation failed'))
-          }
-        })
-        worker.on('error', (err) => { worker.terminate(); reject(err) })
-        worker.on('exit', (code) => { if (code !== 0) reject(new Error(`worker exited with code ${code}`)) })
-        // Send the buffer to the worker (structured clone, no transfer).
-        worker.postMessage({ buffer })
-      })
-      writeImageVariants(key, variants.web, variants.thumb)
+      const variants = await buildImageVariants(buffer)
+      // Write variants to disk (file-serving route falls back to original
+      // if these are missing, so a failure here is non-fatal).
+      const { derivativePath, ensureDirForFile } = await import('@/lib/order-images/storage')
+      const webPath = derivativePath(key, 'web')
+      const thumbPath = derivativePath(key, 'thumb')
+      ensureDirForFile(webPath)
+      ensureDirForFile(thumbPath)
+      const { writeFileSync } = await import('node:fs')
+      writeFileSync(webPath, variants.web)
+      writeFileSync(thumbPath, variants.thumb)
     } catch (error) {
       // Variant generation failed (e.g. corrupt pixels). The file-serving
       // route falls back to the original, so the upload still succeeds.
