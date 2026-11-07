@@ -78,7 +78,12 @@ export function fillTrend(
   rows: TrendPoint[],
 ): TrendPoint[] {
   const counts = new Map(rows.map((row) => [row.bucket, row.count]))
-  return buckets.map((bucket) => ({ bucket, count: counts.get(bucket) ?? 0 }))
+  const itemCounts = new Map(rows.map((row) => [row.bucket, row.itemCount]))
+  return buckets.map((bucket) => ({
+    bucket,
+    count: counts.get(bucket) ?? 0,
+    itemCount: itemCounts.get(bucket) ?? 0,
+  }))
 }
 
 // The x axis label: the day and month for the daily windows, the month name

@@ -18,11 +18,14 @@ import {
 // grey in the luma palette; `--chart-1` is too light to read as a line on the
 // card background.
 const chartConfig = {
-  count: {
-    label: 'ออเดอร์',
-    color: 'var(--chart-2)',
-  },
+  count: { label: 'ออเดอร์', color: 'var(--info)' },
+  itemCount: { label: 'ไอเท็ม', color: 'var(--chart-2)' },
 } satisfies ChartConfig
+
+const SERIES = [
+  { key: 'count', label: 'ออเดอร์', color: 'var(--info)' },
+  { key: 'itemCount', label: 'ไอเท็ม', color: 'var(--chart-2)' },
+] as const
 
 const GRAIN_LABEL: Record<TrendGrain, string> = {
   day: 'รายวัน',
@@ -47,6 +50,20 @@ export function OrderTrend({
 
   return (
     <div className="relative border-t px-2 pb-4 pt-3 sm:px-4">
+      <div
+        data-slot="order-chart-legend"
+        className="mb-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        {SERIES.map((series) => (
+          <span key={series.key} className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-[2px]"
+              style={{ backgroundColor: series.color }}
+            />
+            {series.label}
+          </span>
+        ))}
+      </div>
       <ChartContainer
         config={chartConfig}
         className="h-[180px] w-full"
@@ -64,6 +81,18 @@ export function OrderTrend({
                 offset="95%"
                 stopColor="var(--color-count)"
                 stopOpacity={0.05}
+              />
+            </linearGradient>
+            <linearGradient id="fill-order-item-count" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="5%"
+                stopColor="var(--color-itemCount)"
+                stopOpacity={0.25}
+              />
+              <stop
+                offset="95%"
+                stopColor="var(--color-itemCount)"
+                stopOpacity={0.02}
               />
             </linearGradient>
           </defs>
@@ -99,6 +128,13 @@ export function OrderTrend({
             type="natural"
             fill="url(#fill-order-count)"
             stroke="var(--color-count)"
+            strokeWidth={2}
+          />
+          <Area
+            dataKey="itemCount"
+            type="natural"
+            fill="url(#fill-order-item-count)"
+            stroke="var(--color-itemCount)"
             strokeWidth={2}
           />
         </AreaChart>

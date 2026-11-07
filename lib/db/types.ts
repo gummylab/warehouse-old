@@ -78,6 +78,7 @@ export type TrendGrain = 'day' | 'month' | 'year'
 export type TrendPoint = {
   bucket: string
   count: number
+  itemCount: number
 }
 
 export type OrderOverviewRange = {
