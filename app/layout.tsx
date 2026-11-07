@@ -1,7 +1,7 @@
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Kanit } from 'next/font/google'
 import './globals.css'
 
@@ -21,6 +21,9 @@ export const metadata: Metadata = {
     template: '%s | Warehouse Dashboard',
   },
   description: 'ระบบจัดการรูปภาพออเดอร์สำหรับโรงงาน',
+}
+
+export const viewport: Viewport = {
   themeColor: '#ffffff',
 }
 
