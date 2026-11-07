@@ -75,6 +75,7 @@ export function RegisterView({ approvedUsers, pendingUsers }: RegisterViewProps)
             // messages instead of the table's generic "ไม่พบข้อมูล".
             <EmptyState
               variant="page"
+              bordered
               icon={tab === 'pending' ? <InboxIcon /> : <UserCheckIcon />}
               title={
                 tab === 'pending'

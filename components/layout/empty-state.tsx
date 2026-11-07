@@ -1,13 +1,6 @@
 import type { ReactNode } from 'react'
 
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { cn } from '@/lib/utils'
 
 // One empty state for every "there is no data yet" screen on both surfaces.
@@ -52,8 +45,7 @@ export function EmptyState({
   bordered?: boolean
   className?: string
 }) {
-  const resolvedHeading =
-    headingLevel ?? (variant === 'inline' ? 'none' : 'h2')
+  const resolvedHeading = headingLevel ?? (variant === 'inline' ? 'none' : 'h2')
   const showBorder = bordered ?? variant !== 'page'
 
   return (
@@ -65,21 +57,17 @@ export function EmptyState({
         variant === 'section' && 'flex-none p-6 sm:p-8',
         variant === 'inline' && 'flex-none gap-2 p-4 sm:p-6',
         showBorder ? 'border' : 'border-0',
-        className,
+        className
       )}>
       <EmptyHeader>
         {icon ? (
-          <EmptyMedia
-            variant="icon"
-            className={cn(variant === 'inline' && 'size-8 rounded-lg')}>
+          <EmptyMedia variant="icon" className={cn(variant === 'inline' && 'size-8 rounded-lg')}>
             {icon}
           </EmptyMedia>
         ) : null}
 
         {resolvedHeading === 'none' ? (
-          <EmptyTitle className={cn(variant === 'inline' && 'text-base')}>
-            {title}
-          </EmptyTitle>
+          <EmptyTitle className={cn(variant === 'inline' && 'text-base')}>{title}</EmptyTitle>
         ) : resolvedHeading === 'h2' ? (
           <h2 className={titleClassName(variant)}>{title}</h2>
         ) : (
@@ -97,8 +85,5 @@ export function EmptyState({
 // Matches EmptyTitle's own classes so a real heading looks the same as the
 // div the primitive ships with.
 function titleClassName(variant: EmptyStateVariant): string {
-  return cn(
-    'font-heading text-lg font-medium tracking-tight',
-    variant === 'inline' && 'text-base',
-  )
+  return cn('font-heading text-lg font-medium tracking-tight', variant === 'inline' && 'text-base')
 }
