@@ -81,6 +81,12 @@ function openAt(file: string): Handles {
     db.pragma('journal_mode = WAL')
     db.pragma('busy_timeout = 5000')
     db.pragma('foreign_keys = ON')
+    // mmap_size: memory-map the DB file for faster reads (256 MB).
+    db.pragma('mmap_size = 268435456')
+    // cache_size: in-memory page cache (64 MB, negative = KB).
+    db.pragma('cache_size = -64000')
+    // wal_autocheckpoint: checkpoint WAL every 1000 pages (default, explicit).
+    db.pragma('wal_autocheckpoint = 1000')
 
     // Synchronous by design (better-sqlite3): a brand-new file ends up with
     // every table before the first query, and an up-to-date file is a no-op

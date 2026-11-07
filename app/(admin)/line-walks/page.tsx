@@ -7,7 +7,7 @@ import { FootprintsIcon, InboxIcon } from 'lucide-react'
 import { EmptyState } from '@/components/layout/empty-state'
 import { StateScreen } from '@/components/layout/state-screen'
 import { ButtonLink } from '@/components/ui/button'
-import { getLineWalkOverview, listLineWalks, getCachedLineWalkOverview } from '@/lib/db/line-walks'
+import { getCachedLineWalkOverview, listLineWalks } from '@/lib/db/line-walks'
 import { listLines } from '@/lib/db/order-images'
 import {
   hasLineWalkFilters,
@@ -30,35 +30,12 @@ export const metadata: Metadata = {
   title: PAGE_TITLES['/line-walks'],
 }
 
-export default async function LineWalksPage(
-  props: PageProps<'/line-walks'>,
-) {
+export default async function LineWalkManagementPage(props: PageProps<'/line-walks'>) {
   const params = await props.searchParams
-
-  return (
-    <Suspense fallback={<StateScreen loading title="กำลังโหลด..." />}>
-      <LineWalksData params={params} />
-    </Suspense>
-  )
-}
-
-async function LineWalksData({
-  params,
-}: {
-  params: Record<string, string | string[] | undefined>
-}) {
-  // io() keeps the synchronous SQLite reads out of the static shell; the
-  // parser reads the clock for the default "today", so it also runs after this
-  // dynamic access rather than during prerendering.
   await io()
-  const filters = parseLineWalkListParams(params)
 
-  // The whole catalog, not only the lines that already have records.
-  const lines = listLines()
+  const filters = parseLineWalkListParams(params)
   const today = todayBangkok()
-  // The KPI and the chart share one window and ignore the table filters.
-  const overview = await getCachedLineWalkOverview(today)
-  const result = listLineWalks(filters)
   const filtered = hasLineWalkFilters(filters)
   const defaultToday = filters.period === 'day' && filters.date === today
 
@@ -74,52 +51,91 @@ async function LineWalksData({
         </ButtonLink>
       </div>
 
-      <LineWalkOverview overview={overview} today={today} />
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดภาพรวม..." />}>
+        <LineWalkOverviewSection today={today} />
+      </Suspense>
 
-      <LineWalkFilters
-        key={lineWalkListHref(filters, 1)}
-        lines={lines}
-        filters={filters}
-      />
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตัวกรอง..." />}>
+        <LineWalkFiltersSection filters={filters} />
+      </Suspense>
 
-      {result.total === 0 ? (
-        <EmptyState
-          variant="page"
-          className="md:min-h-0 md:overflow-y-auto"
-          icon={<InboxIcon />}
-          title={
-            filtered
-              ? 'ไม่พบบันทึกตามเงื่อนไข'
-              : defaultToday
-                ? 'วันนี้ยังไม่มีการเดินไลน์'
-                : 'ไม่พบบันทึกในช่วงเวลาที่เลือก'
-          }
-          description={
-            filtered
-              ? 'ลองเปลี่ยนช่วงเวลา ไลน์ผลิต กะ หรือคำค้น'
-              : defaultToday
-                ? 'บันทึกจากการเดินไลน์ในฟอร์ม LIFF แล้วจะแสดงที่นี่'
-                : 'ลองเลือกช่วงเวลาอื่น หรือกลับไปดูของวันนี้'
-          }
-          actions={
-            filtered || !defaultToday ? (
-              <ButtonLink href="/line-walks" variant="outline">
-                {filtered ? 'ล้างตัวกรอง' : 'กลับไปวันนี้'}
-              </ButtonLink>
-            ) : undefined
-          }
-        />
-      ) : (
-        <>
-          <LineWalkTable rows={result.rows} />
-          <LineWalkPagination
-            filters={filters}
-            page={result.page}
-            pageCount={result.pageCount}
-            total={result.total}
-          />
-        </>
-      )}
+      <Suspense fallback={<StateScreen loading title="กำลังโหลดตาราง..." />}>
+        <LineWalkTableSection filters={filters} filtered={filtered} defaultToday={defaultToday} today={today} />
+      </Suspense>
     </div>
+  )
+}
+
+// Streams the KPI strip + chart independently.
+async function LineWalkOverviewSection({ today }: { today: string }) {
+  const overview = await getCachedLineWalkOverview(today)
+  return <LineWalkOverview overview={overview} today={today} />
+}
+
+// Streams the filter bar (line catalog).
+async function LineWalkFiltersSection({ filters }: { filters: ReturnType<typeof parseLineWalkListParams> }) {
+  const lines = listLines()
+  return (
+    <LineWalkFilters
+      key={lineWalkListHref(filters, 1)}
+      lines={lines}
+      filters={filters}
+    />
+  )
+}
+
+// Streams the table (or empty state).
+async function LineWalkTableSection({
+  filters,
+  filtered,
+  defaultToday,
+  today,
+}: {
+  filters: ReturnType<typeof parseLineWalkListParams>
+  filtered: boolean
+  defaultToday: boolean
+  today: string
+}) {
+  const result = listLineWalks(filters)
+  if (result.total === 0) {
+    return (
+      <EmptyState
+        variant="page"
+        className="md:min-h-0 md:overflow-y-auto"
+        icon={<InboxIcon />}
+        title={
+          filtered
+            ? 'ไม่พบบันทึกตามเงื่อนไข'
+            : defaultToday
+              ? 'วันนี้ยังไม่มีการเดินไลน์'
+              : 'ไม่พบบันทึกในช่วงเวลาที่เลือก'
+        }
+        description={
+          filtered
+            ? 'ลองเปลี่ยนช่วงเวลา ไลน์ผลิต กะ หรือคำค้น'
+            : defaultToday
+              ? 'บันทึกจากการเดินไลน์ในฟอร์ม LIFF แล้วจะแสดงที่นี่'
+              : 'ลองเลือกช่วงเวลาอื่น หรือกลับไปดูของวันนี้'
+        }
+        actions={
+          filtered || !defaultToday ? (
+            <ButtonLink href="/line-walks" variant="outline">
+              {filtered ? 'ล้างตัวกรอง' : 'กลับไปวันนี้'}
+            </ButtonLink>
+          ) : undefined
+        }
+      />
+    )
+  }
+  return (
+    <>
+      <LineWalkTable rows={result.rows} />
+      <LineWalkPagination
+        filters={filters}
+        page={result.page}
+        pageCount={result.pageCount}
+        total={result.total}
+      />
+    </>
   )
 }
