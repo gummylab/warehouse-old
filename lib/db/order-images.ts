@@ -6,6 +6,8 @@
 // atomically (see saveImage).
 import 'server-only'
 
+import { cache } from 'react'
+
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 
@@ -141,7 +143,7 @@ function toImage(row: ImageRows): ImageRecord {
 // and an admin edit to a line name would then need an explicit invalidation
 // to show up. The pages that read it are 'instant = false' anyway (the
 // LIFF gate withholds their children), so a cached shell would buy nothing.
-export function listLines(): string[] {
+function _listLines(): string[] {
   return getOrm()
     .select({ name: lines.name })
     .from(lines)
@@ -197,7 +199,7 @@ function buildOrderWhere(filters: OrderListFilters): SQL | undefined {
 // Three small counts instead of one statement with three scalar subqueries:
 // the queries are readable on their own, and SQLite answers them from the
 // same indexes in the same process.
-export function getOrderSummary(range: {
+function _getOrderSummary(range: {
   from: string
   to: string
 }): OrderSummary {
@@ -248,7 +250,7 @@ function getTrendPoints(
 
 // Everything the overview needs for all three grains in one call, so the page
 // can hand the whole thing to the client and the switch needs no refetch.
-export function getOrderOverview(today: string): OrderOverview {
+function _getOrderOverview(today: string): OrderOverview {
   const overview = {} as OrderOverview
 
   for (const grain of TREND_GRAINS) {
@@ -258,14 +260,14 @@ export function getOrderOverview(today: string): OrderOverview {
         window.buckets,
         getTrendPoints(grain, window.from, window.to),
       ),
-      summary: getOrderSummary(window),
+      summary: _getOrderSummary(window),
     }
   }
 
   return overview
 }
 
-export function listOrders(filters: OrderListFilters): OrderListResult {
+function _listOrders(filters: OrderListFilters): OrderListResult {
   const orm = getOrm()
   const pageSize = Math.max(1, Math.min(100, Math.floor(filters.pageSize)))
   const where = buildOrderWhere(filters)
@@ -514,7 +516,7 @@ export function orderExists(id: string): boolean {
   )
 }
 
-export function getOrderDetail(orderId: string): OrderDetail | undefined {
+function _getOrderDetail(orderId: string): OrderDetail | undefined {
   const orm = getOrm()
   const orderRow = orm.select().from(orders).where(eq(orders.id, orderId)).get()
   if (!orderRow) return undefined
@@ -556,7 +558,7 @@ export function getOrderDetail(orderId: string): OrderDetail | undefined {
 // Scoped read for the item-images page: the order (for its header and the
 // back link), the item itself and its photos in seq order. The client
 // refetches this after every mutation on that page.
-export function getItemDetail(itemId: string): ItemDetail | undefined {
+function _getItemDetail(itemId: string): ItemDetail | undefined {
   const orm = getOrm()
   const itemRow = orm.select().from(items).where(eq(items.id, itemId)).get()
   if (!itemRow) return undefined
@@ -729,7 +731,7 @@ export function saveImage(input: {
 
 // Minimal shape for the file-serving route. storage_key deliberately stays
 // out of ImageRecord so API responses never leak filesystem layout.
-export function getImageFile(
+function _getImageFile(
   id: string,
 ): { storageKey: string; mimeType: string | null } | undefined {
   const row = getOrm()
@@ -740,7 +742,7 @@ export function getImageFile(
   return row ?? undefined
 }
 
-export function getImage(id: string): ImageRecord | undefined {
+function _getImage(id: string): ImageRecord | undefined {
   const row = getOrm().select().from(images).where(eq(images.id, id)).get()
   return row ? toImage(row) : undefined
 }
@@ -771,3 +773,13 @@ export function setImagePackage(id: string, pkg: string | null): boolean {
     .run()
   return result.changes > 0
 }
+
+// React cache() wrappers (within-request dedup).
+export const listLines = cache(_listLines)
+export const getOrderSummary = cache(_getOrderSummary)
+export const getOrderOverview = cache(_getOrderOverview)
+export const listOrders = cache(_listOrders)
+export const getOrderDetail = cache(_getOrderDetail)
+export const getItemDetail = cache(_getItemDetail)
+export const getImage = cache(_getImage)
+export const getImageFile = cache(_getImageFile)

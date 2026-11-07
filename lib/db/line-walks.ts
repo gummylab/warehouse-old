@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { randomUUID } from 'node:crypto'
 
 import { and, between, eq, sql, type SQL } from 'drizzle-orm'
@@ -59,7 +61,7 @@ function keyMatch(key: {
 
 // The composite key is the identity. Callers pass trimmed brand and pack style,
 // because those are the values the unique index stores.
-export function findLineWalk(key: {
+function _findLineWalk(key: {
   walkDate: string
   shift: LineWalkShift
   line: string
@@ -180,7 +182,7 @@ function buildLineWalkWhere(
 
 // The overview KPI and chart read one date window and nothing else: a line,
 // shift or search belongs to the table below.
-export function getLineWalkSummary(range: {
+function _getLineWalkSummary(range: {
   from: string
   to: string
 }): LineWalkSummary {
@@ -199,7 +201,7 @@ export function getLineWalkSummary(range: {
   return row ?? { records: 0, people: 0, amount: 0 }
 }
 
-export function listLineWalks(
+function _listLineWalks(
   filters: LineWalkListFilters,
 ): LineWalkListResult {
   const orm = getOrm()
@@ -267,7 +269,7 @@ function getLineWalkPoints(
 }
 
 // The three overview windows in one call, so the switch needs no refetch.
-export function getLineWalkOverview(today: string): LineWalkOverview {
+function _getLineWalkOverview(today: string): LineWalkOverview {
   const overview = {} as LineWalkOverview
 
   for (const grain of TREND_GRAINS) {
@@ -277,9 +279,15 @@ export function getLineWalkOverview(today: string): LineWalkOverview {
         window.buckets,
         getLineWalkPoints(grain, window.from, window.to),
       ),
-      summary: getLineWalkSummary(window),
+      summary: _getLineWalkSummary(window),
     }
   }
 
   return overview
 }
+
+// React cache() wrappers (within-request dedup).
+export const findLineWalk = cache(_findLineWalk)
+export const getLineWalkSummary = cache(_getLineWalkSummary)
+export const listLineWalks = cache(_listLineWalks)
+export const getLineWalkOverview = cache(_getLineWalkOverview)
