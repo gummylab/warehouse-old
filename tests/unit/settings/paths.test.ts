@@ -16,7 +16,7 @@ const previous = new Map<string, string | undefined>()
 // Absolute paths built with join(), never a hand-written 'D:/...': the suite
 // also runs on Linux, where that string is a relative path.
 const envDb = join(root, 'harness.db')
-const savedDb = join(root, 'saved', 'wh.db')
+const savedDb = join(root, 'saved')
 const envStorage = join(root, 'uploads')
 const savedStorage = join(root, 'photos')
 
@@ -56,7 +56,7 @@ describe('databaseFile', () => {
     process.env.WH_DB_PATH = envDb
     updateSettings({ databasePath: savedDb })
 
-    expect(databaseFile()).toBe(savedDb)
+    expect(databaseFile()).toBe(join(savedDb, 'wh.db'))
   })
 })
 

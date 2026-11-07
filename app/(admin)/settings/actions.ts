@@ -1,7 +1,7 @@
 'use server'
 
 import { existsSync, mkdirSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 
 import { requireLocalAdminRequest } from '@/lib/admin/authorize'
 import { applyDatabasePath } from '@/lib/db'
@@ -25,15 +25,23 @@ export async function saveDatabasePath(input: {
   await requireLocalAdminRequest()
 
   const requested = input.path.trim()
-  if (!requested) return { status: 'error', message: 'ระบุที่อยู่ไฟล์ฐานข้อมูล' }
+  if (!requested) return { status: 'error', message: 'ระบุโฟลเดอร์ฐานข้อมูล' }
 
-  const target = resolve(requested)
+  const dir = resolve(requested)
+  // The fixed file name lives inside the folder the operator typed.
+  const base = basename(dir) === 'wh.db' ? dirname(dir) : dir
+  const target = resolve(base, 'wh.db')
+
+  if (existsSync(base) && statSync(base).isFile()) {
+    return { status: 'error', message: 'ที่อยู่นี้เป็นไฟล์ ไม่ใช่โฟลเดอร์' }
+  }
+
   if (!input.confirm && !hasContent(target)) {
-    return { status: 'confirm', path: target }
+    return { status: 'confirm', path: base }
   }
 
   try {
-    return { status: 'saved', path: applyDatabasePath(target) }
+    return { status: 'saved', path: applyDatabasePath(base) }
   } catch (error) {
     return {
       status: 'error',

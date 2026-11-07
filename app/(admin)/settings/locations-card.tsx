@@ -83,12 +83,13 @@ export function LocationsCard({
 
       <PathField
         id="settings-database-path"
-        label="ฐานข้อมูล"
+        label="ฐานข้อมูล (โฟลเดอร์)"
         value={database}
         error={databaseError}
         saving={savingDatabase}
         onChange={setDatabase}
         onSave={() => submitDatabase(false)}
+        hint="ระบบจะใช้ไฟล์ wh.db ภายในโฟลเดอร์นี้"
       />
 
       <PathField
@@ -99,7 +100,7 @@ export function LocationsCard({
         saving={savingStorage}
         onChange={setStorage}
         onSave={submitStorage}
-        hint="รูปเดิมยังอยู่ที่โฟลเดอร์เดิม ไม่ถูกย้ายตาม"
+        hint="ระบบจะสร้างโฟลเดอร์ order-images ภายใน • รูปเดิมยังอยู่ที่โฟลเดอร์เดิม ไม่ถูกย้ายตาม"
       />
 
       <Dialog
@@ -111,8 +112,8 @@ export function LocationsCard({
           <DialogHeader>
             <DialogTitle>สร้างฐานข้อมูลใหม่</DialogTitle>
             <DialogDescription>
-              ไฟล์นี้ยังไม่มี ระบบจะสร้างฐานข้อมูลว่างที่ {pending}{' '}
-              ข้อมูลเดิมยังอยู่ที่ไฟล์เดิม และกลับมาใช้ได้โดยแก้ที่อยู่กลับ
+              โฟลเดอร์นี้ยังไม่มีไฟล์ wh.db ระบบจะสร้างฐานข้อมูลว่างที่{' '}
+              {pending}/wh.db ข้อมูลเดิมยังอยู่ที่ไฟล์เดิม และกลับมาใช้ได้โดยแก้ที่อยู่กลับ
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
