@@ -46,7 +46,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
         .locator('form[aria-label="ตัวกรองออเดอร์"] > *')
         .allInnerTexts()
     ).map((text) => text.split('\n')[0]),
-  ).toEqual(['วันที่', 'ช่วงเวลา', 'ค้นหาเลขออเดอร์', 'ไลน์ผลิต', 'ค้นหา'])
+  ).toEqual(['วันที่', 'ช่วงเวลา', 'ไลน์ผลิต', 'ค้นหาเลขออเดอร์', 'ค้นหา'])
 
   const orderLink = page.getByRole('link', { name: orderNumber })
   await expect(orderLink).toBeVisible()

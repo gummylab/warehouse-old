@@ -60,17 +60,6 @@ export function StepOneFields({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5 text-sm">
-        <label htmlFor="order-number">เลขออเดอร์</label>
-        <OrderNumberInput
-          id="order-number"
-          label="เลขออเดอร์"
-          value={orderNumber}
-          onChange={setOrderNumber}
-          disabled={submitting}
-        />
-      </div>
-
       <label className="flex flex-col gap-1.5 text-sm">
         ไลน์ผลิต
         <Select value={line} onValueChange={setLine} disabled={submitting}>
@@ -86,6 +75,17 @@ export function StepOneFields({
           </SelectContent>
         </Select>
       </label>
+
+      <div className="flex flex-col gap-1.5 text-sm">
+        <label htmlFor="order-number">เลขออเดอร์</label>
+        <OrderNumberInput
+          id="order-number"
+          label="เลขออเดอร์"
+          value={orderNumber}
+          onChange={setOrderNumber}
+          disabled={submitting}
+        />
+      </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

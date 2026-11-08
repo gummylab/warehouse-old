@@ -188,19 +188,6 @@ export function OrderFilters({
       </div>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
-        ค้นหาเลขออเดอร์
-        <Input
-          type="search"
-          name="q"
-          defaultValue={filters.query ?? ''}
-          placeholder="เช่น 123456789"
-          inputMode="numeric"
-          autoComplete="off"
-          disabled={pending}
-        />
-      </label>
-
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
         ไลน์ผลิต
         <Select
           items={lineItems}
@@ -218,6 +205,19 @@ export function OrderFilters({
             ))}
           </SelectContent>
         </Select>
+      </label>
+
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm">
+        ค้นหาเลขออเดอร์
+        <Input
+          type="search"
+          name="q"
+          defaultValue={filters.query ?? ''}
+          placeholder="เช่น 123456789"
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={pending}
+        />
       </label>
 
       <div className={cn('flex items-center gap-2', mobile ? 'w-full' : 'shrink-0')}>
