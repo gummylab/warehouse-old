@@ -302,6 +302,8 @@ export const listLineWalks = cache(_listLineWalks)
 export const getLineWalkOverview = cache(_getLineWalkOverview)
 
 // Cross-request cache for the line-walk overview (60s revalidation).
+// Writes expire the tag immediately (safeRevalidateTag), so the first read
+// after a save recomputes instead of serving the old numbers.
 export const getCachedLineWalkOverview = unstable_cache(
   async (today: string) => _getLineWalkOverview(today),
   ['line-walk-overview'],

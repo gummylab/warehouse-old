@@ -887,7 +887,8 @@ export const getOrderSummary = cache(_getOrderSummary)
 export const getOrderOverview = cache(_getOrderOverview)
 
 // Cross-request cache for the dashboard overview (60s revalidation).
-// Invalidated via revalidateTag('orders') on order/item/image mutations.
+// Every write expires the tag immediately (safeRevalidateTag), so the first
+// read after a mutation recomputes instead of serving the old numbers.
 export const getCachedOrderOverview = unstable_cache(
   async (today: string) => _getOrderOverview(today),
   ['order-overview'],
