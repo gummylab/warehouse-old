@@ -22,6 +22,7 @@ import {
   isAcceptedImageType,
   MAX_FILE_BYTES,
 } from '@/lib/order-images/upload'
+import { compressImage } from '@/lib/order-images/compress'
 import { notifySuccess } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -38,6 +39,7 @@ type UploadEntry = {
   file: File
   status: 'ready' | 'uploading' | 'done' | 'error' | 'rejected'
   error?: string
+  progress?: number
 }
 
 // The upload dialog of one item's photo page.
@@ -96,7 +98,7 @@ export function UploadDialog({
     setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
   }
 
-  function addFiles(list: FileList | null) {
+  async function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return
     const added: UploadEntry[] = []
     for (const file of Array.from(list)) {
@@ -111,7 +113,9 @@ export function UploadDialog({
         added.push({ key, file, status: 'rejected', error: errorMessage('file-too-large') })
         continue
       }
-      added.push({ key, file, status: 'ready' })
+      // Compress before upload to reduce size and avoid Cloudflare timeout
+      const compressed = await compressImage(file)
+      added.push({ key, file: compressed, status: 'ready' })
     }
     setEntries((prev) => [...prev, ...added])
   }
@@ -143,14 +147,28 @@ export function UploadDialog({
     let failed = false
     for (const entry of queue) {
       if (controller.signal.aborted) break
-      updateEntry(entry.key, { status: 'uploading', error: undefined })
-      const result = await uploadImage(itemId, entry.file, controller.signal)
+      updateEntry(entry.key, { status: 'uploading', error: undefined, progress: 0 })
+      
+      // Auto-retry up to 3 times
+      let result: Awaited<ReturnType<typeof uploadImage>> | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (controller.signal.aborted) break
+        result = await uploadImage(itemId, entry.file, controller.signal, (p) => {
+          updateEntry(entry.key, { progress: p })
+        })
+        if (result.ok) break
+        // Wait 1s before retry (unless last attempt)
+        if (attempt < 2 && !controller.signal.aborted) {
+          await new Promise((r) => setTimeout(r, 1000))
+        }
+      }
+      
       if (controller.signal.aborted) break
-      if (result.ok) {
-        updateEntry(entry.key, { status: 'done' })
+      if (result && result.ok) {
+        updateEntry(entry.key, { status: 'done', progress: 100 })
       } else {
         failed = true
-        updateEntry(entry.key, { status: 'error', error: errorMessage(result.error, result.status) })
+        updateEntry(entry.key, { status: 'error', error: errorMessage(result?.error ?? 'unknown-error', result?.status), progress: undefined })
       }
     }
 
@@ -256,7 +274,15 @@ export function UploadDialog({
                 <span className="min-w-0 flex-1 truncate text-sm">{entry.file.name}</span>
 
                 {entry.status === 'uploading' && (
-                  <Spinner className="size-4 shrink-0" aria-label="กำลังอัปโหลด" />
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${entry.progress ?? 0}%` }}
+                      />
+                    </div>
+                    <Spinner className="size-4 shrink-0" aria-label="กำลังอัปโหลด" />
+                  </div>
                 )}
                 {entry.status === 'done' && (
                   <CheckIcon className="size-4 shrink-0 text-success" aria-label="อัปโหลดแล้ว" />

@@ -5,8 +5,7 @@ import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { itemExists, saveImageOriginal } from '@/lib/db/order-images'
 import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { buildImageVariants } from '@/lib/order-images/optimize'
-import { isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
-import sharp from 'sharp'
+import { isAcceptedImageType, MAX_FILE_BYTES, validateImageMagicBytes } from '@/lib/order-images/upload'
 
 // One file per request; the form loops over a multi-file selection so a
 // single failure can be reported without losing the other uploads. The
@@ -47,15 +46,10 @@ export async function POST(
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  // Lightweight format validation (sharp metadata read) — fast enough to
-  // keep in the request path so we can return 400 for bad images.
-  const meta = await sharp(buffer).metadata().catch(() => null)
-  if (
-    !meta?.format ||
-    !['jpeg', 'png', 'webp'].includes(meta.format) ||
-    !meta.width ||
-    !meta.height
-  ) {
+  // Fast format validation via magic bytes — avoids reading the entire
+  // buffer through sharp (which is slow for large files). Corrupt images
+  // with valid magic bytes are caught later during variant generation.
+  if (!validateImageMagicBytes(buffer)) {
     return NextResponse.json({ error: 'unsupported-type' }, { status: 400 })
   }
 
@@ -86,9 +80,9 @@ export async function POST(
       const thumbPath = derivativePath(key, 'thumb')
       ensureDirForFile(webPath)
       ensureDirForFile(thumbPath)
-      const { writeFileSync } = await import('node:fs')
-      writeFileSync(webPath, variants.web)
-      writeFileSync(thumbPath, variants.thumb)
+      const { writeFile } = await import('node:fs/promises')
+      await writeFile(webPath, variants.web)
+      await writeFile(thumbPath, variants.thumb)
     } catch (error) {
       // Variant generation failed (e.g. corrupt pixels). The file-serving
       // route falls back to the original, so the upload still succeeds.

@@ -109,13 +109,57 @@ export function deleteItem(itemId: string) {
 
 // The signal lets the caller abort an upload that is still in flight, for
 // example when the upload dialog is closed while a file is on its way.
-export function uploadImage(itemId: string, file: File, signal?: AbortSignal) {
-  const form = new FormData()
-  form.append('file', file)
-  return request<{ image: ImageRecord }>(`/api/liff/order-images/items/${itemId}/images`, {
-    method: 'POST',
-    body: form,
-    signal,
+// onProgress reports upload percentage (0-100) for the progress bar.
+export function uploadImage(
+  itemId: string,
+  file: File,
+  signal?: AbortSignal,
+  onProgress?: (percent: number) => void,
+): Promise<ApiResult<{ image: ImageRecord }>> {
+  return new Promise((resolve) => {
+    const form = new FormData()
+    form.append('file', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `/api/liff/order-images/items/${itemId}/images`)
+
+    if (signal) {
+      if (signal.aborted) {
+        resolve({ ok: false, status: 0, error: 'network-error' })
+        return
+      }
+      signal.addEventListener('abort', () => xhr.abort(), { once: true })
+    }
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100))
+        }
+      }
+    }
+
+    xhr.onload = () => {
+      const data = (JSON.parse(xhr.responseText || '{}') as {
+        image?: ImageRecord
+        error?: string
+      }) ?? null
+      if (xhr.status >= 200 && xhr.status < 300 && data?.image) {
+        resolve({ ok: true, data: { image: data.image } })
+      } else {
+        resolve({
+          ok: false,
+          status: xhr.status,
+          error: data?.error ?? 'unknown-error',
+        })
+      }
+    }
+
+    xhr.onerror = () => resolve({ ok: false, status: 0, error: 'network-error' })
+    xhr.ontimeout = () => resolve({ ok: false, status: 0, error: 'network-error' })
+    xhr.timeout = 120000 // 2 min — Cloudflare tunnel 100s limit + buffer
+
+    xhr.send(form)
   })
 }
 
