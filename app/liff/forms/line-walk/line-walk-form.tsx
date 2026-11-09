@@ -37,6 +37,7 @@ import {
   parseWholeNumber,
 } from '@/lib/line-walks/validation'
 import { todayBangkok } from '@/lib/order-images/validation'
+import { PAGE_TITLES } from '@/lib/page-titles'
 import { cn } from '@/lib/utils'
 
 import { useLiffSession } from '../../liff-session-context'
@@ -297,7 +298,7 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
       header={
         <FormNavbar
           width="full"
-          title="บันทึกจำนวนการเดินไลน์"
+          title={PAGE_TITLES['/liff/forms/line-walk']}
           action={
             <ButtonLink
               variant="ghost"

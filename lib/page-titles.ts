@@ -1,14 +1,14 @@
 // Single source of truth for page titles, shared by metadata and navbar label.
 export const PAGE_TITLES: Record<string, string> = {
   '/': 'แดชบอร์ด',
-  '/order-images': 'จัดการรูปภาพออเดอร์',
-  '/line-walks': 'รายการเดินไลน์',
+  '/order-images': 'บันทึกภาพออเดอร์',
+  '/line-walks': 'บันทึกการเดินไลน์',
   '/register': 'จัดการผู้ใช้',
   '/settings': 'ตั้งค่า',
   '/liff/authorization': 'ตรวจสอบสิทธิ์การใช้งาน',
   '/liff/forms': 'แบบฟอร์ม',
-  '/liff/forms/order-image': 'อัปโหลดรูปภาพออเดอร์',
-  '/liff/forms/line-walk': 'บันทึกจำนวนการเดินไลน์',
+  '/liff/forms/order-image': 'บันทึกภาพออเดอร์',
+  '/liff/forms/line-walk': 'บันทึกการเดินไลน์',
 }
 
 // Nested admin routes keep their section title. Without this, the detail

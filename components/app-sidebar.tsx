@@ -22,6 +22,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { PAGE_TITLES } from '@/lib/page-titles'
 import { cn } from 'cn'
 
 // Single responsibility: render main nav in content and the two admin entries
@@ -36,21 +37,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="แดชบอร์ด" render={<Link href="/" />}>
+            <SidebarMenuButton tooltip={PAGE_TITLES['/']} render={<Link href="/" />}>
               <LayoutDashboardIcon />
-              <span>แดชบอร์ด</span>
+              <span>{PAGE_TITLES['/']}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="จัดการรูปภาพออเดอร์" render={<Link href="/order-images" />}>
+            <SidebarMenuButton tooltip={PAGE_TITLES['/order-images']} render={<Link href="/order-images" />}>
               <ImageIcon />
-              <span>จัดการรูปภาพออเดอร์</span>
+              <span>{PAGE_TITLES['/order-images']}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="รายการเดินไลน์" render={<Link href="/line-walks" />}>
+            <SidebarMenuButton tooltip={PAGE_TITLES['/line-walks']} render={<Link href="/line-walks" />}>
               <FootprintsIcon />
-              <span>รายการเดินไลน์</span>
+              <span>{PAGE_TITLES['/line-walks']}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -58,15 +59,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="จัดการผู้ใช้" render={<Link href="/register" />}>
+            <SidebarMenuButton tooltip={PAGE_TITLES['/register']} render={<Link href="/register" />}>
               <UsersIcon />
-              <span>จัดการผู้ใช้</span>
+              <span>{PAGE_TITLES['/register']}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="ตั้งค่า" render={<Link href="/settings" />}>
+            <SidebarMenuButton tooltip={PAGE_TITLES['/settings']} render={<Link href="/settings" />}>
               <SettingsIcon />
-              <span>ตั้งค่า</span>
+              <span>{PAGE_TITLES['/settings']}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

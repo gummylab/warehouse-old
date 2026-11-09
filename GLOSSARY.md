@@ -46,6 +46,14 @@ _Avoid_: permission, สิทธิ์การเข้าถึง
 `/liff/forms`, the page that lists one card for each form the user holds; with no grant it shows the empty state instead.
 _Avoid_: หน้าหลัก, home
 
+**บันทึกภาพออเดอร์ (order-image form)**:
+The user-facing name of the `order-image` form (see Order-image form), used for the LIFF form, the admin list at `/order-images` and its detail page. The label lives in `lib/page-titles.ts`, which the sidebar, the form navbar and the hub card read.
+_Avoid_: จัดการรูปภาพออเดอร์, อัปโหลดรูปภาพออเดอร์
+
+**บันทึกการเดินไลน์ (line-walk form)**:
+The user-facing name of the `line-walk` form (see Line walk), used for the LIFF form and the admin list at `/line-walks`.
+_Avoid_: รายการเดินไลน์, บันทึกจำนวนการเดินไลน์
+
 **อนุมัติ (approve)**:
 Moving an access request from pending to approved and choosing its form grants in the same action. Zero forms is a valid outcome.
 _Avoid_: เปิดใช้, อนุญาต

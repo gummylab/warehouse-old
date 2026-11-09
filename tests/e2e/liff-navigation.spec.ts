@@ -34,10 +34,10 @@ test.describe('LIFF routing', () => {
     const consoleErrors = collectConsoleErrors(page)
     await page.goto('/liff/forms')
 
-    await page.getByRole('link', { name: /อัปโหลดรูปภาพออเดอร์/ }).click()
+    await page.getByRole('link', { name: /บันทึกภาพออเดอร์/ }).click()
 
     await expect(page).toHaveURL(/\/liff\/forms\/order-image$/)
-    await expect(page.getByRole('heading', { name: 'อัปโหลดรูปภาพออเดอร์' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'บันทึกภาพออเดอร์' })).toBeVisible()
 
     // The form sits one level below the hub, so its navbar carries the way
     // back to the hub.
@@ -52,11 +52,11 @@ test.describe('LIFF routing', () => {
     const consoleErrors = collectConsoleErrors(page)
     await page.goto('/liff/forms')
 
-    await page.getByRole('link', { name: /บันทึกจำนวนการเดินไลน์/ }).click()
+    await page.getByRole('link', { name: /บันทึกการเดินไลน์/ }).click()
 
     await expect(page).toHaveURL(/\/liff\/forms\/line-walk$/)
     await expect(
-      page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
+      page.getByRole('heading', { name: 'บันทึกการเดินไลน์' }),
     ).toBeVisible()
 
     // The shell starts with one section and exposes its four fields.
