@@ -66,6 +66,7 @@ Data isolation is the part to understand before adding a test:
 - Decoding is the format check (`lib/order-images/optimize.ts`): jpeg, png and webp only, EXIF orientation applied, metadata dropped from the copies. A corrupt image is a 400 `unsupported-type`, not a 500.
 - Deleting a photo, an item or an order unlinks all three files through `removeStoredFiles`. A test that only counts rows will not notice a leaked derivative.
 - `GET /api/liff/order-images/images/[id]/file?size=web|thumb|original` defaults to `web`, answers `image/webp` for the copies, and falls back to the original when a copy is missing. Grids use `thumb`, previews use `web`.
+- `?download=1` on that route forces the original and answers `Content-Disposition: attachment` with the stored file name; the gallery's download button uses it (ADR 0021). In the LINE client the item page intercepts the gallery's `.lg-download` tap, shares the original through the OS share sheet, and falls back to a 5 minute token (`GET .../download-token`) opened in the external browser, because that browser has no session cookie. The admin order detail keeps the plain anchor. Playwright can prove the attachment path but not the LINE WebView, so this still needs an on-device check.
 
 ## Settings
 

@@ -1,7 +1,15 @@
 'use client'
 
-import { startTransition, useOptimistic, useState } from 'react'
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+} from 'react'
 
+import liff from '@line/liff'
 import {
   ChevronLeftIcon,
   ImagePlusIcon,
@@ -12,7 +20,10 @@ import {
 import { EmptyState } from '@/components/layout/empty-state'
 import { FormPage } from '@/components/layout/form-page'
 import { TileButton, TileGrid } from '@/components/layout/tile-grid'
-import { ImageGallery } from '@/components/order-images/image-gallery'
+import {
+  ImageGallery,
+  type GalleryPhoto,
+} from '@/components/order-images/image-gallery'
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,10 +48,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { ImageRecord, ItemDetail } from '@/lib/db/types'
 import { toastMessages } from '@/lib/messages'
+import { photoDownloadName } from '@/lib/order-images/download'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
 import { reduceImages } from '@/lib/order-images/tree'
-import { photoFileUrl } from '@/lib/order-images/urls'
+import {
+  photoDownloadTokenUrl,
+  photoDownloadUrl,
+  photoFileUrl,
+} from '@/lib/order-images/urls'
 import { notifyError, notifySuccess } from '@/lib/toast'
 
 import { FormNavbar } from '../../../../form-navbar'
@@ -82,6 +98,92 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   const previewIndex = previewImageId
     ? optimisticImages.findIndex((image) => image.id === previewImageId)
     : -1
+
+  // LINE's in-app browser ignores the anchor download attribute, so this page
+  // takes the download over there. The same page in Safari/Chrome keeps the
+  // plain anchor, which those browsers download normally. The LIFF SDK is
+  // initialized by the route layout before this page renders; the catch
+  // covers local-device mode, where the SDK was never initialized.
+  const [inClient] = useState(() => {
+    try {
+      return liff.isInClient()
+    } catch {
+      return false
+    }
+  })
+
+  // One fetch per image: the share sheet needs a File, and the tap that opens
+  // it must not wait on the network or the user gesture is gone.
+  const fileCache = useRef(new Map<string, Promise<File | null>>())
+  const loadFile = useCallback((image: ImageRecord) => {
+    const cached = fileCache.current.get(image.id)
+    if (cached) return cached
+    const promise = fetch(photoFileUrl(image.id, 'original'))
+      .then(async (response) => {
+        if (!response.ok) return null
+        const blob = await response.blob()
+        return new File([blob], photoDownloadName(image), {
+          type: blob.type || image.mimeType || 'application/octet-stream',
+        })
+      })
+      .catch(() => null)
+    fileCache.current.set(image.id, promise)
+    return promise
+  }, [])
+
+  // Warm the current slide so the download tap can go straight to the share
+  // sheet. A swipe fetches the next photo the same way.
+  useEffect(() => {
+    if (previewIndex < 0) return
+    const image = optimisticImages[previewIndex]
+    if (image) void loadFile(image)
+  }, [previewIndex, optimisticImages, loadFile])
+
+  const handleDownload = useCallback(
+    async (photo: GalleryPhoto) => {
+      const image = optimisticImages.find((entry) => entry.id === photo.id)
+      if (!image) return
+
+      const file = await loadFile(image)
+      if (
+        file &&
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        navigator.canShare?.({ files: [file] })
+      ) {
+        try {
+          await navigator.share({ files: [file], title: file.name })
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return
+          }
+        }
+      }
+
+      // No share sheet: send the download to the external browser with a
+      // short-lived token, because that browser has no LIFF session cookie.
+      try {
+        const response = await fetch(photoDownloadTokenUrl(image.id))
+        if (!response.ok) throw new Error('download-token')
+        const { token } = (await response.json()) as { token?: string }
+        if (!token) throw new Error('download-token')
+
+        const url = new URL(photoDownloadUrl(image.id), window.location.href)
+        url.searchParams.set('token', token)
+        if (inClient) {
+          liff.openWindow({ url: url.toString(), external: true })
+        } else {
+          window.location.assign(url.toString())
+        }
+      } catch {
+        notifyError(toastMessages.downloadFailed, {
+          description: 'ลองกดค้างที่รูปแล้วเลือกบันทึก',
+        })
+      }
+    },
+    [inClient, loadFile, optimisticImages],
+  )
 
   async function refresh() {
     const result = await getItem(detail.item.id)
@@ -244,6 +346,7 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
         index={previewIndex < 0 ? 0 : previewIndex}
         onClose={() => setPreviewImageId(null)}
         onIndexChange={(next) => setPreviewImageId(optimisticImages[next]?.id ?? null)}
+        onDownload={inClient ? handleDownload : undefined}
       />
 
       {/* Deleting a photo cannot be undone, so it gets its own confirmation

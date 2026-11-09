@@ -24,6 +24,7 @@ export const toastMessages = {
   packageCleared: 'ล้างแพ็กเกจแล้ว',
   imageDeleted: 'ลบรูปแล้ว',
   imageDeleteFailed: 'ลบรูปไม่สำเร็จ',
+  downloadFailed: 'บันทึกรูปไม่สำเร็จ',
 
   settingsSaved: 'บันทึกตำแหน่งที่ตั้งแล้ว',
   databaseConnected: 'เชื่อมต่อฐานข้อมูลใหม่แล้ว',
