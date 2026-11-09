@@ -1,4 +1,4 @@
-import { revalidateTag } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 
 // Expire the tag for the very next read instead of leaving stale content in
 // place. The 'max' profile is stale-while-revalidate: the first read after a
@@ -12,6 +12,20 @@ import { revalidateTag } from 'next/cache'
 export function safeRevalidateTag(tag: string): void {
   try {
     revalidateTag(tag, { expire: 0 })
+  } catch {
+    // No request context — skip invalidation (tests, background tasks).
+  }
+}
+
+// Same guard for the path sweep. revalidatePath('/path', 'layout') also
+// purges the Client Cache, which is the only way to drop an RSC payload the
+// browser prefetched before the data underneath it changed.
+export function safeRevalidatePath(
+  path: string,
+  type?: 'page' | 'layout',
+): void {
+  try {
+    revalidatePath(path, type)
   } catch {
     // No request context — skip invalidation (tests, background tasks).
   }

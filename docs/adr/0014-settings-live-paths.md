@@ -22,3 +22,4 @@ A saved value wins over the environment: precedence is `config/settings.json`, t
 - Changing the storage root hides the existing photos until the operator copies the folder, because `images.storage_key` is relative to the root.
 - The settings file must sit where the app can write. A read-only checkout fails the save, and the filesystem error is shown inline under the field.
 - Absolute paths make the settings file machine specific, which is why it is gitignored.
+- A successful save now also proves the live connection answers a query and expires the overview caches, so the first visit shows the new file (ADR 0020).

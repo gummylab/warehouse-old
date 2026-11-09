@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 
-import { MapPin, type LucideIcon } from 'lucide-react'
+import { LoaderCircle, MapPin, type LucideIcon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -36,6 +37,7 @@ export function LocationsCard({
   const [pending, setPending] = useState<string | null>(null)
   const [savingDatabase, startDatabase] = useTransition()
   const [savingStorage, startStorage] = useTransition()
+  const router = useRouter()
 
   function submitDatabase(confirm: boolean) {
     startDatabase(async () => {
@@ -51,7 +53,10 @@ export function LocationsCard({
       setPending(null)
       setDatabaseError(null)
       setDatabase(result.path)
-      notifySuccess(toastMessages.settingsSaved, { id: 'settings-saved' })
+      notifySuccess(toastMessages.databaseConnected, { id: 'settings-saved' })
+      // The switch cleared the server caches; reload the current route so the
+      // paths this page reads match the settings file the action just wrote.
+      router.refresh()
     })
   }
 
@@ -81,29 +86,44 @@ export function LocationsCard({
 
       </div>
 
-      <PathField
-        id="settings-database-path"
-        label="โฟลเดอร์ฐานข้อมูล"
+      {savingDatabase ? (
+        // The connection swap is the only operation that changes what every
+        // page reads, so it owns the card until the action has proved the new
+        // file answers a query. Both fields stay mounted only while idle.
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg bg-muted/60 px-4 py-6 text-center">
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-hidden />
+          <p className="text-sm font-medium">กำลังเชื่อมต่อฐานข้อมูล…</p>
+          <p className="text-xs text-muted-foreground">
+            หน้าจอจะกลับมาใช้งานได้เมื่อเชื่อมต่อสำเร็จ
+          </p>
+        </div>
+      ) : (
+        <>
+          <PathField
+            id="settings-database-path"
+            label="โฟลเดอร์ฐานข้อมูล"
+            value={database}
+            error={databaseError}
+            saving={savingDatabase}
+            savingLabel="กำลังเชื่อมต่อ…"
+            onChange={setDatabase}
+            onSave={() => submitDatabase(false)}
+          />
 
-        value={database}
-        error={databaseError}
-        saving={savingDatabase}
-        onChange={setDatabase}
-        onSave={() => submitDatabase(false)}
-
-      />
-
-      <PathField
-        id="settings-storage-path"
-        label="โฟลเดอร์ที่จัดเก็บไฟล์"
-
-        value={storage}
-        error={storageError}
-        saving={savingStorage}
-        onChange={setStorage}
-        onSave={submitStorage}
-
-      />
+          <PathField
+            id="settings-storage-path"
+            label="โฟลเดอร์ที่จัดเก็บไฟล์"
+            value={storage}
+            error={storageError}
+            saving={savingStorage}
+            onChange={setStorage}
+            onSave={submitStorage}
+          />
+        </>
+      )}
 
       <Dialog
         open={pending !== null}
@@ -130,7 +150,7 @@ export function LocationsCard({
               type="button"
               onClick={() => submitDatabase(true)}
               disabled={savingDatabase}>
-              สร้างและสลับ
+              {savingDatabase ? 'กำลังเชื่อมต่อ…' : 'สร้างและสลับ'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -150,6 +170,7 @@ function PathField({
   error,
   hint,
   saving,
+  savingLabel = 'กำลังบันทึก',
   onChange,
   onSave,
 }: {
@@ -160,6 +181,7 @@ function PathField({
   error: string | null
   hint?: string
   saving: boolean
+  savingLabel?: string
   onChange: (value: string) => void
   onSave: () => void
 }) {
@@ -187,7 +209,7 @@ function PathField({
           disabled={saving}
           aria-label={`บันทึก${label}`}
           className="sm:w-28">
-          {saving ? 'กำลังบันทึก' : 'บันทึก'}
+          {saving ? savingLabel : 'บันทึก'}
         </Button>
       </div>
       {hint ? (
