@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { ImageRecord } from '@/lib/db/types'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
+import { photoFileUrl } from '@/lib/order-images/urls'
 
 // One photo in the admin detail page. The tile is a div, not a button: the
 // picture and the menu trigger are two separate controls.
@@ -43,7 +44,7 @@ export function AdminImageTile({
             cookie, so the auth-gated route is loaded directly. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src */}
         <img
-          src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
+          src={photoFileUrl(image.id, 'thumb')}
           alt={`รูปที่ ${image.seq}`}
           width={400}
           height={400}

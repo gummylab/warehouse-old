@@ -129,23 +129,33 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // Named after the photo on screen, so the locator matches any position and
   // the counter below says which one it is.
   const viewer = page.getByRole('dialog', { name: /รูปที่ \d+ จาก 2/ })
-  await expect(viewer.getByRole('img', { name: 'รูปที่ 1' })).toBeVisible()
+  // The thumbnail strip repeats each photo's alt, so the picture on screen is
+  // scoped to the current slide rather than to the whole dialog.
+  const photo = viewer.locator('.lg-item.lg-current img.lg-object')
+  // The counter reports positions, not seq, and the controls loop instead of
+  // going dead at either end.
+  const counter = viewer.locator('.lg-counter')
+  await expect(photo).toBeVisible()
+  await expect(photo).toHaveAttribute('alt', 'รูปที่ 1')
   // Nothing to manage in here: the package picker and the delete live on the
   // card's menu.
   await expect(viewer.getByRole('menuitem')).toHaveCount(0)
-
-  // First photo: the way back is closed and the way forward is not.
-  await expect(viewer.getByRole('button', { name: 'รูปก่อนหน้า' })).toBeDisabled()
-  await expect(viewer.getByText('1 / 2')).toBeVisible()
+  await expect(counter).toHaveText('1 / 2')
 
   await viewer.getByRole('button', { name: 'รูปถัดไป' }).click()
-  await expect(viewer.getByRole('img', { name: 'รูปที่ 2' })).toBeVisible()
-  await expect(viewer.getByRole('button', { name: 'รูปถัดไป' })).toBeDisabled()
-  await expect(viewer.getByText('2 / 2')).toBeVisible()
+  await expect(photo).toHaveAttribute('alt', 'รูปที่ 2')
+  await expect(counter).toHaveText('2 / 2')
 
-  // The arrow keys are the same walk without the buttons.
-  await page.keyboard.press('ArrowLeft')
-  await expect(viewer.getByRole('img', { name: 'รูปที่ 1' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+
+  // The arrow keys are the same walk without the buttons. The viewer is
+  // reopened first: it ignores navigation while a slide transition runs, and
+  // the press above would land inside the one the button started.
+  await thumbnail.click()
+  await expect(photo).toHaveAttribute('alt', 'รูปที่ 1')
+  await page.keyboard.press('ArrowRight')
+  await expect(photo).toHaveAttribute('alt', 'รูปที่ 2')
 
   await page.keyboard.press('Escape')
   await expect(viewer).toHaveCount(0)
@@ -159,7 +169,11 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   // one card plus the add cell. The filter skips the previous page, which the
   // router keeps in the DOM but hidden.
   await expect(thumbnail).toHaveCount(0)
-  await expect(page.locator('img[alt="รูปที่ 2"]')).toHaveCount(1)
+  // Scoped to the grid: the closed viewer stays in the DOM and still holds a
+  // copy of every remaining photo.
+  await expect(
+    page.locator('section[data-slot="tile-grid"] img[alt="รูปที่ 2"]'),
+  ).toHaveCount(1)
   await expect(
     page.locator('section[data-slot="tile-grid"] > *').filter({ visible: true }),
   ).toHaveCount(2)

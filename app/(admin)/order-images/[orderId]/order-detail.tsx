@@ -2,12 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 
 import {
   CalendarDaysIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   FactoryIcon,
   ImageIcon,
   PackageIcon,
@@ -18,6 +16,7 @@ import {
 
 import { EmptyState } from '@/components/layout/empty-state'
 import { TileGrid } from '@/components/layout/tile-grid'
+import { ImageGallery } from '@/components/order-images/image-gallery'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -81,11 +80,13 @@ export function OrderDetail({
   const [, startTransition] = useTransition()
   const [orderPending, startOrderTransition] = useTransition()
 
-  const previewImage = images.find((image) => image.id === previewImageId) ?? null
   const deleteImage = images.find((image) => image.id === deleteImageId) ?? null
   const deleteItem = findItem(detail.items, deleteItemId)
-  const previewIndex = previewImage
-    ? images.findIndex((image) => image.id === previewImage.id)
+  // The viewer counts positions, not seq: seq is allocated as MAX(seq) + 1
+  // per item, so a delete leaves gaps. A photo that vanished from the list
+  // resolves to -1, which closes the viewer instead of showing a stale one.
+  const previewIndex = previewImageId
+    ? images.findIndex((image) => image.id === previewImageId)
     : -1
 
   function changePackage(image: ImageRecord, pkg: string | null) {
@@ -167,27 +168,6 @@ export function OrderDetail({
       if (result) setOrderError(result.error)
     })
   }
-
-  function stepPreview(delta: number) {
-    setPreviewImageId((current) =>
-      neighbourId(images, current, delta),
-    )
-  }
-
-  // The viewer follows the same Left/Right keys as the LIFF gallery. The
-  // listener exists only while the dialog is open.
-  useEffect(() => {
-    if (previewImageId === null) return
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-      const delta = event.key === 'ArrowRight' ? 1 : -1
-      setPreviewImageId((current) => neighbourId(images, current, delta))
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [previewImageId, images])
 
   function handleDeleteOrderOpen(next: boolean) {
     setDeleteOrderOpen(next)
@@ -308,58 +288,15 @@ export function OrderDetail({
         ))
       )}
 
-      <Dialog
-        open={previewImage !== null}
-        onOpenChange={(open) => {
-          if (!open) setPreviewImageId(null)
-        }}>
-        <DialogContent className="gap-0 p-2 sm:max-w-3xl">
-          <DialogTitle className="sr-only">
-            {previewImage
-              ? `รูปที่ ${previewIndex + 1} จาก ${images.length}`
-              : 'รูปภาพ'}
-          </DialogTitle>
-
-          {previewImage ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src */}
-              <img
-                src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
-                alt={`รูปที่ ${previewImage.seq}`}
-                width={1200}
-                height={900}
-                className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
-              />
-
-              {images.length > 1 ? (
-                <div className="mt-1 flex items-center justify-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="size-11"
-                    aria-label="รูปก่อนหน้า"
-                    disabled={previewIndex <= 0}
-                    onClick={() => stepPreview(-1)}>
-                    <ChevronLeftIcon />
-                  </Button>
-                  <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground">
-                    {previewIndex + 1} / {images.length}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="size-11"
-                    aria-label="รูปถัดไป"
-                    disabled={previewIndex >= images.length - 1}
-                    onClick={() => stepPreview(1)}>
-                    <ChevronRightIcon />
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {/* The viewer. Same component as the LIFF item page, so the admin
+          dashboard gets the swipe, zoom and thumbnail strip too. */}
+      <ImageGallery
+        photos={images}
+        open={previewIndex >= 0}
+        index={previewIndex < 0 ? 0 : previewIndex}
+        onClose={() => setPreviewImageId(null)}
+        onIndexChange={(next) => setPreviewImageId(images[next]?.id ?? null)}
+      />
 
       <Dialog
         open={deleteImage !== null}
@@ -615,15 +552,6 @@ function findItem(
     if (child) return child
   }
   return null
-}
-
-function neighbourId(
-  images: ImageRecord[],
-  currentId: string | null,
-  delta: number,
-): string | null {
-  const at = images.findIndex((image) => image.id === currentId)
-  return at < 0 ? currentId : (images[at + delta]?.id ?? currentId)
 }
 
 function deleteItemDescription(node: OrderItemNode): string {
