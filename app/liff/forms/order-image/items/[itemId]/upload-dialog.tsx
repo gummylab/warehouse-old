@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
-import { CameraIcon, CheckIcon, FileImageIcon, UploadIcon, XIcon } from 'lucide-react'
+import { CameraIcon, FileImageIcon, UploadIcon, XIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -37,6 +37,7 @@ import { errorMessage, uploadImage } from '../../order-image-api'
 type UploadEntry = {
   key: string
   file: File
+  previewUrl: string
   status: 'ready' | 'uploading' | 'done' | 'error' | 'rejected'
   error?: string
   progress?: number
@@ -78,7 +79,11 @@ export function UploadDialog({
     if (!next) {
       controllerRef.current?.abort()
       controllerRef.current = null
-      setEntries([])
+      // Revoke all object URLs to prevent memory leaks
+      setEntries((prev) => {
+        prev.forEach((e) => URL.revokeObjectURL(e.previewUrl))
+        return []
+      })
       setUploading(false)
       onUploadingChange(false)
     }
@@ -106,16 +111,16 @@ export function UploadDialog({
       // The same caps the server applies, checked here so a wrong file is
       // named before it is sent instead of after a round trip.
       if (!isAcceptedImageType(file.type)) {
-        added.push({ key, file, status: 'rejected', error: errorMessage('unsupported-type') })
+        added.push({ key, file, previewUrl: URL.createObjectURL(file), status: 'rejected', error: errorMessage('unsupported-type') })
         continue
       }
       if (file.size > MAX_FILE_BYTES) {
-        added.push({ key, file, status: 'rejected', error: errorMessage('file-too-large') })
+        added.push({ key, file, previewUrl: URL.createObjectURL(file), status: 'rejected', error: errorMessage('file-too-large') })
         continue
       }
       // Compress before upload to reduce size and avoid Cloudflare timeout
       const compressed = await compressImage(file)
-      added.push({ key, file: compressed, status: 'ready' })
+      added.push({ key, file: compressed, previewUrl: URL.createObjectURL(compressed), status: 'ready' })
     }
     setEntries((prev) => [...prev, ...added])
   }
@@ -129,7 +134,11 @@ export function UploadDialog({
   }
 
   function removeEntry(key: string) {
-    setEntries((prev) => prev.filter((entry) => entry.key !== key))
+    setEntries((prev) => {
+      const entry = prev.find((e) => e.key === key)
+      if (entry) URL.revokeObjectURL(entry.previewUrl)
+      return prev.filter((e) => e.key !== key)
+    })
   }
 
   async function startUpload() {
@@ -270,32 +279,37 @@ export function UploadDialog({
           <ul className="flex flex-col gap-2">
             {entries.map((entry) => (
               <li key={entry.key} className="flex items-center gap-2 rounded-xl border p-2">
-                <FileImageIcon className="size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-sm">{entry.file.name}</span>
+                {/* Thumbnail preview */}
+                <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+                  <img
+                    src={entry.previewUrl}
+                    alt={entry.file.name}
+                    className="size-full object-cover"
+                  />
+                  {entry.status === 'uploading' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Spinner className="size-4 text-white" aria-label="กำลังอัปโหลด" />
+                    </div>
+                  )}
+                </div>
 
-                {entry.status === 'uploading' && (
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{entry.file.name}</span>
+                  {entry.status === 'uploading' && (
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full bg-primary transition-all duration-300"
                         style={{ width: `${entry.progress ?? 0}%` }}
                       />
                     </div>
-                    <Spinner className="size-4 shrink-0" aria-label="กำลังอัปโหลด" />
-                  </div>
-                )}
-                {entry.status === 'done' && (
-                  <CheckIcon className="size-4 shrink-0 text-success" aria-label="อัปโหลดแล้ว" />
-                )}
-                {(entry.status === 'error' || entry.status === 'rejected') && (
-                  <span
-                    aria-live="polite"
-                    className="max-w-40 shrink-0 truncate text-xs text-destructive">
-                    {entry.error}
-                  </span>
-                )}
+                  )}
+                  {(entry.status === 'error' || entry.status === 'rejected') && (
+                    <span className="text-xs text-destructive">{entry.error}</span>
+                  )}
+                </div>
 
-                {entry.status !== 'uploading' && entry.status !== 'done' && (
+                {/* Done: show X to remove; Error/Rejected: show X to remove */}
+                {(entry.status === 'done' || entry.status === 'error' || entry.status === 'rejected') && (
                   <Button
                     variant="ghost"
                     size="icon-xs"
