@@ -8,6 +8,7 @@ import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
 import { seedOrder, uniqueOrderNumber } from './support/data'
+import { toNumbers } from './support/numbers'
 
 // The admin side of the order-image journey: the form writes the rows, this
 // page reads the summary, opens one order, relabels a photo and deletes the
@@ -374,3 +375,57 @@ test('refuses the admin page when the request came through Cloudflare', async ({
     'หน้านี้เปิดได้จากเครื่องของผู้ดูแลระบบเท่านั้น',
   )
 })
+
+// A write from the phone has to reach the KPI strip on the next load. Adding an
+// item is the write that used to skip the tag: only creating an order and
+// deleting one expired 'orders', so a new item stayed out of the "ไอเท็ม" cell
+// until the 60 second revalidation.
+//
+// The prime write is an order creation, which expires the tag in both the old
+// and the new code. Without it the first read could be served from the entry an
+// earlier test in this file cached, and `before` would not describe this test's
+// data at all. The measured write is the item add.
+//
+// One reload only. If the item add does not expire the tag, that reload is
+// answered from the entry cached before it and the cell keeps its old value.
+test('updates the overview on the first load after a write', async ({
+  page,
+  request,
+}) => {
+  const today = todayBangkok()
+  const seeded = await seedOrder({
+    orderNumber: uniqueOrderNumber(),
+    orderDate: today,
+  })
+  const consoleErrors = collectConsoleErrors(page)
+
+  const prime = await request.post('/api/liff/order-images/orders', {
+    data: { orderNumber: uniqueOrderNumber(), orderDate: today, line: 'ดอกแค' },
+  })
+  expect(prime.status()).toBe(200)
+
+  await page.goto('/order-images')
+  const kpi = page
+    .getByRole('region', { name: 'ภาพรวมออเดอร์' })
+    .locator('[data-slot="summary-value"]')
+  // The overview streams in behind a Suspense boundary, so the values are not
+  // in the DOM when the load event fires.
+  await expect(kpi).toHaveCount(3)
+  const before = toNumbers(await kpi.allTextContents())
+
+  const response = await request.post(
+    `/api/liff/order-images/orders/${seeded.orderId}/items`,
+    { data: { parentItemId: null } },
+  )
+  expect(response.status()).toBe(201)
+
+  await page.reload()
+  await expect(kpi).toHaveCount(3)
+
+  // The cells are ออเดอร์, ไอเท็ม and รูปภาพ, in that order.
+  const after = toNumbers(await kpi.allTextContents())
+  expect(after).toEqual([before[0], before[1] + 1, before[2]])
+
+  expect(consoleErrors).toEqual([])
+})
+

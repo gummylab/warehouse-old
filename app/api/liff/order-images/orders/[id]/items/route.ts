@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { addItem, orderExists } from '@/lib/db/order-images'
 import type { AddItemResult } from '@/lib/db/order-images'
 import { authenticateFormRequest } from '@/lib/liff/order-session'
@@ -32,6 +33,9 @@ export async function POST(
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: errorStatus(result) })
   }
+  // The overview counts items, both in the KPI strip and in the chart, so a
+  // new item has to expire the cached numbers before the next page load.
+  safeRevalidateTag('orders')
   return NextResponse.json({ item: result.item }, { status: 201 })
 }
 

@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type APIRequestContext } from '@playwright/test'
 
 import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
 import { seedLineWalk, uniqueSuffix } from './support/data'
+import { toNumbers } from './support/numbers'
 
 // The admin surface is local-only (ADR 0007), and the e2e browser runs on
 // 127.0.0.1, so the gate lets the page render without any setup.
@@ -98,3 +99,66 @@ test('lists line walks with the overview and table filters', async ({
 
   expect(consoleErrors).toEqual([])
 })
+
+// A write on the phone has to show up in the overview on the next load, not
+// the one after it. Every POST goes through the endpoint the form uses, which
+// is what expires the cached overview; on 127.0.0.1 the request is trusted as
+// local device mode (ADR 0004) and needs no cookie.
+//
+// The first write only primes: it makes the values read next come from the
+// cache's fresh recomputation rather than from an entry an earlier e2e run
+// left behind in the shared dist folder. The second write is the measured one.
+//
+// One reload only. With stale-while-revalidate semantics that reload would be
+// answered from the entry cached before the second write, so the numbers would
+// still be the old ones and this test would fail.
+test('updates the overview on the first load after a write', async ({
+  page,
+  request,
+}) => {
+  await saveLineWalk(request, `E2E Prime ${uniqueSuffix()}`, 13, 131)
+
+  await page.goto('/line-walks')
+  const kpi = page
+    .getByRole('region', { name: 'ภาพรวมการเดินไลน์' })
+    .locator('[data-slot="line-walk-summary-value"]')
+  // The overview streams in behind a Suspense boundary, so the values are not
+  // in the DOM when the load event fires.
+  await expect(kpi).toHaveCount(3)
+  const before = toNumbers(await kpi.allTextContents())
+
+  await saveLineWalk(request, `E2E Fresh ${uniqueSuffix()}`, 7, 70)
+
+  await page.reload()
+  await expect(kpi).toHaveCount(3)
+
+  // The cells are บันทึก, จำนวนคน and ยอดสินค้า, in that order.
+  const after = toNumbers(await kpi.allTextContents())
+  expect(after).toEqual([before[0] + 1, before[1] + 7, before[2] + 70])
+})
+
+// The phone's own write path, so the POST and its revalidation run exactly as
+// they do in the app.
+async function saveLineWalk(
+  request: APIRequestContext,
+  brand: string,
+  people: number,
+  amount: number,
+): Promise<void> {
+  const response = await request.post('/api/liff/line-walks', {
+    data: {
+      entries: [
+        {
+          walkDate: todayBangkok(),
+          shift: 'day',
+          line: 'ดอกแค',
+          brand,
+          packStyle: 'box',
+          people,
+          amount,
+        },
+      ],
+    },
+  })
+  expect(response.status()).toBe(200)
+}

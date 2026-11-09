@@ -1,3 +1,6 @@
+import { rmSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { defineConfig, devices } from '@playwright/test'
 
 import {
@@ -32,6 +35,22 @@ const serverEnv = {
 // Workers inherit this process's environment, so setting the paths here means
 // every spec sees them from its first import, with no import-order dance.
 Object.assign(process.env, serverEnv)
+
+// The dist dir is shared by every run on purpose (see support/env.ts), and
+// Next keeps its data cache inside it, so an `unstable_cache` entry survives
+// the server restart. Left in place, the overview numbers cached by an older
+// run sit next to this run's freshly seeded database, and an assertion that
+// compares two reads would be comparing two datasets. Clear the cache before
+// the server starts; both layouts are listed because dev and prod use
+// different folders. A leftover server can hold the files on Windows, so a
+// failure here is not fatal.
+for (const cacheDir of ['dev/cache/fetch-cache', 'cache']) {
+  try {
+    rmSync(resolve(E2E_DIST_DIR, cacheDir), { recursive: true, force: true })
+  } catch {
+    // Keep going: the server falls back to whatever entries are still there.
+  }
+}
 
 // The server-only marker package resolves to a throwing stub unless the
 // "react-server" export condition is set. Next.js sets it for the server
