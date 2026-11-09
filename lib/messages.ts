@@ -26,6 +26,7 @@ export const toastMessages = {
   imageDeleteFailed: 'ลบรูปไม่สำเร็จ',
 
   settingsSaved: 'บันทึกตำแหน่งที่ตั้งแล้ว',
+  databaseConnected: 'เชื่อมต่อฐานข้อมูลใหม่แล้ว',
 
   uploadDone: (count: number) => `อัปโหลด ${count} รูปแล้ว`,
 

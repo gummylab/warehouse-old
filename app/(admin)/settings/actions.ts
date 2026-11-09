@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 
 import { requireLocalAdminRequest } from '@/lib/admin/authorize'
+import { safeRevalidatePath, safeRevalidateTag } from '@/lib/cache/revalidate'
 import { applyDatabasePath } from '@/lib/db'
 import { storageBase } from '@/lib/settings/paths'
 import { updateSettings } from '@/lib/settings/store'
@@ -41,7 +42,16 @@ export async function saveDatabasePath(input: {
   }
 
   try {
-    return { status: 'saved', path: applyDatabasePath(base) }
+    const saved = applyDatabasePath(base)
+    // The overviews on /order-images and /line-walks live in unstable_cache
+    // entries keyed by the day, not by the database file, so a switch leaves
+    // them holding the old file's numbers until the 60 second revalidation.
+    // Expire both tags, then purge the Client Cache: a prefetched RSC payload
+    // of either page would otherwise survive the switch as well.
+    safeRevalidateTag('orders')
+    safeRevalidateTag('line-walks')
+    safeRevalidatePath('/', 'layout')
+    return { status: 'saved', path: saved }
   } catch (error) {
     return {
       status: 'error',

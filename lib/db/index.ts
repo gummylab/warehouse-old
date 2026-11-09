@@ -120,12 +120,27 @@ function openDatabase(): Handles {
   return openAt(databaseFile())
 }
 
+// A read through the handle that is about to serve requests. Opening a file
+// proves it exists and migrates; this proves the connection built on it
+// answers a query. The orders table is always present after migrate(), and a
+// count touches no page that the seed does not create.
+function verifyOpen(db: Database.Database): void {
+  const row = db.prepare('SELECT count(*) AS count FROM orders').get() as
+    | { count?: unknown }
+    | undefined
+  if (!row || typeof row.count !== 'number') {
+    throw new Error('ฐานข้อมูลใหม่ไม่ตอบสนอง')
+  }
+}
+
 // Switches the whole app to another SQLite file without a restart.
 //
 // The target is opened and migrated first, in a throwaway handle, and the live
 // connection is only dropped after that succeeds: a typo in the path must not
-// be able to leave the dashboard without a database. When the reopen somehow
-// fails anyway, the previous path is written back and the app returns to the
+// be able to leave the dashboard without a database. The live handle then has
+// to answer a real query before this function reports success, because that
+// answer is what the settings screen shows as "connected". When the reopen or
+// the read fails, the previous path is written back and the app returns to the
 // file it was serving before.
 export function applyDatabasePath(requested: string): string {
   // The operator types a folder; the fixed file name lives inside it. A value
@@ -137,16 +152,28 @@ export function applyDatabasePath(requested: string): string {
   const previous = databaseFile()
   if (target === previous) {
     updateSettings({ databasePath: base })
+    try {
+      verifyOpen(getDb())
+    } catch {
+      // The configured file is already this one, so a broken handle has to be
+      // replaced rather than rolled back to a different path.
+      closeDb()
+      verifyOpen(getDb())
+    }
     return base
   }
 
   const probe = openAt(target)
-  probe.db.close()
+  try {
+    verifyOpen(probe.db)
+  } finally {
+    probe.db.close()
+  }
 
   updateSettings({ databasePath: base })
   closeDb()
   try {
-    getDb()
+    verifyOpen(getDb())
   } catch (error) {
     updateSettings({ databasePath: dirname(previous) })
     closeDb()
