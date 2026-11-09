@@ -4,6 +4,7 @@ import { todayBangkok } from '../../lib/order-images/validation'
 
 import { collectConsoleErrors } from './support/console'
 import { seedLineWalk, uniqueSuffix } from './support/data'
+import { toNumbers } from './support/numbers'
 
 // The admin surface is local-only (ADR 0007), and the e2e browser runs on
 // 127.0.0.1, so the gate lets the page render without any setup.
@@ -160,9 +161,4 @@ async function saveLineWalk(
     },
   })
   expect(response.status()).toBe(200)
-}
-
-// The summary values are localised ("1,234"), so compare them as numbers.
-function toNumbers(values: string[]): number[] {
-  return values.map((value) => Number(value.replace(/\D/g, '')))
 }

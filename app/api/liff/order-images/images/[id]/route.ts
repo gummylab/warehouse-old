@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { deleteImage, getImage, setImagePackage } from '@/lib/db/order-images'
 import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { imagePackageSchema, parseJsonBody } from '@/lib/liff/schemas'
@@ -48,5 +49,9 @@ export async function DELETE(
   if (!deleteImage(id)) {
     return NextResponse.json({ error: 'image-not-found' }, { status: 404 })
   }
+  // The overview counts photos, so a delete has to expire it. PATCH above is
+  // deliberately left alone: a package label is not counted anywhere in the
+  // overview, so relabelling changes no number it shows.
+  safeRevalidateTag('orders')
   return NextResponse.json({ ok: true })
 }

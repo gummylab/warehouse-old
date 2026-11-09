@@ -1,6 +1,7 @@
 import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 
+import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { itemExists, saveImageOriginal } from '@/lib/db/order-images'
 import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { buildImageVariants } from '@/lib/order-images/optimize'
@@ -68,6 +69,11 @@ export async function POST(
     createdBy: auth.createdBy,
     buffer,
   })
+
+  // The admin overview counts photos, so a new one has to expire the cached
+  // numbers; this route is called from the phone, where no page revalidation
+  // would run on its own.
+  safeRevalidateTag('orders')
 
   // Defer heavy variant generation to after the response.
   after(async () => {
