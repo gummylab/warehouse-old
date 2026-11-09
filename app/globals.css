@@ -181,11 +181,21 @@
 
 /* lightGallery stacks its lightbox at 1050, far above the fixed z-index
    scale this app uses (overlays 50, toasts 60). The portal root takes the
-   overlay slot: making it fixed gives it the stacking context, so the
-   backdrop (1040) stays under the stage (1050) inside it while a toast
-   still renders above the whole viewer. */
+   overlay slot, so a toast still renders above the whole viewer.
+
+   The backdrop and the stage are siblings inside that root, and the order
+   between them is stated here instead of trusting the library's 1040/1050:
+   if the stage ever lands below the backdrop, the photo, the toolbar and
+   the thumbnail strip all disappear behind a black screen while the image
+   itself still loads. */
 .lg-container {
   position: fixed;
   inset: 0;
   z-index: 50;
+}
+.lg-container .lg-backdrop {
+  z-index: 1;
+}
+.lg-container .lg-outer {
+  z-index: 2;
 }
