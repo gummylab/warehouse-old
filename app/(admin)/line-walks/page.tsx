@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { io } from 'next/cache'
 import { Suspense } from 'react'
 
-import { FootprintsIcon, InboxIcon } from 'lucide-react'
+import { InboxIcon, PlusIcon } from 'lucide-react'
 
 import { EmptyState } from '@/components/layout/empty-state'
 import { StateScreen } from '@/components/layout/state-screen'
@@ -46,7 +46,7 @@ export default async function LineWalkManagementPage(props: PageProps<'/line-wal
           href="/liff/forms/line-walk"
           target="_blank"
           rel="noreferrer">
-          <FootprintsIcon />
+          <PlusIcon />
           บันทึกการเดินไลน์
         </ButtonLink>
       </div>
