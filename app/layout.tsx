@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     default: 'Warehouse Dashboard',
     template: '%s | Warehouse Dashboard',
   },
-  description: 'ระบบจัดการรูปภาพออเดอร์สำหรับโรงงาน',
+  description: 'ระบบบันทึกภาพออเดอร์สำหรับโรงงาน',
 }
 
 export const viewport: Viewport = {

@@ -28,7 +28,7 @@ test('approving a request moves the user into the approved table', async ({ page
   await pendingRow.getByRole('button', { name: 'อนุมัติ' }).click()
 
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('checkbox', { name: 'อัปโหลดรูปภาพออเดอร์' }).check()
+  await dialog.getByRole('checkbox', { name: 'บันทึกภาพออเดอร์' }).check()
   await dialog.getByRole('button', { name: 'อนุมัติ' }).click()
 
   // The toast confirms the write on the same round trip, so a failed action
@@ -49,7 +49,7 @@ test('approving a request moves the user into the approved table', async ({ page
   await page.getByRole('tab', { name: /ผู้ใช้ที่อนุมัติแล้ว/ }).click()
   const approvedRow = page.getByRole('row').filter({ hasText: user.displayName })
   await expect(approvedRow).toBeVisible()
-  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toBeVisible()
+  await expect(approvedRow.getByText('บันทึกภาพออเดอร์')).toBeVisible()
 
   expect(consoleErrors).toEqual([])
 })
@@ -66,19 +66,19 @@ test('editing an approved user replaces the form badges', async ({ page }) => {
   await page.getByPlaceholder('ค้นหา...').fill(user.displayName)
 
   const approvedRow = page.getByRole('row').filter({ hasText: user.displayName })
-  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toBeVisible()
+  await expect(approvedRow.getByText('บันทึกภาพออเดอร์')).toBeVisible()
 
   await approvedRow.getByRole('button', { name: 'แก้ไข' }).click()
 
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('checkbox', { name: 'บันทึกจำนวนการเดินไลน์' }).check()
-  await dialog.getByRole('checkbox', { name: 'อัปโหลดรูปภาพออเดอร์' }).uncheck()
+  await dialog.getByRole('checkbox', { name: 'บันทึกการเดินไลน์' }).check()
+  await dialog.getByRole('checkbox', { name: 'บันทึกภาพออเดอร์' }).uncheck()
   await dialog.getByRole('button', { name: 'บันทึก' }).click()
 
   // The dialog closes on success and the badges have already swapped.
   await expect(dialog).toHaveCount(0)
-  await expect(approvedRow.getByText('บันทึกจำนวนการเดินไลน์')).toBeVisible()
-  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toHaveCount(0)
+  await expect(approvedRow.getByText('บันทึกการเดินไลน์')).toBeVisible()
+  await expect(approvedRow.getByText('บันทึกภาพออเดอร์')).toHaveCount(0)
   await expect.poll(() => getUserByLineId(user.lineUserId)?.formIds).toEqual(['line-walk'])
 })
 

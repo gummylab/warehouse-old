@@ -66,9 +66,9 @@ test('starts fresh after leaving the success screen', async ({ page }) => {
   await page.getByRole('link', { name: 'กลับไปหน้าหลัก' }).click()
   await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
 
-  await page.getByRole('link', { name: /บันทึกจำนวนการเดินไลน์/ }).click()
+  await page.getByRole('link', { name: /บันทึกการเดินไลน์/ }).click()
   await expect(
-    page.getByRole('heading', { name: 'บันทึกจำนวนการเดินไลน์' }),
+    page.getByRole('heading', { name: 'บันทึกการเดินไลน์' }),
   ).toBeVisible()
   await expect(page.getByText('บันทึกแล้ว 1 รายการ')).toHaveCount(0)
   await expect(page.getByLabel(/ชื่อแบรนด์/)).toHaveValue('')

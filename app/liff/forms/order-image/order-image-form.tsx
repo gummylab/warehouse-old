@@ -8,6 +8,7 @@ import { Button, ButtonLink } from '@/components/ui/button'
 import type { OrderDetail } from '@/lib/db/types'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { isValidCalendarDate, isValidOrderNumber, normalizeOrderNumber } from '@/lib/order-images/validation'
+import { PAGE_TITLES } from '@/lib/page-titles'
 
 import { ChevronLeftIcon } from 'lucide-react'
 import { FormNavbar } from '../../form-navbar'
@@ -98,7 +99,7 @@ export function OrderImageForm({ lines, initialDetail }: { lines: string[]; init
       header={
         <FormNavbar
           width="full"
-          title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : 'อัปโหลดรูปภาพออเดอร์'}
+          title={detail ? `ออเดอร์ ${detail.order.orderNumber}` : PAGE_TITLES['/liff/forms/order-image']}
           subtitle={
             detail
               ? `${formatThaiDate(detail.order.orderDate)} / ไลน์${detail.order.line}`

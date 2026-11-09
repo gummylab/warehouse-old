@@ -87,7 +87,7 @@ test('summarizes, inspects and deletes an uploaded order', async ({
   const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
   await expect(breadcrumb).toBeVisible()
   await expect(
-    breadcrumb.getByRole('link', { name: 'จัดการรูปภาพออเดอร์' }),
+    breadcrumb.getByRole('link', { name: 'บันทึกภาพออเดอร์' }),
   ).toBeVisible()
   await expect(breadcrumb.getByText(orderNumber)).toBeVisible()
   await expect(

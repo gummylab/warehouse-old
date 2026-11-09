@@ -37,7 +37,7 @@ test('lists line walks with the overview and table filters', async ({
   await page.goto('/line-walks')
 
   await expect(
-    page.getByRole('heading', { name: 'รายการเดินไลน์', level: 1 }),
+    page.getByRole('heading', { name: 'บันทึกการเดินไลน์', level: 1 }),
   ).toBeVisible()
 
   const overview = page.getByRole('region', { name: 'ภาพรวมการเดินไลน์' })
