@@ -36,7 +36,11 @@ test.describe('local device mode', () => {
     const response = await request.post('/api/liff/status', { data: {} })
 
     expect(response.status()).toBe(200)
-    expect(await response.json()).toEqual({ status: 'approved', mode: 'local' })
+    expect(await response.json()).toEqual({
+      status: 'approved',
+      mode: 'local',
+      forms: ['order-image', 'line-walk'],
+    })
   })
 
   test('stops trusting the request as soon as CF-Connecting-IP is present', async ({ request }) => {

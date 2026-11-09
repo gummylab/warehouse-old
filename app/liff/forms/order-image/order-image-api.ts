@@ -6,7 +6,7 @@
 // compile time, so no server code reaches the client bundle.
 import type { ImageRecord, ItemDetail, ItemRecord, OrderDetail } from '@/lib/db/types'
 import { toastMessages } from '@/lib/messages'
-import { notifyError } from '@/lib/toast'
+import { notifyError, notifyFormAccessRevoked } from '@/lib/toast'
 
 import { postJson, type LiffToken } from '../../liff-session-context'
 
@@ -50,6 +50,10 @@ async function request<T>(
     response = await fetch(path, init).catch(() => null)
   }
   if (!response) return { ok: false, status: 0, error: 'network-error' }
+
+  // Approval passed but the grant is gone: the admin removed this form while
+  // the user was on it. Offer the way back; the inline error also says why.
+  if (response.status === 403) notifyFormAccessRevoked()
 
   const data = (await response.json().catch(() => null)) as
     | (T & { error?: string })
@@ -153,7 +157,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
 // what separates them (expired session vs revoked user vs misconfigured
 // secret), so the message needs it too.
 function authMessage(status: number): string {
-  if (status === 403) return 'บัญชีของคุณไม่มีสิทธิ์ใช้งานแบบฟอร์มนี้'
+  if (status === 403) return 'คุณไม่มีสิทธิ์ใช้แบบฟอร์มนี้แล้ว'
   if (status === 503) return 'ระบบยังตั้งค่าเซสชันไม่เรียบร้อย กรุณาติดต่อผู้ดูแล'
   if (status === 0) return ERROR_MESSAGES['network-error']
   return ERROR_MESSAGES['session-failed']

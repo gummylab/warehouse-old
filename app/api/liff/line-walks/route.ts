@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { findLineWalk, saveLineWalks } from '@/lib/db/line-walks'
 import { lineExists } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import {
   lineWalkLookupSchema,
   lineWalkSaveSchema,
@@ -22,7 +22,7 @@ import { isValidCalendarDate } from '@/lib/order-images/validation'
 // methods authenticate the caller exactly like the order-image endpoints.
 
 export async function GET(request: Request) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'line-walk')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'line-walk')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

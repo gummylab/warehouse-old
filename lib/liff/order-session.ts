@@ -1,14 +1,15 @@
-// Session cookie for the order-image form (ADR 0005). The LIFF idToken is
-// exchanged once for an HMAC-signed cookie; every order-images endpoint
-// then authenticates locally, which is also the only way an <img src> can
-// prove identity (it cannot send headers). Approval is still re-checked
-// against the database on every request, so revoking a user (ADR 0003,
-// deletes the users row) cuts access immediately rather than after the
-// cookie TTL.
+// Session cookie for the LIFF forms (ADR 0005). The LIFF idToken is
+// exchanged once for an HMAC-signed cookie; every form endpoint then
+// authenticates locally, which is also the only way an <img src> can prove
+// identity (it cannot send headers). Approval and the form grant are still
+// re-checked against the database on every request, so revoking a user
+// (ADR 0003, deletes the users row) or removing a form from them cuts access
+// immediately rather than after the cookie TTL.
 import { jwtVerify, SignJWT } from 'jose'
 import type { NextResponse } from 'next/server'
 
 import { getUserByLineId } from '../db/users'
+import type { FormId } from '../forms/registry'
 import { readLineTokenRequest, resolveLineIdentity } from './identity'
 import { isLocalDeviceRequest } from './local-device'
 
@@ -61,15 +62,33 @@ export function setSessionCookie(response: NextResponse, token: string): void {
   })
 }
 
-export type OrderImageAuth =
+export type LiffAuth =
   | { ok: true; createdBy: string }
   | { ok: false; status: 401 | 403 | 503 }
 
-export async function authenticateOrderImageRequest(
+// Identity plus approval, with no form check. The session endpoint is the one
+// caller: a cookie proves who the caller is, never which forms they may open
+// (ADR 0005), and both forms exchange through that same endpoint.
+export async function authenticateApprovedRequest(request: Request): Promise<LiffAuth> {
+  return authenticate(request)
+}
+
+// Identity plus approval plus the grant for this form. Every form endpoint
+// goes through here, so removing a form from a user cuts access on the next
+// request instead of at cookie expiry.
+export async function authenticateFormRequest(
   request: Request,
-): Promise<OrderImageAuth> {
+  formId: FormId,
+): Promise<LiffAuth> {
+  return authenticate(request, formId)
+}
+
+async function authenticate(
+  request: Request,
+  formId?: FormId,
+): Promise<LiffAuth> {
   // ADR 0004: the machine running the server is its own approved user and
-  // never needs a cookie.
+  // never needs a cookie. It may open every form.
   if (isLocalDeviceRequest(request)) return { ok: true, createdBy: 'local-device' }
 
   // Cookie first: the file endpoint is also reached by <img> tags, which
@@ -79,7 +98,7 @@ export async function authenticateOrderImageRequest(
     // Present but unsignable means misconfiguration, not a bad caller.
     if (!sessionSecret()) return { ok: false, status: 503 }
     const session = await verifySessionToken(cookie)
-    if (session) return approveSub(session.sub)
+    if (session) return approveSub(session.sub, formId)
     // Expired or tampered cookie: fall through so a Bearer caller can
     // still succeed, then report 401 if nothing else authenticates.
   }
@@ -92,17 +111,20 @@ export async function authenticateOrderImageRequest(
     if (!result.ok) {
       return { ok: false, status: result.reason === 'unconfigured' ? 503 : 401 }
     }
-    return approveSub(result.identity.lineUserId)
+    return approveSub(result.identity.lineUserId, formId)
   }
 
   return { ok: false, status: 401 }
 }
 
-// Approval is re-checked on every request (one indexed local read): the
-// cookie only proves who the caller is, not that they may still write.
-function approveSub(sub: string): OrderImageAuth {
+// Approval is re-checked on every request (local indexed reads): the cookie
+// only proves who the caller is, not that they may still write, and the
+// grant lookup is what makes a form the admin just removed stop working.
+function approveSub(sub: string, formId?: FormId): LiffAuth {
   const user = getUserByLineId(sub)
-  return user?.status === 'approved' ? { ok: true, createdBy: sub } : { ok: false, status: 403 }
+  if (user?.status !== 'approved') return { ok: false, status: 403 }
+  if (formId && !user.formIds.includes(formId)) return { ok: false, status: 403 }
+  return { ok: true, createdBy: sub }
 }
 
 function readSessionCookie(request: Request): string | null {

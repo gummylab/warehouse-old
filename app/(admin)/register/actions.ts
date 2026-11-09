@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache'
 
 import { requireLocalAdminRequest } from '@/lib/admin/authorize'
-import { approvePendingUser, deleteApprovedUser, deletePendingUser } from '@/lib/db/users'
+import {
+  approvePendingUser,
+  deleteApprovedUser,
+  deletePendingUser,
+  setUserForms,
+} from '@/lib/db/users'
 
 // Server action result: null on success, otherwise an error message (Thai,
 // rendered next to the button) shown when the write did not apply.
@@ -13,9 +18,15 @@ export type DecideActionState = { error: string } | null
 // calling instead of trusting that the page that rendered the button is the
 // only way in (see lib/admin/authorize.ts). The check runs first, before any
 // database write.
-export async function approveUser(id: string): Promise<DecideActionState> {
+//
+// formIds is the set the admin ticked in the approve dialog. The data layer
+// drops ids the registry does not know, so a forged value cannot grant a form.
+export async function approveUser(
+  id: string,
+  formIds: string[],
+): Promise<DecideActionState> {
   await requireLocalAdminRequest()
-  const updated = approvePendingUser(id, new Date().toISOString())
+  const updated = approvePendingUser(id, new Date().toISOString(), formIds)
   if (!updated) {
     return { error: 'ไม่พบคำขอนี้ หรือดำเนินการไปแล้ว ลองรีเฟรชหน้าอีกครั้ง' }
   }
@@ -23,6 +34,21 @@ export async function approveUser(id: string): Promise<DecideActionState> {
   // no cache to expire. What this call does is make the server re-render
   // the current route as part of the action's response, so the decided row
   // leaves the queue in the same roundtrip.
+  revalidatePath('/register')
+  return null
+}
+
+// Replaces the whole grant set from the edit dialog on the approved table.
+// Returns an error when the row is gone (revoked elsewhere, or a stale page).
+export async function updateUserForms(
+  id: string,
+  formIds: string[],
+): Promise<DecideActionState> {
+  await requireLocalAdminRequest()
+  const updated = setUserForms(id, formIds)
+  if (!updated) {
+    return { error: 'ไม่พบผู้ใช้นี้ หรือเพิกถอนไปแล้ว ลองรีเฟรชหน้าอีกครั้ง' }
+  }
   revalidatePath('/register')
   return null
 }

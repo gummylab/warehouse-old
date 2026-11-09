@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { findOrCreateOrder, lineExists } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { orderLookupSchema, parseJsonBody } from '@/lib/liff/schemas'
 import {
   isValidCalendarDate,
@@ -15,7 +15,7 @@ import {
 // buttons, so this response carries the order id only. Errors are machine
 // codes; the form maps them to Thai copy so wording stays in one place.
 export async function POST(request: Request) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

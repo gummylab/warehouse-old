@@ -2,7 +2,7 @@ import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { itemExists, saveImageOriginal } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { buildImageVariants } from '@/lib/order-images/optimize'
 import { isAcceptedImageType, MAX_FILE_BYTES } from '@/lib/order-images/upload'
 import sharp from 'sharp'
@@ -22,7 +22,7 @@ export async function POST(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/items/[id]/images'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

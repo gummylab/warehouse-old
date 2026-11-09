@@ -23,7 +23,13 @@ test('approving a request moves the user into the approved table', async ({ page
   const pendingRow = page.getByRole('row').filter({ hasText: user.displayName })
   await expect(pendingRow).toBeVisible()
 
+  // Approving opens the form picker, so the grant set is chosen in the same
+  // moment access is granted. Nothing is ticked by default.
   await pendingRow.getByRole('button', { name: 'อนุมัติ' }).click()
+
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'อัปโหลดรูปภาพออเดอร์' }).check()
+  await dialog.getByRole('button', { name: 'อนุมัติ' }).click()
 
   // The toast confirms the write on the same round trip, so a failed action
   // can never leave a success message behind.
@@ -36,14 +42,44 @@ test('approving a request moves the user into the approved table', async ({ page
   // response and React commits it before the write is flushed. Polling is
   // what waits for the write itself.
   await expect.poll(() => getUserByLineId(user.lineUserId)?.status).toBe('approved')
+  await expect.poll(() => getUserByLineId(user.lineUserId)?.formIds).toEqual(['order-image'])
 
   // The search term survives the tab switch, so the approved table shows the
-  // same single row.
+  // same single row with the form it was granted.
   await page.getByRole('tab', { name: /ผู้ใช้ที่อนุมัติแล้ว/ }).click()
   const approvedRow = page.getByRole('row').filter({ hasText: user.displayName })
   await expect(approvedRow).toBeVisible()
+  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toBeVisible()
 
   expect(consoleErrors).toEqual([])
+})
+
+test('editing an approved user replaces the form badges', async ({ page }) => {
+  const user = seedUser({
+    status: 'approved',
+    displayName: `E2E Edit ${uniqueSuffix()}`,
+    formIds: ['order-image'],
+  })
+
+  await page.goto('/register')
+  await page.getByRole('tab', { name: /ผู้ใช้ที่อนุมัติแล้ว/ }).click()
+  await page.getByPlaceholder('ค้นหา...').fill(user.displayName)
+
+  const approvedRow = page.getByRole('row').filter({ hasText: user.displayName })
+  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toBeVisible()
+
+  await approvedRow.getByRole('button', { name: 'แก้ไข' }).click()
+
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('checkbox', { name: 'บันทึกจำนวนการเดินไลน์' }).check()
+  await dialog.getByRole('checkbox', { name: 'อัปโหลดรูปภาพออเดอร์' }).uncheck()
+  await dialog.getByRole('button', { name: 'บันทึก' }).click()
+
+  // The dialog closes on success and the badges have already swapped.
+  await expect(dialog).toHaveCount(0)
+  await expect(approvedRow.getByText('บันทึกจำนวนการเดินไลน์')).toBeVisible()
+  await expect(approvedRow.getByText('อัปโหลดรูปภาพออเดอร์')).toHaveCount(0)
+  await expect.poll(() => getUserByLineId(user.lineUserId)?.formIds).toEqual(['line-walk'])
 })
 
 test('revoking an approved user deletes the row and closes the dialog', async ({ page }) => {
@@ -99,6 +135,7 @@ test('a refused decision puts the row back in the table', async ({ page }) => {
   deletePendingUser(user.id)
 
   await pendingRow.getByRole('button', { name: 'อนุมัติ' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'อนุมัติ' }).click()
 
   // The refusal is reported next to the button, and the row comes back:
   // the operator has to see that their click did nothing.

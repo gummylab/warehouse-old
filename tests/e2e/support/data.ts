@@ -29,6 +29,7 @@ export type SeededUser = {
   lineUserId: string
   displayName: string
   status: 'pending' | 'approved'
+  formIds: string[]
 }
 
 // Names and ids carry a random suffix: the specs share one database, so a row
@@ -50,18 +51,30 @@ export function seedUser({
   status,
   displayName = `E2E User ${uniqueSuffix()}`,
   lineUserId = `U-e2e-${randomUUID()}`,
+  // Every form by default, matching what the admin screen grants when the
+  // operator ticks them all. A spec that tests a restricted user passes a
+  // subset instead.
+  formIds = ['order-image', 'line-walk'],
 }: {
   status: 'pending' | 'approved'
   displayName?: string
   lineUserId?: string
+  formIds?: string[]
 }): SeededUser {
   const created = createPendingUser({ lineUserId, displayName })
   if (status === 'approved') {
     // The same write the register screen performs, so the row looks like any
     // other approved user to the server.
-    approvePendingUser(created.id, new Date().toISOString())
+    approvePendingUser(created.id, new Date().toISOString(), formIds)
   }
-  return { id: created.id, lineUserId, displayName, status }
+  // A pending row has no grants yet, whatever the caller passed.
+  return {
+    id: created.id,
+    lineUserId,
+    displayName,
+    status,
+    formIds: status === 'approved' ? formIds : [],
+  }
 }
 
 const PNG_BYTES = Buffer.from(

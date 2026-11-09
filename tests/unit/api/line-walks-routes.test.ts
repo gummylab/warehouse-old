@@ -13,12 +13,12 @@ isolateTestData({ env: { LIFF_SESSION_SECRET: SECRET } })
 
 const DATE = '2026-11-05'
 
-function seededUser(lineUserId: string) {
+function seededUser(lineUserId: string, formIds = ['line-walk']) {
   const user = createPendingUser({
     lineUserId,
     displayName: `User ${lineUserId}`,
   })
-  approvePendingUser(user.id, '2026-11-05T03:00:00.000Z')
+  approvePendingUser(user.id, '2026-11-05T03:00:00.000Z', formIds)
   return user
 }
 
@@ -59,6 +59,17 @@ describe('line-walk routes', () => {
     const response = await GET(getRequest(keyParams(line)))
 
     expect(response.status).toBe(401)
+  })
+
+  it('refuses an approved user who was granted a different form', async () => {
+    seededUser('U-line-other', ['order-image'])
+    const line = listLines()[0]
+
+    const response = await GET(
+      getRequest(keyParams(line), await cookieHeadersFor('U-line-other')),
+    )
+
+    expect(response.status).toBe(403)
   })
 
   it('returns null when the key has no record', async () => {

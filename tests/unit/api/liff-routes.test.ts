@@ -47,9 +47,15 @@ function stubLineVerify(body: unknown, status = 200) {
   )
 }
 
-function seededUser(lineUserId: string, status: 'pending' | 'approved') {
+function seededUser(
+  lineUserId: string,
+  status: 'pending' | 'approved',
+  formIds = ['order-image', 'line-walk'],
+) {
   const user = createPendingUser({ lineUserId, displayName: `User ${lineUserId}` })
-  if (status === 'approved') approvePendingUser(user.id, '2026-10-19T03:00:00.000Z')
+  if (status === 'approved') {
+    approvePendingUser(user.id, '2026-10-19T03:00:00.000Z', formIds)
+  }
   return user
 }
 
@@ -66,7 +72,11 @@ describe('POST /api/liff/status', () => {
     const response = await post({ host: 'localhost:8080' })
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ status: 'approved', mode: 'local' })
+    expect(await response.json()).toEqual({
+      status: 'approved',
+      mode: 'local',
+      forms: ['order-image', 'line-walk'],
+    })
     expect(await listUsers()).toEqual([])
   })
 
@@ -99,19 +109,35 @@ describe('POST /api/liff/status', () => {
     const response = await post({}, { token: 'id-token' })
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ status: 'none' })
+    expect(await response.json()).toEqual({ status: 'none', forms: [] })
   })
 
   it('answers the stored status for a known user', async () => {
     stubLineVerify({ sub: 'U-pending', name: 'Pending User' })
     seededUser('U-pending', 'pending')
 
-    expect(await (await post({}, { token: 'id-token' })).json()).toEqual({ status: 'pending' })
+    expect(await (await post({}, { token: 'id-token' })).json()).toEqual({
+      status: 'pending',
+      forms: [],
+    })
 
     seededUser('U-approved', 'approved')
     stubLineVerify({ sub: 'U-approved', name: 'Approved User' })
 
-    expect(await (await post({}, { token: 'id-token' })).json()).toEqual({ status: 'approved' })
+    expect(await (await post({}, { token: 'id-token' })).json()).toEqual({
+      status: 'approved',
+      forms: ['order-image', 'line-walk'],
+    })
+  })
+
+  it('answers only the forms the admin granted', async () => {
+    seededUser('U-one-form', 'approved', ['line-walk'])
+    stubLineVerify({ sub: 'U-one-form', name: 'One Form' })
+
+    expect(await (await post({}, { token: 'id-token' })).json()).toEqual({
+      status: 'approved',
+      forms: ['line-walk'],
+    })
   })
 })
 

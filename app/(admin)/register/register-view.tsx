@@ -18,6 +18,12 @@ interface RegisterViewProps {
   pendingUsers: RegisterUser[]
 }
 
+// The two optimistic updates the screen supports. A union rather than two
+// hooks keeps one source of truth for the row list.
+type OptimisticAction =
+  | { type: 'remove'; id: string }
+  | { type: 'setForms'; id: string; formIds: string[] }
+
 // Single table whose columns/data swap with the selected tab. The tab switcher
 // sits at the right end of the search row (searchSlot) instead of its own row,
 // so it stays mounted across switches — no focus loss, no duplicated triggers.
@@ -34,14 +40,22 @@ export function RegisterView({ approvedUsers, pendingUsers }: RegisterViewProps)
   // The rows the operator sees. A decided row leaves the table on the
   // click, before the server has answered, and the server's revalidated
   // payload replaces these rows once it arrives (or puts the row back if
-  // the write was refused).
+  // the write was refused). An edited form set shows the same way: the
+  // badges swap before the round trip.
   //
   // useOptimistic only accepts updates made inside a transition or an
-  // action, so removeUser is called from the buttons' own action, never
+  // action, so both helpers are called from the buttons' own action, never
   // from an event handler.
-  const [optimisticUsers, removeOptimistic] = useOptimistic(
+  const [optimisticUsers, applyOptimistic] = useOptimistic(
     [...approvedUsers, ...pendingUsers],
-    (users, id: string) => users.filter((user) => user.id !== id),
+    (users, action: OptimisticAction) => {
+      if (action.type === 'remove') {
+        return users.filter((user) => user.id !== action.id)
+      }
+      return users.map((user) =>
+        user.id === action.id ? { ...user, formIds: action.formIds } : user,
+      )
+    },
   )
 
   const approved = optimisticUsers.filter((user) => user.status === 'approved')
@@ -50,7 +64,10 @@ export function RegisterView({ approvedUsers, pendingUsers }: RegisterViewProps)
   return (
     <RegisterDecisionProvider
       value={{
-        removeUser: removeOptimistic,
+        removeUser: (id) =>
+          applyOptimistic({ type: 'remove', id }),
+        updateForms: (id, formIds) =>
+          applyOptimistic({ type: 'setForms', id, formIds }),
         reportError: setError,
       }}
     >

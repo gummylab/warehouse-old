@@ -1,9 +1,15 @@
 import { SignJWT } from 'jose'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { approvePendingUser, createPendingUser, deleteApprovedUser } from '@/lib/db/users'
 import {
-  authenticateOrderImageRequest,
+  approvePendingUser,
+  createPendingUser,
+  deleteApprovedUser,
+  getUserByLineId,
+  setUserForms,
+} from '@/lib/db/users'
+import {
+  authenticateFormRequest,
   setSessionCookie,
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
@@ -29,9 +35,19 @@ afterEach(() => {
 
 const APPROVED = 'U-approved'
 
-function seededApproved(lineUserId: string = APPROVED) {
+// Every case in this file exercises an order-image endpoint, so the form id is
+// named once here. The grant cases below call authenticateFormRequest directly
+// when the form under test matters.
+function authenticate(request: Request) {
+  return authenticateFormRequest(request, 'order-image')
+}
+
+function seededApproved(
+  lineUserId: string = APPROVED,
+  formIds: string[] = ['order-image'],
+) {
   const user = createPendingUser({ lineUserId, displayName: 'Approved User' })
-  approvePendingUser(user.id, '2026-10-19T03:00:00.000Z')
+  approvePendingUser(user.id, '2026-10-19T03:00:00.000Z', formIds)
   return user
 }
 
@@ -121,20 +137,20 @@ describe('setSessionCookie', () => {
   })
 })
 
-describe('authenticateOrderImageRequest: local device', () => {
+describe('authenticate: local device', () => {
   it('trusts the machine running the server without any credential', async () => {
     const request = requestWithHeaders({ host: 'localhost:8080' })
 
-    expect(await authenticateOrderImageRequest(request)).toEqual({
+    expect(await authenticate(request)).toEqual({
       ok: true,
       createdBy: 'local-device',
     })
   })
 })
 
-describe('authenticateOrderImageRequest: cookie', () => {
+describe('authenticate: cookie', () => {
   it('refuses a request that carries no credential at all', async () => {
-    expect(await authenticateOrderImageRequest(requestWithHeaders({}))).toEqual({
+    expect(await authenticate(requestWithHeaders({}))).toEqual({
       ok: false,
       status: 401,
     })
@@ -144,7 +160,7 @@ describe('authenticateOrderImageRequest: cookie', () => {
     seededApproved()
     const token = (await signSessionToken(APPROVED)) ?? ''
 
-    expect(await authenticateOrderImageRequest(cookieRequest(token))).toEqual({
+    expect(await authenticate(cookieRequest(token))).toEqual({
       ok: true,
       createdBy: APPROVED,
     })
@@ -154,7 +170,7 @@ describe('authenticateOrderImageRequest: cookie', () => {
     createPendingUser({ lineUserId: 'U-pending', displayName: 'Pending User' })
     const token = (await signSessionToken('U-pending')) ?? ''
 
-    expect(await authenticateOrderImageRequest(cookieRequest(token))).toEqual({
+    expect(await authenticate(cookieRequest(token))).toEqual({
       ok: false,
       status: 403,
     })
@@ -163,13 +179,13 @@ describe('authenticateOrderImageRequest: cookie', () => {
   it('refuses a signed cookie as soon as the user is revoked', async () => {
     const user = seededApproved()
     const token = (await signSessionToken(APPROVED)) ?? ''
-    expect((await authenticateOrderImageRequest(cookieRequest(token))).ok).toBe(true)
+    expect((await authenticate(cookieRequest(token))).ok).toBe(true)
 
     // Revoking deletes the row (ADR 0003), which is what makes the per-request
     // approval check cut access immediately instead of at cookie expiry.
     deleteApprovedUser(user.id)
 
-    expect(await authenticateOrderImageRequest(cookieRequest(token))).toEqual({
+    expect(await authenticate(cookieRequest(token))).toEqual({
       ok: false,
       status: 403,
     })
@@ -178,14 +194,14 @@ describe('authenticateOrderImageRequest: cookie', () => {
   it('refuses a signed cookie for a sub that has no users row', async () => {
     const token = (await signSessionToken('U-ghost')) ?? ''
 
-    expect(await authenticateOrderImageRequest(cookieRequest(token))).toEqual({
+    expect(await authenticate(cookieRequest(token))).toEqual({
       ok: false,
       status: 403,
     })
   })
 
   it('refuses an unsigned cookie value', async () => {
-    expect(await authenticateOrderImageRequest(cookieRequest('not-a-token'))).toEqual({
+    expect(await authenticate(cookieRequest('not-a-token'))).toEqual({
       ok: false,
       status: 401,
     })
@@ -196,7 +212,7 @@ describe('authenticateOrderImageRequest: cookie', () => {
     const token = (await signSessionToken(APPROVED)) ?? ''
     vi.stubEnv('LIFF_SESSION_SECRET', 'too-short-to-be-a-key')
 
-    expect(await authenticateOrderImageRequest(cookieRequest(token))).toEqual({
+    expect(await authenticate(cookieRequest(token))).toEqual({
       ok: false,
       status: 503,
     })
@@ -205,14 +221,14 @@ describe('authenticateOrderImageRequest: cookie', () => {
   it('falls through an expired cookie and reports missing credentials', async () => {
     seededApproved()
 
-    expect(await authenticateOrderImageRequest(cookieRequest(await expiredToken(APPROVED)))).toEqual({
+    expect(await authenticate(cookieRequest(await expiredToken(APPROVED)))).toEqual({
       ok: false,
       status: 401,
     })
   })
 })
 
-describe('authenticateOrderImageRequest: bearer fallback', () => {
+describe('authenticate: bearer fallback', () => {
   function stubLineVerify(body: unknown, status = 200) {
     vi.stubEnv('NEXT_PUBLIC_LIFF_ID', '1234567890-abcdefgh')
     vi.stubGlobal(
@@ -233,7 +249,7 @@ describe('authenticateOrderImageRequest: bearer fallback', () => {
 
     const request = requestWithHeaders({ authorization: 'Bearer some-liff-id-token' })
 
-    expect(await authenticateOrderImageRequest(request)).toEqual({
+    expect(await authenticate(request)).toEqual({
       ok: true,
       createdBy: APPROVED,
     })
@@ -243,7 +259,7 @@ describe('authenticateOrderImageRequest: bearer fallback', () => {
     stubLineVerify({ sub: 'U-stranger', name: 'Stranger' })
 
     expect(
-      await authenticateOrderImageRequest(
+      await authenticate(
         requestWithHeaders({ authorization: 'Bearer some-liff-id-token' }),
       ),
     ).toEqual({ ok: false, status: 403 })
@@ -253,7 +269,7 @@ describe('authenticateOrderImageRequest: bearer fallback', () => {
     stubLineVerify({ error: 'invalid_request' }, 400)
 
     expect(
-      await authenticateOrderImageRequest(
+      await authenticate(
         requestWithHeaders({ authorization: 'Bearer some-liff-id-token' }),
       ),
     ).toEqual({ ok: false, status: 401 })
@@ -263,7 +279,7 @@ describe('authenticateOrderImageRequest: bearer fallback', () => {
     vi.stubEnv('NEXT_PUBLIC_LIFF_ID', '')
 
     expect(
-      await authenticateOrderImageRequest(
+      await authenticate(
         requestWithHeaders({ authorization: 'Bearer some-liff-id-token' }),
       ),
     ).toEqual({ ok: false, status: 503 })
@@ -271,10 +287,42 @@ describe('authenticateOrderImageRequest: bearer fallback', () => {
 
   it('ignores an empty or non-bearer authorization header', async () => {
     expect(
-      await authenticateOrderImageRequest(requestWithHeaders({ authorization: 'Bearer ' })),
+      await authenticate(requestWithHeaders({ authorization: 'Bearer ' })),
     ).toEqual({ ok: false, status: 401 })
     expect(
-      await authenticateOrderImageRequest(requestWithHeaders({ authorization: 'Basic abc' })),
+      await authenticate(requestWithHeaders({ authorization: 'Basic abc' })),
     ).toEqual({ ok: false, status: 401 })
+  })
+})
+
+describe('authenticateFormRequest: form grant', () => {
+  it('refuses an approved user who was granted a different form', async () => {
+    seededApproved(APPROVED, ['line-walk'])
+    const token = (await signSessionToken(APPROVED)) ?? ''
+
+    expect(await authenticate(cookieRequest(token))).toEqual({ ok: false, status: 403 })
+    expect(await authenticateFormRequest(cookieRequest(token), 'line-walk')).toEqual({
+      ok: true,
+      createdBy: APPROVED,
+    })
+  })
+
+  it('stops answering as soon as the admin removes the grant', async () => {
+    seededApproved()
+    const token = (await signSessionToken(APPROVED)) ?? ''
+    expect((await authenticate(cookieRequest(token))).ok).toBe(true)
+
+    setUserForms(getUserByLineId(APPROVED)?.id ?? '', [])
+
+    expect(await authenticate(cookieRequest(token))).toEqual({ ok: false, status: 403 })
+  })
+
+  it('lets the local device open every form without a grant row', async () => {
+    const request = requestWithHeaders({ host: 'localhost:8080' })
+
+    expect(await authenticateFormRequest(request, 'line-walk')).toEqual({
+      ok: true,
+      createdBy: 'local-device',
+    })
   })
 })

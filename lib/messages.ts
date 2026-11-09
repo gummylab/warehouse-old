@@ -9,6 +9,7 @@ export const toastMessages = {
   userApproved: (name: string) => `อนุมัติ ${name} แล้ว`,
   userRejected: (name: string) => `ปฏิเสธคำขอของ ${name} แล้ว`,
   userRevoked: (name: string) => `เพิกถอนสิทธิ์ของ ${name} แล้ว`,
+  userFormsSaved: (name: string) => `บันทึกสิทธิ์ฟอร์มของ ${name} แล้ว`,
 
   itemAdded: (number: number) => `เพิ่มไอเท็ม ${number} แล้ว`,
   itemAddFailed: 'เพิ่มไอเท็มไม่สำเร็จ',
