@@ -51,6 +51,11 @@ function getLimit(pathname: string): { limit: number; windowMs: number } {
 }
 
 export function proxy(request: NextRequest) {
+  // Bypass rate limiting for load testing.
+  if (process.env.RATE_LIMIT_DISABLED === 'true') {
+    return NextResponse.next()
+  }
+
   const ip =
     request.headers.get('cf-connecting-ip') ||
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
