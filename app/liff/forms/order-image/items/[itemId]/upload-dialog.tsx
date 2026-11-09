@@ -103,7 +103,7 @@ export function UploadDialog({
     setEntries((prev) => prev.map((entry) => (entry.key === key ? { ...entry, ...patch } : entry)))
   }
 
-  async function addFiles(list: FileList | null) {
+  function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return
     const added: UploadEntry[] = []
     for (const file of Array.from(list)) {
@@ -118,9 +118,9 @@ export function UploadDialog({
         added.push({ key, file, previewUrl: URL.createObjectURL(file), status: 'rejected', error: errorMessage('file-too-large') })
         continue
       }
-      // Compress before upload to reduce size and avoid Cloudflare timeout
-      const compressed = await compressImage(file)
-      added.push({ key, file: compressed, previewUrl: URL.createObjectURL(compressed), status: 'ready' })
+      // Don't compress here — compress during upload so the preview shows
+      // the original file immediately.
+      added.push({ key, file, previewUrl: URL.createObjectURL(file), status: 'ready' })
     }
     setEntries((prev) => [...prev, ...added])
   }
@@ -158,11 +158,20 @@ export function UploadDialog({
       if (controller.signal.aborted) break
       updateEntry(entry.key, { status: 'uploading', error: undefined, progress: 0 })
       
+      // Compress during upload (not before) so preview shows original immediately
+      const fileToUpload = await compressImage(entry.file)
+      // Update preview if compressed version is different
+      if (fileToUpload !== entry.file) {
+        const newPreviewUrl = URL.createObjectURL(fileToUpload)
+        URL.revokeObjectURL(entry.previewUrl)
+        updateEntry(entry.key, { file: fileToUpload, previewUrl: newPreviewUrl })
+      }
+      
       // Auto-retry up to 3 times
       let result: Awaited<ReturnType<typeof uploadImage>> | null = null
       for (let attempt = 0; attempt < 3; attempt++) {
         if (controller.signal.aborted) break
-        result = await uploadImage(itemId, entry.file, controller.signal, (p) => {
+        result = await uploadImage(itemId, fileToUpload, controller.signal, (p) => {
           updateEntry(entry.key, { progress: p })
         })
         if (result.ok) break
@@ -309,7 +318,7 @@ export function UploadDialog({
                 </div>
 
                 {/* Done: show X to remove; Error/Rejected: show X to remove */}
-                {(entry.status === 'done' || entry.status === 'error' || entry.status === 'rejected') && (
+                {(entry.status === 'ready' || entry.status === 'done' || entry.status === 'error' || entry.status === 'rejected') && (
                   <Button
                     variant="ghost"
                     size="icon-xs"
