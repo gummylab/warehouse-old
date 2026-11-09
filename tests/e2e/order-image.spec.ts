@@ -142,6 +142,12 @@ test('uploads, labels and deletes a photo for an item', async ({ page, request }
   await expect(viewer.getByRole('menuitem')).toHaveCount(0)
   await expect(counter).toHaveText('1 / 2')
 
+  // The toolbar's download is the original attachment, not the web copy.
+  const downloadPromise = page.waitForEvent('download')
+  await viewer.getByRole('link', { name: 'ดาวน์โหลด' }).click()
+  const savedFile = await downloadPromise
+  expect(savedFile.suggestedFilename()).toMatch(/\.png$/i)
+
   await viewer.getByRole('button', { name: 'รูปถัดไป' }).click()
   await expect(photo).toHaveAttribute('alt', 'รูปที่ 2')
   await expect(counter).toHaveText('2 / 2')

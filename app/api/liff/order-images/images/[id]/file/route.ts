@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { NextResponse } from 'next/server'
 
 import { getImageFile } from '@/lib/db/order-images'
+import { verifyDownloadToken } from '@/lib/liff/download-token'
 import { authenticateFormRequest } from '@/lib/liff/order-session'
 import {
   derivativePath,
@@ -27,20 +28,31 @@ export async function GET(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/images/[id]/file'>,
 ) {
+  const { id } = await params
+  const search = new URL(request.url).searchParams
+  const download = search.get('download') === '1'
+
+  // The cookie (or the local-device shortcut) is the normal credential. A
+  // download opened in the external browser has no cookie, so it may present
+  // the short-lived token the authenticated page minted instead.
   const auth = await authenticateFormRequest(request, 'order-image')
-  if (!auth.ok) {
+  if (!auth.ok && !(download && verifyDownloadToken(search.get('token'), id))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }
 
-  const { id } = await params
   const file = getImageFile(id)
   if (!file) {
     return NextResponse.json({ error: 'image-not-found' }, { status: 404 })
   }
 
-  const requested = new URL(request.url).searchParams.get('size')
-  const size: RequestedSize =
-    requested === 'thumb' || requested === 'original' ? requested : 'web'
+  const requested = search.get('size')
+  // A download is the uploaded original, never the web/thumb copy: those are
+  // display sizes, and the operator asked to keep the photo.
+  const size: RequestedSize = download
+    ? 'original'
+    : requested === 'thumb' || requested === 'original'
+      ? requested
+      : 'web'
 
   const original = originalPath(file.storageKey)
   const absolute = size === 'original' ? original : derivativePath(file.storageKey, size)
@@ -69,22 +81,35 @@ export async function GET(
     }
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': contentType ?? 'application/octet-stream',
+    // The stored bytes come from a phone upload and the Content-Type is
+    // whatever the client claimed, so the browser must not be allowed to
+    // sniff its way to a different type (an HTML body served as an image
+    // would run as a script on this origin).
+    'X-Content-Type-Options': 'nosniff',
+    // private: the bytes are auth-gated, so shared caches must not keep
+    // them. immutable: a given image id never changes content, and a
+    // replaced photo always gets a fresh id.
+    'Cache-Control': 'private, max-age=31536000, immutable',
+  }
+  if (download) {
+    // The viewer's anchor names the file too, but a direct navigation (the
+    // external browser or a share sheet) only has this header.
+    headers['Content-Disposition'] =
+      `attachment; filename="${downloadName(file.storageKey)}"`
+  }
+
   // The bytes are copied into a fresh Uint8Array because BodyInit does not
   // accept a Buffer's ArrayBufferLike view. The copy is bounded by the 10 MB
   // upload limit and happens after the file is already in memory, so it is
   // not worth streaming the file to avoid it.
-  return new NextResponse(new Uint8Array(bytes), {
-    headers: {
-      'Content-Type': contentType ?? 'application/octet-stream',
-      // The stored bytes come from a phone upload and the Content-Type is
-      // whatever the client claimed, so the browser must not be allowed to
-      // sniff its way to a different type (an HTML body served as an image
-      // would run as a script on this origin).
-      'X-Content-Type-Options': 'nosniff',
-      // private: the bytes are auth-gated, so shared caches must not keep
-      // them. immutable: a given image id never changes content, and a
-      // replaced photo always gets a fresh id.
-      'Cache-Control': 'private, max-age=31536000, immutable',
-    },
-  })
+  return new NextResponse(new Uint8Array(bytes), { headers })
+}
+
+// The stored name (seq-package.ext) is ASCII and unique per image. Strip the
+// characters that would break the quoted header.
+function downloadName(storageKey: string): string {
+  const raw = storageKey.split('/').pop() ?? ''
+  return raw.replace(/["\\\r\n]/g, '').trim() || 'photo'
 }

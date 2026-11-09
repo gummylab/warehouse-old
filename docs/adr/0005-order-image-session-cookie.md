@@ -10,3 +10,4 @@ The cookie proves identity, never permission: every request re-reads the users r
 - The stolen-cookie window is bounded by the 12-hour TTL and the per-request approval check; the cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
 - Stored bytes are served with `Cache-Control: private, max-age=31536000, immutable`: private because access is authenticated, immutable because an image id never changes content (a replaced photo gets a new id).
 - The form's fetch layer re-exchanges automatically on a 401, so an expired cookie mid-session heals instead of dead-ending the page.
+- The `file` route also accepts a short-lived download token when the request asks for `download=1`, because the cookie lives in the LINE WebView and is not shared with the external browser (ADR 0021).
