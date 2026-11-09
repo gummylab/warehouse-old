@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { addItem, orderExists } from '@/lib/db/order-images'
 import type { AddItemResult } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { addItemSchema, parseJsonBody } from '@/lib/liff/schemas'
 
 // Step 2 "add item" buttons: auto-numbered next single (+100) or next
@@ -11,7 +11,7 @@ export async function POST(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/orders/[id]/items'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getOrderDetail } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 
 // Full order state for step 2: items (varieties nested) with their images.
 // The client refetches this after every mutation instead of patching local
@@ -10,7 +10,7 @@ export async function GET(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/orders/[id]'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

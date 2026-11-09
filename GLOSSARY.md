@@ -32,6 +32,24 @@ _Avoid_: /liff/api (the API lives under /api/liff)
 When `/liff` opens on the machine running the server: the request never passed through Cloudflare and names the loopback host, so the server answers `approved` without LINE and without a users row; a badge reading "Admin" in the form navbar marks these pages (ADR 0004).
 _Avoid_: dev bypass, localhost mock, local user
 
+## Forms and access
+
+**แบบฟอร์ม (form)**:
+A LIFF feature page an approved user may open, identified by `order-image` or `line-walk`. It is one unit of access: a user either holds it or does not.
+_Avoid_: เมนู, หน้า, ฟีเจอร์
+
+**สิทธิ์ฟอร์ม (form grant)**:
+The right an approved user holds to open one form. Without it the form hub hides that card and the form's API answers 403.
+_Avoid_: permission, สิทธิ์การเข้าถึง
+
+**หน้าแบบฟอร์ม (form hub)**:
+`/liff/forms`, the page that lists one card for each form the user holds; with no grant it shows the empty state instead.
+_Avoid_: หน้าหลัก, home
+
+**อนุมัติ (approve)**:
+Moving an access request from pending to approved and choosing its form grants in the same action. Zero forms is a valid outcome.
+_Avoid_: เปิดใช้, อนุญาต
+
 ## Order images
 
 **Order-image form**:

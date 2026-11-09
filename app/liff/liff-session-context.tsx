@@ -47,6 +47,10 @@ export type LiffSessionState = {
   // Token for /api/liff calls; set once LINE issued one, even when the
   // status call that follows fails (so a retry can reuse it).
   token: LiffToken | null
+  // Form ids this user may open, in display order. The status call answers
+  // it, the gate matches a pathname against it, and the hub renders from it.
+  // Empty for a pending user, an unknown user, or a failed status call.
+  forms: string[]
 }
 
 type LiffSessionContextValue = LiffSessionState & {
@@ -68,8 +72,8 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
   // being set inside the effect (which would be a synchronous setState).
   const [session, setSession] = useState<LiffSessionState>(() =>
     LIFF_ID
-      ? { status: 'loading', mode: 'line', stage: null, token: null }
-      : { status: 'unconfigured', mode: 'line', stage: null, token: null },
+      ? { status: 'loading', mode: 'line', stage: null, token: null, forms: [] }
+      : { status: 'unconfigured', mode: 'line', stage: null, token: null, forms: [] },
   )
   const [run, setRun] = useState(0)
 
@@ -78,7 +82,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
     if (!LIFF_ID && !isLocalDeviceBrowser()) return
     // Drop the cached boot so a rejected init can actually be retried.
     bootPromise = null
-    setSession({ status: 'loading', mode: 'line', stage: null, token: null })
+    setSession({ status: 'loading', mode: 'line', stage: null, token: null, forms: [] })
     setRun((n) => n + 1)
   }, [])
 
@@ -104,7 +108,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
       postJson('/api/liff/status', null).then((data) => {
         if (cancelled) return
         if (!data) {
-          setSession({ status: 'error', mode: 'local', stage: 'api', token: null })
+          setSession({ status: 'error', mode: 'local', stage: 'api', token: null, forms: [] })
           return
         }
         setSession({
@@ -112,6 +116,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
           mode: data.mode === 'local' ? 'local' : 'line',
           stage: null,
           token: null,
+          forms: data.forms ?? [],
         })
       })
       return () => {
@@ -125,7 +130,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
       .then((boot) => {
         if (cancelled) return
         if (boot.phase === 'timeout') {
-          setSession({ status: 'error', mode: 'line', stage: 'init-timeout', token: null })
+          setSession({ status: 'error', mode: 'line', stage: 'init-timeout', token: null, forms: [] })
           return
         }
         if (boot.phase === 'no-token') {
@@ -136,14 +141,14 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
           liff.login()
           setTimeout(() => {
             if (!cancelled)
-              setSession({ status: 'outside-line', mode: 'line', stage: null, token: null })
+              setSession({ status: 'outside-line', mode: 'line', stage: null, token: null, forms: [] })
           }, 1000)
           return
         }
         return postJson('/api/liff/status', boot.token).then((data) => {
           if (cancelled) return
           if (!data) {
-            setSession({ status: 'error', mode: 'line', stage: 'api', token: boot.token })
+            setSession({ status: 'error', mode: 'line', stage: 'api', token: boot.token, forms: [] })
             return
           }
           setSession({
@@ -151,6 +156,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
             mode: 'line',
             stage: null,
             token: boot.token,
+            forms: data.forms ?? [],
           })
         })
       })
@@ -158,7 +164,7 @@ export function LiffSessionProvider({ children }: { children: React.ReactNode })
         // liff.init rejected: bad LIFF id, network failure, unsupported
         // browser. postJson never throws, so this catch is init only.
         if (!cancelled)
-          setSession({ status: 'error', mode: 'line', stage: 'init-failed', token: null })
+          setSession({ status: 'error', mode: 'line', stage: 'init-failed', token: null, forms: [] })
       })
 
     return () => {
@@ -189,7 +195,7 @@ export async function postJson(
   // null token: the local device status call. The server decides from the
   // request headers, not from a token (ADR 0004), so the body stays empty.
   token: LiffToken | null,
-): Promise<{ status?: string; mode?: string } | null> {
+): Promise<{ status?: string; mode?: string; forms?: string[] } | null> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

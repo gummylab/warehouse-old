@@ -6,6 +6,7 @@ import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 
 import * as schema from './schema'
+import { seedForms } from './seed-forms'
 import { seedLines } from './seed'
 import { databaseFile } from '../settings/paths'
 import { updateSettings } from '../settings/store'
@@ -95,9 +96,11 @@ function openAt(file: string): Handles {
     const orm = drizzle(db, { schema })
     migrate(orm, { migrationsFolder: MIGRATIONS_FOLDER })
 
-    // The line catalog is seeded here, once per open, rather than on every
-    // read: a write inside a read path would make the catalog uncacheable.
+    // The line catalog and the form catalog are seeded here, once per open,
+    // rather than on every read: a write inside a read path would make the
+    // catalogs uncacheable.
     seedLines(orm)
+    seedForms(orm)
     return { db, orm }
   } catch (error) {
     // A half-open handle keeps the file locked on Windows, so a failed

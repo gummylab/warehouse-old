@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
@@ -12,6 +12,7 @@ import { notifySuccess } from '@/lib/toast'
 
 import { approveUser, rejectUser, type DecideActionState } from './actions'
 import { actionsHeader, profileColumn, requestedAtColumn } from './columns'
+import { FormPickerDialog } from './form-picker-dialog'
 import { useRegisterDecision } from './register-decision-context'
 
 const columnHelper = createColumnHelper<DataTableFeatures, RegisterUser>()
@@ -31,20 +32,15 @@ export const pendingColumns = columnHelper.columns([
   }),
 ])
 
-// Both buttons post straight to server actions (write + revalidate
+// Both decisions post straight to server actions (write + revalidate
 // /register), so a decided row leaves the queue without the client
-// navigating anywhere.
+// navigating anywhere. Approving needs one dialog first now: the admin picks
+// the form set in the same click that grants access, which is the only moment
+// the choice is cheap.
 function DecideButtons({ id, displayName }: { id: string; displayName: string }) {
   return (
     <div className="flex justify-center gap-2">
-      <DecideButton
-        id={id}
-        displayName={displayName}
-        label="อนุมัติ"
-        variant="default"
-        action={approveUser}
-        successMessage={toastMessages.userApproved}
-      />
+      <ApproveButton id={id} displayName={displayName} />
       <DecideButton
         id={id}
         displayName={displayName}
@@ -54,6 +50,46 @@ function DecideButtons({ id, displayName }: { id: string; displayName: string })
         successMessage={toastMessages.userRejected}
       />
     </div>
+  )
+}
+
+function ApproveButton({ id, displayName }: { id: string; displayName: string }) {
+  const [open, setOpen] = useState(false)
+  const { removeUser, reportError } = useRegisterDecision()
+
+  const [, formAction, pending] = useActionState(
+    async (
+      previous: DecideActionState,
+      formData: FormData,
+    ): Promise<DecideActionState> => {
+      const formIds = formData.getAll('formIds').map(String)
+      // The row leaves the queue on the confirm click, matching the reject
+      // path; the server's revalidated payload puts it back on a refusal.
+      removeUser(id)
+      const result = await approveUser(id, formIds)
+      if (result) reportError(result.error)
+      else notifySuccess(toastMessages.userApproved(displayName))
+      return result
+    },
+    null,
+  )
+
+  return (
+    <>
+      <Button size="sm" variant="default" onClick={() => setOpen(true)}>
+        อนุมัติ
+      </Button>
+      <FormPickerDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="อนุมัติผู้ใช้"
+        description={`เลือกฟอร์มที่ "${displayName}" จะเห็น ไม่เลือกเลยก็ได้`}
+        submitLabel="อนุมัติ"
+        selectedFormIds={[]}
+        formAction={formAction}
+        pending={pending}
+      />
+    </>
   )
 }
 

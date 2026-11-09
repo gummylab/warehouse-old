@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { safeRevalidateTag } from '@/lib/cache/revalidate'
 import { deleteItemCascade, getItemDetail } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 
 // Everything the item-images page needs for one item: the order it belongs
 // to, the item itself and its photos in seq order. Refetched after every
@@ -14,7 +14,7 @@ export async function GET(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/items/[id]'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }
@@ -33,7 +33,7 @@ export async function DELETE(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/items/[id]'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

@@ -19,6 +19,10 @@ export type RegisterUser = {
   status: 'pending' | 'approved'
   // ISO 8601. Stored as a string so server and client formats never clash.
   requestedAt: string
+  // Grants, ordered as the hub and the badge list show them. A pending user
+  // has none: the set is chosen at approval and changed from the approved
+  // table afterwards. Empty is valid and means the user may open no form.
+  formIds: string[]
 }
 
 export type OrderRecord = {

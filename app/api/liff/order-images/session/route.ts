@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import {
-  authenticateOrderImageRequest,
+  authenticateApprovedRequest,
   resolveExchangeIdentity,
   setSessionCookie,
   signSessionToken,
@@ -11,7 +11,9 @@ import {
 // device, which needs none). Idempotent: a still-valid cookie answers
 // without another LINE round trip.
 export async function POST(request: Request) {
-  const auth = await authenticateOrderImageRequest(request)
+  // Identity and approval only: a cookie says who the caller is, never which
+  // forms they may open (ADR 0005). Each form endpoint checks its own grant.
+  const auth = await authenticateApprovedRequest(request)
   if (auth.ok && auth.createdBy !== 'local-device') {
     return NextResponse.json({ ok: true, mode: 'line' })
   }

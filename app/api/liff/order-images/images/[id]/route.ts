@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { deleteImage, getImage, setImagePackage } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import { imagePackageSchema, parseJsonBody } from '@/lib/liff/schemas'
 import { isPackageName } from '@/lib/order-images/packages'
 
@@ -13,7 +13,7 @@ export async function PATCH(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/images/[id]'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }
@@ -39,7 +39,7 @@ export async function DELETE(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/images/[id]'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

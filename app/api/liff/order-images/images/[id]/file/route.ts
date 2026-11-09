@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { NextResponse } from 'next/server'
 
 import { getImageFile } from '@/lib/db/order-images'
-import { authenticateOrderImageRequest } from '@/lib/liff/order-session'
+import { authenticateFormRequest } from '@/lib/liff/order-session'
 import {
   derivativePath,
   isInsideRoot,
@@ -27,7 +27,7 @@ export async function GET(
   request: Request,
   { params }: RouteContext<'/api/liff/order-images/images/[id]/file'>,
 ) {
-  const auth = await authenticateOrderImageRequest(request)
+  const auth = await authenticateFormRequest(request, 'order-image')
   if (!auth.ok) {
     return NextResponse.json({ error: 'unauthorized' }, { status: auth.status })
   }

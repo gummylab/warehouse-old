@@ -13,6 +13,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -53,6 +54,33 @@ export const users = sqliteTable(
     uniqueIndex('idx_users_line_user_id').on(table.lineUserId),
     check('users_status_check', sql`${table.status} IN ('pending', 'approved')`),
   ],
+)
+
+// The forms an approved user may open. Rows are seeded from
+// lib/forms/registry.ts on every database open (lib/db/seed-forms.ts), so a
+// row exists exactly while the code still ships that form. The table exists
+// as the referential target for grants, not as an admin-editable catalog.
+export const forms = sqliteTable('forms', {
+  id: text('id').primaryKey(),
+  // Display order shared by the hub and the register badge list.
+  sortOrder: integer('sort_order').notNull(),
+})
+
+// One row per (user, form): the grant that lets an approved user open a form.
+// Both sides cascade. Revoking a user deletes the users row (ADR 0003) and
+// retiring a form deletes its row during the seed, so an orphan grant cannot
+// survive either one.
+export const userForms = sqliteTable(
+  'user_forms',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    formId: text('form_id')
+      .notNull()
+      .references(() => forms.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.formId] })],
 )
 
 // Catalog of production lines the order-image form's dropdown offers. Seeded
@@ -183,6 +211,8 @@ export const lineWalks = sqliteTable(
 // Row shapes for the data layer. The public, client-safe shapes stay in
 // ./types.ts; these are the ORM's own view of a row.
 export type UserRow = typeof users.$inferSelect
+export type FormRow = typeof forms.$inferSelect
+export type UserFormRow = typeof userForms.$inferSelect
 export type LineRow = typeof lines.$inferSelect
 export type OrderRow = typeof orders.$inferSelect
 export type ItemRow = typeof items.$inferSelect

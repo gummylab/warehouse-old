@@ -4,9 +4,12 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { ArrowUpDownIcon } from 'lucide-react'
 
 import { type DataTableFeatures } from '@/components/data-table/data-table-features'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { type RegisterUser } from '@/lib/db/types'
+import { formById } from '@/lib/forms/registry'
 
+import { FormEditButton } from './form-edit-button'
 import { RevokeButton } from './revoke-button'
 import { UserAvatar } from './user-avatar'
 
@@ -61,23 +64,49 @@ export const requestedAtColumn = columnHelper.accessor('requestedAt', {
 // text-left default so the label centers over the column content.
 export const actionsHeader = <div className="text-center">จัดการ</div>
 
+// The grant set at a glance: one badge per form with its full page title.
+// The column is not sortable or filterable: the set is small, and the search
+// box already covers the only thing an operator types here (a name).
+export const formsColumn = columnHelper.display({
+  id: 'forms',
+  header: 'ฟอร์ม',
+  cell: ({ row }) =>
+    row.original.formIds.length === 0 ? (
+      <span className="text-sm text-muted-foreground">ยังไม่มีฟอร์ม</span>
+    ) : (
+      <div className="flex flex-wrap gap-1">
+        {row.original.formIds.map((id) => (
+          <Badge key={id} variant="secondary">
+            {formById(id)?.label ?? id}
+          </Badge>
+        ))}
+      </div>
+    ),
+})
+
 const actionsColumn = columnHelper.display({
   id: 'actions',
   // Renderer function: TanStack's header type rejects a bare Element.
   header: () => actionsHeader,
   cell: ({ row }) => (
-    <div className="flex justify-center">
-      {/* Single action per row: a direct button beats a dropdown (one click,
-          same rule the pending queue follows); the confirm dialog lives in
-          the button. */}
+    <div className="flex justify-center gap-2">
+      {/* Two direct buttons beat a dropdown (one click each, same rule the
+          pending queue follows); the destructive one keeps its confirm
+          dialog, the edit one its form picker. */}
+      <FormEditButton
+        id={row.original.id}
+        displayName={row.original.displayName}
+        formIds={row.original.formIds}
+      />
       <RevokeButton id={row.original.id} displayName={row.original.displayName} />
     </div>
   ),
 })
 
-// Approved users table: profile + request date + revoke action.
+// Approved users table: profile + request date + granted forms + actions.
 export const columns = columnHelper.columns([
   profileColumn,
   requestedAtColumn,
+  formsColumn,
   actionsColumn,
 ])

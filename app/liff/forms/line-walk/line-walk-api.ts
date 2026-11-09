@@ -6,6 +6,7 @@ import type {
   LineWalkRecord,
   LineWalkShift,
 } from '@/lib/db/types'
+import { notifyFormAccessRevoked } from '@/lib/toast'
 
 import { postJson, type LiffToken } from '../../liff-session-context'
 
@@ -36,6 +37,10 @@ async function request<T>(
     response = await fetch(path, init).catch(() => null)
   }
   if (!response) return { ok: false, status: 0, error: 'network-error' }
+
+  // Approval passed but the grant is gone: the admin removed this form while
+  // the user was on it. Offer the way back; the inline error also says why.
+  if (response.status === 403) notifyFormAccessRevoked()
 
   const data = (await response.json().catch(() => null)) as
     | (T & { error?: string })
@@ -98,6 +103,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'invalid-entries': 'รายการไม่ถูกต้อง',
 }
 
-export function errorMessage(code: string): string {
+export function errorMessage(code: string, status = 0): string {
+  // A 403 with 'unauthorized' is the grant check, not an expired session.
+  if (code === 'unauthorized' && status === 403) {
+    return 'คุณไม่มีสิทธิ์ใช้แบบฟอร์มนี้แล้ว'
+  }
   return ERROR_MESSAGES[code] ?? ERROR_MESSAGES['unknown-error']
 }

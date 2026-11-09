@@ -4,11 +4,12 @@ import { cache } from 'react'
 
 import { randomUUID } from 'node:crypto'
 
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { io } from 'next/cache'
 
+import { normalizeFormIds } from '../forms/registry'
 import { getOrm } from './index'
-import { users } from './schema'
+import { forms, userForms, users } from './schema'
 import type { RegisterUser } from './types'
 
 export type { RegisterUser } from './types'
@@ -46,8 +47,44 @@ type UserRow = {
 // exercise (cacheLife() throws outside a use-cache scope).
 export async function listUsers(): Promise<RegisterUser[]> {
   await io()
-  const rows = getOrm().select(USER_COLUMNS).from(users).all()
-  return rows.map(toRegisterUser)
+  const orm = getOrm()
+  const rows = orm.select(USER_COLUMNS).from(users).all()
+  // One extra read for the whole list, grouped in JS: a per-user query would
+  // be N+1, and a join would force USER_COLUMNS to change shape.
+  const grants = readGrantsByUser()
+  return rows.map((row) => toRegisterUser(row, grants.get(row.id) ?? []))
+}
+
+// Form ids per user, in display order. Reads the forms table so a grant whose
+// form was retired can never reach a caller.
+function readGrantsByUser(): Map<string, string[]> {
+  const rows = getOrm()
+    .select({ userId: userForms.userId, formId: userForms.formId })
+    .from(userForms)
+    .innerJoin(forms, eq(forms.id, userForms.formId))
+    .orderBy(asc(forms.sortOrder))
+    .all()
+
+  const byUser = new Map<string, string[]>()
+  for (const row of rows) {
+    const current = byUser.get(row.userId)
+    if (current) current.push(row.formId)
+    else byUser.set(row.userId, [row.formId])
+  }
+  return byUser
+}
+
+// The same list for one user. Used by the identity lookup every /api/liff
+// request goes through, so it stays a single indexed read.
+function readFormIds(userId: string): string[] {
+  return getOrm()
+    .select({ formId: userForms.formId })
+    .from(userForms)
+    .innerJoin(forms, eq(forms.id, userForms.formId))
+    .where(eq(userForms.userId, userId))
+    .orderBy(asc(forms.sortOrder))
+    .all()
+    .map((row) => row.formId)
 }
 
 // Used by the LIFF status endpoint. Sync and unaugmented: the caller has
@@ -58,7 +95,7 @@ function _getUserByLineId(lineUserId: string): RegisterUser | undefined {
     .from(users)
     .where(eq(users.lineUserId, lineUserId))
     .get()
-  return row ? toRegisterUser(row) : undefined
+  return row ? toRegisterUser(row, readFormIds(row.id)) : undefined
 }
 
 // Used by the LIFF request endpoint; identity fields come from the
@@ -74,6 +111,8 @@ export function createPendingUser(input: {
     avatarUrl: input.avatarUrl,
     status: 'pending',
     requestedAt: new Date().toISOString(),
+    // A request carries no grants; the admin picks them at approval.
+    formIds: [],
   }
   getOrm()
     .insert(users)
@@ -92,14 +131,55 @@ export function createPendingUser(input: {
 // Returns false when the row was already decided or does not exist, so the
 // caller can surface that instead of pretending the write succeeded. The
 // status = 'pending' guard makes a double-click on a queue button
-// idempotent.
-export function approvePendingUser(id: string, decidedAt: string): boolean {
-  const result = getOrm()
-    .update(users)
-    .set({ status: 'approved', decidedAt })
-    .where(and(eq(users.id, id), eq(users.status, 'pending')))
-    .run()
-  return result.changes > 0
+// idempotent. The status flip and its grants commit in one transaction: an
+// approval without the chosen form set would lose the admin's choice.
+export function approvePendingUser(
+  id: string,
+  decidedAt: string,
+  formIds: readonly string[],
+): boolean {
+  const grants = normalizeFormIds(formIds)
+  return getOrm().transaction((tx) => {
+    const result = tx
+      .update(users)
+      .set({ status: 'approved', decidedAt })
+      .where(and(eq(users.id, id), eq(users.status, 'pending')))
+      .run()
+    if (result.changes === 0) return false
+
+    if (grants.length > 0) {
+      tx.insert(userForms)
+        .values(grants.map((formId) => ({ userId: id, formId })))
+        .run()
+    }
+    return true
+  })
+}
+
+// Replaces the whole grant set from the approved table's edit dialog.
+// Replacement rather than merge: the dialog shows the complete set, so a form
+// that is no longer checked must lose its row. An empty set is valid and
+// means the user may open no form. Returns false when the row does not exist
+// or is not approved, which also keeps a pending row from gaining grants
+// through this path.
+export function setUserForms(id: string, formIds: readonly string[]): boolean {
+  const grants = normalizeFormIds(formIds)
+  return getOrm().transaction((tx) => {
+    const row = tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, id), eq(users.status, 'approved')))
+      .get()
+    if (!row) return false
+
+    tx.delete(userForms).where(eq(userForms.userId, id)).run()
+    if (grants.length > 0) {
+      tx.insert(userForms)
+        .values(grants.map((formId) => ({ userId: id, formId })))
+        .run()
+    }
+    return true
+  })
 }
 
 // Rejecting removes the request entirely (ADR 0003): the user simply sees
@@ -126,7 +206,7 @@ export function deleteApprovedUser(id: string): boolean {
   return result.changes > 0
 }
 
-function toRegisterUser(row: UserRow): RegisterUser {
+function toRegisterUser(row: UserRow, formIds: string[]): RegisterUser {
   return {
     id: row.id,
     displayName: row.displayName,
@@ -134,6 +214,7 @@ function toRegisterUser(row: UserRow): RegisterUser {
     avatarUrl: row.avatarUrl ?? undefined,
     status: row.status,
     requestedAt: row.requestedAt,
+    formIds,
   }
 }
 

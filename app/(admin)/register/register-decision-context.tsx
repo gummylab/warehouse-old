@@ -16,6 +16,10 @@ export type RegisterDecisionContextValue = {
   // Removes a row from the table it is in. The server's revalidated
   // payload replaces the optimistic rows once it arrives.
   removeUser: (id: string) => void
+  // Swaps a row's form badges before the server answers, so the edit dialog
+  // closes with the new set already visible. A refusal reverts the overlay
+  // and the base row comes back unchanged.
+  updateForms: (id: string, formIds: string[]) => void
   // Reports that a decision was refused. The message lives above the
   // table rather than next to the button, because the button unmounts
   // together with the row it removed.

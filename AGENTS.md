@@ -41,13 +41,22 @@ Data isolation is the part to understand before adding a test:
 
 ## Schema and database
 
-- `lib/db/schema.ts` is the single source of truth for the six tables, their indexes, unique indexes and CHECK constraints. The SQL under `drizzle/` is generated from it by `bun run db:generate` (`drizzle.config.ts` holds the dialect and paths), and the generated files are committed.
+- `lib/db/schema.ts` is the single source of truth for the eight tables, their indexes, unique indexes and CHECK constraints. The SQL under `drizzle/` is generated from it by `bun run db:generate` (`drizzle.config.ts` holds the dialect and paths), and the generated files are committed.
 - Changing a column or an index means editing `lib/db/schema.ts` and regenerating. Hand-editing the database or the SQL under `drizzle/` is not the workflow (ADR 0013). Constrained text columns carry a type-level `enum`, but the CHECK constraint in the SQL is what the file enforces.
 - `bun run build` runs `bun run db:check` before Next.js starts (`scripts/check-migrations.ts`): it fingerprints `drizzle/` by content, runs the generator, and fails when that changed the folder, because the migration was never generated. The generated file is left in the working tree. Content, not filename, is compared, since each migration gets a random suffix. stdin is closed and the child times out, so a rename prompt fails the build instead of hanging it; run `bun run db:generate` directly to answer that prompt.
-- `lib/db/index.ts` opens the file, sets the pragmas (WAL, `busy_timeout 5000`, `foreign_keys ON`), runs `migrate()` over `drizzle/`, then seeds the line catalog. `migrate()` takes the ORM instance, not the raw driver, because it runs through the dialect. If the migration throws, the handle is closed before the error is rethrown: a half-open handle locks the file on Windows and the next test file fails with EPERM.
+- `lib/db/index.ts` opens the file, sets the pragmas (WAL, `busy_timeout 5000`, `foreign_keys ON`), runs `migrate()` over `drizzle/`, then seeds the line catalog and the form catalog (`seedLines`, `seedForms`). `migrate()` takes the ORM instance, not the raw driver, because it runs through the dialect. If the migration throws, the handle is closed before the error is rethrown: a half-open handle locks the file on Windows and the next test file fails with EPERM.
 - `drizzle/` is read at runtime, so it must ship with the app. It resolves from `process.cwd()` under `next start`; a future standalone build would have to trace it into the output.
 - A database file created before ADR 0013 has no `__drizzle_migrations` table, so `migrate()` tries to create tables that already exist and fails. Copy the file aside and start from an empty one rather than patching it.
 - Data-layer modules query through `getOrm()`; `getDb()` stays for row counts and the rare direct query. Raw `sql` fragments remain where the builder falls short: `ESCAPE '\'` on LIKE, `substr(walk_date, 1, 7)` buckets, `count(*)`, correlated item counts and `ORDER BY rowid` in `listLines`.
+
+## Form permissions
+
+- An approved LINE user may open only the forms granted in `user_forms`. `forms` is the catalog, seeded from `lib/forms/registry.ts`; the registry also owns each form's path and reads its label from `PAGE_TITLES`, so a form's name lives in one place.
+- `seedForms` runs on every database open next to `seedLines`. It upserts changed sort orders and deletes a row the registry no longer ships; the FK cascade removes that form's grants with it, so a grant can never point at a page the app no longer has.
+- `/api/liff/status` answers `forms: string[]` (ids, `sort_order`). That one call feeds the LIFF session context, the gate and the hub. Local device mode answers every form (ADR 0004); a pending or unknown user answers `[]`.
+- Three layers enforce it (ADR 0017): the hub renders only the granted cards, `LiffGate` replaces a form path the user lacks with `/liff/forms` (the rule is pure and unit-tested in `lib/liff/form-access.ts`), and every form endpoint calls `authenticateFormRequest(request, formId)`. The session exchange stays at `authenticateApprovedRequest`: a cookie proves identity, never permission (ADR 0005, 0018).
+- `/register` picks the set in the approve dialog (`form-picker-dialog.tsx`, nothing ticked by default) and replaces it from the edit dialog. The data layer normalizes ids against the registry, so a forged id grants nothing. Zero forms is valid: the hub shows "ยังไม่ได้รับสิทธิ์แบบฟอร์ม".
+- Revoking deletes the user row and the cascade removes the grants. Removing a form from the registry retires its row on the next open, which removes its grants too.
 
 ## Uploads and storage
 

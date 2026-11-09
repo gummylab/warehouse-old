@@ -235,7 +235,7 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
     setSaving(false)
 
     if (!result.ok) {
-      setSaveError(errorMessage(result.error))
+      setSaveError(errorMessage(result.error, result.status))
       return
     }
     setSaved(result.data.entries)
