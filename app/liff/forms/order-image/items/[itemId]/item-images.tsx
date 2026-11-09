@@ -1,10 +1,9 @@
 'use client'
 
-import { startTransition, useEffect, useOptimistic, useRef, useState } from 'react'
+import { startTransition, useOptimistic, useState } from 'react'
 
 import {
   ChevronLeftIcon,
-  ChevronRightIcon,
   ImagePlusIcon,
   MoreVerticalIcon,
   Trash2Icon,
@@ -13,6 +12,7 @@ import {
 import { EmptyState } from '@/components/layout/empty-state'
 import { FormPage } from '@/components/layout/form-page'
 import { TileButton, TileGrid } from '@/components/layout/tile-grid'
+import { ImageGallery } from '@/components/order-images/image-gallery'
 import { Button, ButtonLink } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,6 +40,7 @@ import { toastMessages } from '@/lib/messages'
 import { formatThaiDate } from '@/lib/order-images/format'
 import { PACKAGE_OPTIONS } from '@/lib/order-images/packages'
 import { reduceImages } from '@/lib/order-images/tree'
+import { photoFileUrl } from '@/lib/order-images/urls'
 import { notifyError, notifySuccess } from '@/lib/toast'
 
 import { FormNavbar } from '../../../../form-navbar'
@@ -47,10 +48,11 @@ import { deleteImage, errorMessage, getItem, setImagePackage } from '../../order
 import { UploadDialog } from './upload-dialog'
 
 // The photo page for one item: a grid of photos plus the cell that adds the
-// next one. Tapping a photo opens the viewer, which shows the picture and
-// nothing else. Everything that changes a photo — the package label and the
-// delete — lives in the menu on its card. Mutations refetch this item
-// through the API, so the labels and counts on the cards are never stale.
+// next one. Tapping a photo opens the shared lightGallery viewer, which
+// walks the item's photos with a swipe, the arrow keys and a thumbnail
+// strip. Everything that changes a photo — the package label and the delete
+// — lives in the menu on its card. Mutations refetch this item through the
+// API, so the labels and counts on the cards are never stale.
 export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   const [detail, setDetail] = useState(initialDetail)
   const [error, setError] = useState<string | null>(null)
@@ -71,14 +73,12 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
   // The grid renders the preview, not the last server response, so a change
   // appears on the click and the response replaces the preview afterwards.
   const [optimisticImages, applyOptimistic] = useOptimistic(detail.images, reduceImages)
-  // Where the finger went down, for the swipe across the photo in the viewer.
-  // Touch only: a mouse drag over a picture is a selection, not a navigation.
-  const swipeStart = useRef<{ x: number; y: number } | null>(null)
 
-  const previewImage = optimisticImages.find((image) => image.id === previewImageId) ?? null
   const deletingImage = optimisticImages.find((image) => image.id === deletingImageId) ?? null
   // The viewer counts positions, not seq: seq is allocated as MAX(seq) + 1 per
   // item, so a delete leaves gaps and "รูปที่ 3 จาก 2" would make no sense.
+  // A photo that vanished from the list resolves to -1, which closes the
+  // viewer instead of showing a stale picture.
   const previewIndex = previewImageId
     ? optimisticImages.findIndex((image) => image.id === previewImageId)
     : -1
@@ -147,26 +147,6 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
       }
     })
   }
-
-  // Walking the viewer by one photo. The buttons, the arrow keys and the
-  // swipe all end up here, so the three ways to move cannot drift apart.
-  function stepPreview(delta: number) {
-    setPreviewImageId((currentId) => neighbourId(optimisticImages, currentId, delta))
-  }
-
-  // Arrow keys are the quickest way through the photos with a keyboard. The
-  // listener exists only while the viewer is open, and the update reads the
-  // latest list, so a refresh mid-view cannot move to a stale photo.
-  useEffect(() => {
-    if (previewImageId === null) return
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-      const delta = event.key === 'ArrowRight' ? 1 : -1
-      setPreviewImageId((currentId) => neighbourId(optimisticImages, currentId, delta))
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [previewImageId, optimisticImages])
 
   return (
     <FormPage
@@ -255,81 +235,16 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
         onUploadingChange={setUploading}
       />
 
-      {/* The viewer: the photo, then a bar to walk the item's photos. The
-          title stays for screen readers, so the dialog has a name without
-          putting text on screen. */}
-      <Dialog
-        open={previewImage !== null}
-        onOpenChange={(open) => {
-          if (!open) setPreviewImageId(null)
-        }}>
-        <DialogContent
-          className="gap-0 p-2 sm:max-w-3xl"
-          onTouchStart={(event) => {
-            const touch = event.touches[0]
-            swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
-          }}
-          onTouchEnd={(event) => {
-            const start = swipeStart.current
-            swipeStart.current = null
-            const touch = event.changedTouches[0]
-            if (!start || !touch) return
-            const dx = touch.clientX - start.x
-            const dy = touch.clientY - start.y
-            // A mostly vertical drag is the user scrolling, not a request for
-            // the next photo.
-            if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return
-            stepPreview(dx < 0 ? 1 : -1)
-          }}>
-          <DialogTitle className="sr-only">
-            {previewImage
-              ? `รูปที่ ${previewIndex + 1} จาก ${optimisticImages.length}`
-              : 'รูปภาพ'}
-          </DialogTitle>
-
-          {previewImage && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
-              <img
-                src={`/api/liff/order-images/images/${previewImage.id}/file?size=web`}
-                alt={`รูปที่ ${previewImage.seq}`}
-                width={1200}
-                height={900}
-                className="max-h-[80vh] w-full rounded-2xl bg-muted object-contain"
-              />
-
-              {/* One photo has nowhere to go, so the bar appears only when
-                  there is something to walk. 44px targets sit under the
-                  picture, where a thumb reaches and nothing covers the photo. */}
-              {optimisticImages.length > 1 && (
-                <div className="mt-1 flex items-center justify-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="size-11"
-                    aria-label="รูปก่อนหน้า"
-                    disabled={previewIndex <= 0}
-                    onClick={() => stepPreview(-1)}>
-                    <ChevronLeftIcon />
-                  </Button>
-                  <span className="min-w-12 text-center text-xs tabular-nums text-muted-foreground">
-                    {previewIndex + 1} / {optimisticImages.length}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    className="size-11"
-                    aria-label="รูปถัดไป"
-                    disabled={previewIndex >= optimisticImages.length - 1}
-                    onClick={() => stepPreview(1)}>
-                    <ChevronRightIcon />
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* The viewer. lightGallery owns the gestures, the arrow keys, the
+          focus trap and the thumbnail strip, so this screen only supplies
+          the photo list and keeps the open/position state. */}
+      <ImageGallery
+        photos={optimisticImages}
+        open={previewIndex >= 0}
+        index={previewIndex < 0 ? 0 : previewIndex}
+        onClose={() => setPreviewImageId(null)}
+        onIndexChange={(next) => setPreviewImageId(optimisticImages[next]?.id ?? null)}
+      />
 
       {/* Deleting a photo cannot be undone, so it gets its own confirmation
           instead of a button that fires on the first tap. */}
@@ -355,20 +270,6 @@ export function ItemImages({ initialDetail }: { initialDetail: ItemDetail }) {
       </Dialog>
     </FormPage>
   )
-}
-
-// A swipe has to be deliberate: a short drag is usually a slip while tapping.
-const SWIPE_THRESHOLD_PX = 40
-
-// The id `delta` photos away from `currentId`, or the same id at an edge, so a
-// swipe past the first or the last photo simply stays put.
-function neighbourId(
-  images: ImageRecord[],
-  currentId: string | null,
-  delta: number
-): string | null {
-  const at = images.findIndex((image) => image.id === currentId)
-  return at < 0 ? currentId : (images[at + delta]?.id ?? currentId)
 }
 
 // One photo as a card: the picture inside its own frame, the package label
@@ -401,7 +302,7 @@ function PhotoTile({
             fetch carries no session cookie and would be rejected 403. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- auth-gated src, see above */}
         <img
-          src={`/api/liff/order-images/images/${image.id}/file?size=thumb`}
+          src={photoFileUrl(image.id, 'thumb')}
           alt={`รูปที่ ${image.seq}`}
           width={400}
           height={400}
