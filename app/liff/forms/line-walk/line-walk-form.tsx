@@ -304,7 +304,8 @@ export function LineWalkForm({ lines }: { lines: string[] }) {
               variant="ghost"
               size="icon"
               aria-label="กลับไปหน้าแบบฟอร์ม"
-              href="/liff/forms">
+              href="/liff/forms"
+              onClick={resetForm}>
               <ChevronLeftIcon />
             </ButtonLink>
           }

@@ -79,6 +79,40 @@ test('starts fresh after leaving the success screen', async ({ page }) => {
   expect(consoleErrors).toEqual([])
 })
 
+// The route keeps its client state while it is hidden, so the navbar exit has
+// to clear it as well. "ตรวจสอบ" deliberately returns to the form with the
+// saved values in place for editing; without a reset on the way out, the next
+// visit would show them as if they had never been saved.
+test('starts fresh after leaving through the navbar back button', async ({
+  page,
+}) => {
+  const brand = `brand-${uniqueSuffix()}`
+  const consoleErrors = collectConsoleErrors(page)
+
+  await page.goto('/liff/forms/line-walk')
+
+  const first = page.getByRole('region', { name: 'รายการที่ 1' })
+  await fillKey(page, first, brand)
+  await first.getByLabel(/จำนวนคน/).fill('2')
+  await first.getByLabel(/ยอดสินค้า/).fill('20')
+  await page.getByRole('button', { name: 'บันทึกทั้งหมด' }).click()
+  await expect(page.getByText('บันทึกแล้ว 1 รายการ')).toBeVisible()
+
+  await page.getByRole('button', { name: 'ตรวจสอบ' }).click()
+  await expect(page.getByLabel(/ชื่อแบรนด์/)).toHaveValue(brand)
+
+  await page.getByRole('link', { name: 'กลับไปหน้าแบบฟอร์ม' }).click()
+  await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
+
+  await page.getByRole('link', { name: /บันทึกการเดินไลน์/ }).click()
+  await expect(page.getByLabel(/ชื่อแบรนด์/)).toHaveValue('')
+  // The counts only exist once a key is complete, so a fresh section has none.
+  await expect(page.getByLabel(/จำนวนคน/)).toHaveCount(0)
+  await expect(page.getByText('บันทึกแล้ว 1 รายการ')).toHaveCount(0)
+
+  expect(consoleErrors).toEqual([])
+})
+
 test('flags a duplicate key before saving', async ({ page }) => {  const brand = `brand-${uniqueSuffix()}`
   const consoleErrors = collectConsoleErrors(page)
 
