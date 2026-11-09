@@ -287,7 +287,7 @@ export function UploadDialog({
         {entries.length > 0 && (
           <ul className="flex flex-col gap-2">
             {entries.map((entry) => (
-              <li key={entry.key} className="flex items-center gap-2 rounded-xl border p-2">
+              <li key={entry.key} className="flex items-center gap-2 rounded-xl border p-2 overflow-hidden max-w-full">
                 {/* Thumbnail preview */}
                 <div className="relative size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
                   <img
@@ -303,7 +303,7 @@ export function UploadDialog({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{entry.file.name}</span>
+                  <span className="block truncate text-sm" title={entry.file.name}>{entry.file.name}</span>
                   {entry.status === 'uploading' && (
                     <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                       <div
@@ -313,7 +313,7 @@ export function UploadDialog({
                     </div>
                   )}
                   {(entry.status === 'error' || entry.status === 'rejected') && (
-                    <span className="text-xs text-destructive">{entry.error}</span>
+                    <span className="block truncate text-xs text-destructive">{entry.error}</span>
                   )}
                 </div>
 
