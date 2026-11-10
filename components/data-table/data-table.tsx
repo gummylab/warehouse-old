@@ -65,8 +65,9 @@ export function DataTable<TData extends RowData>({
   const rows = table.getRowModel().rows
 
   return (
-    // flex-1 lets the page stretch the table to the viewport bottom; pages
-    // must wrap it in a flex column for that to take effect.
+    // The table fills the available height (flex-1) so it extends down to the
+    // bottom of the page, but rows keep their natural height instead of
+    // stretching to fill it. The wrapper scrolls when content overflows.
     <div className="flex flex-1 flex-col gap-y-4">
       {(searchColumn || searchSlot) && (
         <div className="flex items-center justify-between gap-4">
@@ -89,12 +90,12 @@ export function DataTable<TData extends RowData>({
         <div className="flex flex-1 flex-col">{emptySlot}</div>
       ) : (
         <>
-          {/* flex-1 fills the leftover height; the data-slot variant passes h-full
-              down to shadcn's wrapper div, which className on <Table> cannot reach.
-              h-full makes the table distribute spare height across rows, so cells
-              get align-top! to pin content up top instead of floating mid-row. */}
-          <div className="flex-1 overflow-hidden rounded-md border *:data-[slot=table-container]:h-full">
-            <Table className="h-full">
+          {/* Rows keep their natural height instead of stretching to fill the viewport,
+              so a table with few rows no longer shows giant cells. The wrapper scrolls
+              when the content is taller than the available space. Cells stay
+              align-top so multi-line content stays pinned to the top of the row. */}
+          <div className="flex-1 overflow-auto rounded-md border">
+            <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
