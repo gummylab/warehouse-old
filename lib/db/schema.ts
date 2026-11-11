@@ -192,6 +192,7 @@ export const lineWalks = sqliteTable(
     createdBy: text('created_by').notNull(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    updatedBy: text('updated_by'),
   },
   (table) => [
     uniqueIndex('idx_line_walks_key').on(

@@ -11,6 +11,7 @@ import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { fillLineWalkTrend } from '../line-walks/trend'
 import { TREND_GRAINS, trendWindow } from '../trend'
 import { getOrm } from './index'
+import { safeRevalidateTag } from '../cache/revalidate'
 import { lineWalks, users } from './schema'
 import { escapeLike } from './sql'
 import type {
@@ -106,6 +107,7 @@ export function saveLineWalks(
           createdBy,
           createdAt: now,
           updatedAt: now,
+          updatedBy: createdBy,
         })
         .onConflictDoUpdate({
           target: [
@@ -121,6 +123,7 @@ export function saveLineWalks(
             people: entry.people,
             amount: entry.amount,
             updatedAt: now,
+            updatedBy: createdBy,
           },
         })
         .run()
@@ -136,17 +139,25 @@ export function saveLineWalks(
   )
 }
 
+export function deleteLineWalk(id: string): void {
+  getOrm().delete(lineWalks).where(eq(lineWalks.id, id)).run()
+  safeRevalidateTag('line-walks')
+}
+
 // The admin list row: the record plus the creator's display name. A row saved
 // on this machine has no users entry, so it falls back to the local label.
 function toListRow(
   row: typeof lineWalks.$inferSelect,
   creatorName: string | null,
 ): LineWalkListRow {
+  // Show the latest recorder: prefer updatedBy, fall back to createdBy for
+  // rows written before the column existed.
+  const recorder = row.updatedBy ?? row.createdBy
   return {
     ...toRecord(row),
     creatorName:
       creatorName ??
-      (row.createdBy === 'local-device' ? 'แอดมิน' : row.createdBy),
+      (recorder === 'local-device' ? 'แอดมิน' : recorder),
   }
 }
 
@@ -237,7 +248,13 @@ function _listLineWalks(
       creatorName: users.displayName,
     })
     .from(lineWalks)
-    .leftJoin(users, eq(users.lineUserId, lineWalks.createdBy))
+    .leftJoin(
+      users,
+      eq(
+        users.lineUserId,
+        sql`coalesce(${lineWalks.updatedBy}, ${lineWalks.createdBy})`,
+      ),
+    )
     .where(where)
     .orderBy(sql`${lineWalks.walkDate} DESC`, sql`${lineWalks.updatedAt} DESC`)
     .limit(pageSize)

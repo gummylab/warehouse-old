@@ -12,6 +12,8 @@ import {
   formatThaiDateTime,
 } from '@/lib/order-images/format'
 
+import { LineWalkActions } from './line-walk-actions'
+
 const SHIFT_LABEL: Record<LineWalkShift, string> = {
   day: 'กลางวัน',
   night: 'กลางคืน',
@@ -36,6 +38,7 @@ export function LineWalkTable({ rows }: { rows: LineWalkListRow[] }) {
             <TableHead className="hidden xl:table-cell">
               แก้ไขล่าสุด
             </TableHead>
+            <TableHead className="text-center">การจัดการ</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -59,6 +62,16 @@ export function LineWalkTable({ rows }: { rows: LineWalkListRow[] }) {
               </TableCell>
               <TableCell className="hidden xl:table-cell">
                 {formatThaiDateTime(row.updatedAt)}
+              </TableCell>
+              <TableCell className="text-center">
+                <LineWalkActions
+                  id={row.id}
+                  walkDate={row.walkDate}
+                  shift={row.shift}
+                  line={row.line}
+                  brand={row.brand}
+                  packStyle={row.packStyle}
+                />
               </TableCell>
             </TableRow>
           ))}

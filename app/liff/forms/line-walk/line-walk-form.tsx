@@ -99,14 +99,37 @@ function newSection(id: string): Section {
 // The line-walk form. Each section is one record keyed by date, shift, line,
 // brand and pack style; completing that key looks the record up, and saving
 // upserts every section in one request.
-export function LineWalkForm({ lines }: { lines: string[] }) {
+export function LineWalkForm({
+  lines,
+  initialSection,
+}: {
+  lines: string[]
+  initialSection?: {
+    walkDate?: string
+    shift?: LineWalkShift | null
+    line?: string | null
+    brand?: string
+    packStyle?: string
+  }
+}) {
   const { token } = useLiffSession()
   const mobile = useIsMobile()
   const nextId = useRef(2)
 
-  const [sections, setSections] = useState<Section[]>([
-    newSection('section-1'),
-  ])
+  const [sections, setSections] = useState<Section[]>(() => {
+    const base = newSection('section-1')
+    if (!initialSection) return [base]
+    return [
+      {
+        ...base,
+        walkDate: initialSection.walkDate ?? base.walkDate,
+        shift: initialSection.shift ?? base.shift,
+        line: initialSection.line ?? base.line,
+        brand: initialSection.brand ?? base.brand,
+        packStyle: initialSection.packStyle ?? base.packStyle,
+      },
+    ]
+  })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState<LineWalkRecord[] | null>(null)
