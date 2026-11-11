@@ -1,0 +1,1 @@
+ALTER TABLE `line_walks` ADD `updated_by` text;

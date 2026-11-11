@@ -15,6 +15,13 @@
       "when": 1794186188286,
       "tag": "0001_curious_shen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794356319158,
+      "tag": "0002_legal_marauders",
+      "breakpoints": true
     }
   ]
 }
