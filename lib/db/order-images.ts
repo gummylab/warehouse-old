@@ -98,7 +98,7 @@ function toOrderListRow(
     ...toOrder(row),
     itemCount,
     creatorName:
-      creatorName ?? (row.createdBy === 'local-device' ? 'เครื่องนี้' : null),
+      creatorName ?? (row.createdBy === 'local-device' ? 'แอดมิน' : null),
   }
 }
 

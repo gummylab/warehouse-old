@@ -52,7 +52,7 @@ async function OrderDetailData({ orderId }: { orderId: string }) {
 
   const creatorLabel =
     detail.order.createdBy === 'local-device'
-      ? 'เครื่องนี้'
+      ? 'แอดมิน'
       : (getUserByLineId(detail.order.createdBy)?.displayName ??
         detail.order.createdBy)
 

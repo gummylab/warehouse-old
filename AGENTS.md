@@ -81,7 +81,7 @@ Data isolation is the part to understand before adding a test:
 ## Layout architecture
 
 - `app/layout.tsx` (root) is intentionally thin: Kanit font, `TooltipProvider`, global metadata title template ("Warehouse Dashboard"), and the single `<Toaster />`. Do not add sidebar or header here.
-- `app/(admin)/layout.tsx` owns the dashboard chrome: `SidebarProvider` + `AppSidebar` + `AppHeader` + `PageBody` + `PageFooter`. `AppHeader` (`app/(admin)/app-header.tsx`) reads the pathname and renders the title through `getPageTitle`; the sidebar trigger lives there, not in the layout. Every admin page lives under `app/(admin)/`; the route group name does not appear in URLs.
+- `app/(admin)/layout.tsx` owns the dashboard chrome: `SidebarProvider` + `AppSidebar` + `AppHeader` + `PageBody`. `AppHeader` (`app/(admin)/app-header.tsx`) reads the pathname and renders the title through `getPageTitle`; the sidebar trigger lives there, not in the layout. Every admin page lives under `app/(admin)/`; the route group name does not appear in URLs.
 - Pages outside `(admin)` (currently `app/liff/authorization`) render without sidebar/header by design. `app/liff/layout.tsx` only provides the session provider and the gate; `app/liff/authorization/layout.tsx` centres its content and `app/liff/forms/layout.tsx` keeps the form routes top-aligned.
 - `lib/page-titles.ts` is the single source of truth for page titles, shared by `metadata.title` in each page and the header label (`app/(admin)/app-header.tsx` via `getPageTitle`). When adding a route: add its path key there, or the header falls back to the decoded last URL segment.
 - `components/app-sidebar.tsx` hardcodes nav links. Keep its `href`s in sync with the folders under `app/(admin)/` (a stale href silently 404s).

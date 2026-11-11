@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { PageBody } from '@/components/layout/page-body'
-import { PageFooter } from '@/components/layout/page-footer'
 import { SkipLink } from '@/components/layout/skip-link'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 
@@ -43,8 +42,6 @@ export default function AdminLayout({
             <AdminGate>{children}</AdminGate>
           </Suspense>
         </PageBody>
-
-        <PageFooter>โหมดเครื่องผู้ดูแลระบบ</PageFooter>
       </SidebarInset>
     </SidebarProvider>
   )

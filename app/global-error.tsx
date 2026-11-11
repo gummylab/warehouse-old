@@ -55,7 +55,7 @@ export default function GlobalError({
         <div style={styles.page}>
           <h1 style={styles.title}>เกิดข้อผิดพลาดที่ระบบ</h1>
           <p style={styles.description}>
-            กรุณาลองใหม่อีกครั้ง ถ้ายังพบปัญหาให้แจ้งผู้ดูแลระบบ
+            กรุณาลองใหม่อีกครั้ง ถ้ายังพบปัญหาให้แจ้งแอดมิน
           </p>
           {error.digest ? <p style={styles.reference}>รหัสอ้างอิง: {error.digest}</p> : null}
           <button type="button" onClick={() => retry()} style={styles.button}>

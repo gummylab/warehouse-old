@@ -16,7 +16,7 @@ test.describe('LIFF routing', () => {
     await expect(page).toHaveURL(/\/liff\/forms$/)
     await expect(page.getByRole('heading', { name: 'แบบฟอร์ม' })).toBeVisible()
     // The badge must be visible for as long as the session skipped LINE.
-    await expect(page.getByText('Admin')).toBeVisible()
+    await expect(page.getByText('แอดมิน')).toBeVisible()
 
     expect(consoleErrors).toEqual([])
   })
