@@ -372,7 +372,7 @@ test('refuses the admin page when the request came through Cloudflare', async ({
 
   expect(response.ok()).toBe(true)
   expect(await response.text()).toContain(
-    'หน้านี้เปิดได้จากเครื่องของผู้ดูแลระบบเท่านั้น',
+    'หน้านี้เปิดได้เฉพาะเครื่องของแอดมินเท่านั้น',
   )
 })
 

@@ -19,7 +19,7 @@ export default async function AdminGate({ children }: { children: React.ReactNod
   if (!(await isLocalAdminRequest())) {
     return (
       <p className="text-sm text-muted-foreground">
-        หน้านี้เปิดได้จากเครื่องของผู้ดูแลระบบเท่านั้น
+        หน้านี้เปิดได้เฉพาะเครื่องของแอดมินเท่านั้น
       </p>
     )
   }

@@ -14,7 +14,7 @@ export function LocalDeviceBadge() {
       role="status"
       className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
     >
-      Admin
+      แอดมิน
     </span>
   )
 }

@@ -214,7 +214,7 @@ describe('listOrders', () => {
 
   it('labels a local-device creator instead of exposing the raw marker', () => {
     newOrder('B-2', ORDER_DATE, 'local-device')
-    expect(listOrders(filters()).rows[0].creatorName).toBe('เครื่องนี้')
+    expect(listOrders(filters()).rows[0].creatorName).toBe('แอดมิน')
   })
 
   it('filters by order number, line and date range', () => {

@@ -33,6 +33,6 @@ export async function isLocalAdminRequest(): Promise<boolean> {
 // describing the rule to someone probing the endpoint.
 export async function requireLocalAdminRequest(): Promise<void> {
   if (!(await isLocalAdminRequest())) {
-    throw new Error('คำขอนี้มาจากเครื่องอื่นที่ไม่ใช่เครื่องของผู้ดูแลระบบ')
+    throw new Error('คำขอนี้ไม่ได้มาจากเครื่องของแอดมิน')
   }
 }

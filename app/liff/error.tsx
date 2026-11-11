@@ -24,7 +24,7 @@ export default function LiffError({
     <StateScreen
       tone="error"
       title="เกิดข้อผิดพลาด"
-      description="กรุณาลองใหม่อีกครั้ง หากยังไม่ได้ ให้แจ้งผู้ดูแลระบบ"
+      description="กรุณาลองใหม่อีกครั้ง หากยังไม่ได้ ให้แจ้งแอดมิน"
       reference={error.digest}
       actions={
         <>
